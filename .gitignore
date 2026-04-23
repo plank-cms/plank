@@ -18,6 +18,9 @@ packages/core/public/dist/
 # Uploads (local media provider)
 packages/core/public/uploads/
 
+# Generated schema files (user data, not part of the package)
+plank-schemas/
+
 # Logs
 *.log
 npm-debug.log*

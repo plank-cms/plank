@@ -1,33 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { pool, createId } from '@plank/db'
 import type { ContentType } from './types.js'
-
-function schemasDir(): string {
-  return process.env.PLANK_SCHEMAS_DIR ?? join(process.cwd(), 'plank-schemas')
-}
-
-function schemaPath(slug: string): string {
-  return join(schemasDir(), `${slug}.json`)
-}
-
-async function ensureSchemasDir(): Promise<void> {
-  await mkdir(schemasDir(), { recursive: true })
-}
-
-// ── Disk ─────────────────────────────────────────────────────────────────────
-
-async function writeToDisk(contentType: ContentType): Promise<void> {
-  await ensureSchemasDir()
-  await writeFile(schemaPath(contentType.slug), JSON.stringify(contentType, null, 2), 'utf8')
-}
-
-async function readFromDisk(slug: string): Promise<ContentType> {
-  const raw = await readFile(schemaPath(slug), 'utf8')
-  return JSON.parse(raw) as ContentType
-}
-
-// ── Database ──────────────────────────────────────────────────────────────────
 
 type ContentTypeRow = {
   id: string
@@ -53,8 +25,6 @@ function rowToContentType(row: ContentTypeRow): ContentType {
   }
 }
 
-// ── Public CRUD ───────────────────────────────────────────────────────────────
-
 export async function findAllContentTypes(): Promise<ContentType[]> {
   const { rows } = await pool.query<ContentTypeRow>(
     'SELECT * FROM plank_content_types ORDER BY name',
@@ -77,9 +47,7 @@ export async function saveContentType(contentType: ContentType): Promise<Content
      RETURNING *`,
     [createId(), contentType.name, contentType.slug, contentType.tableName, JSON.stringify(contentType.fields)],
   )
-  const saved = rowToContentType(rows[0])
-  await writeToDisk(saved)
-  return saved
+  return rowToContentType(rows[0])
 }
 
 export async function updateContentType(
@@ -93,9 +61,7 @@ export async function updateContentType(
      RETURNING *`,
     [contentType.name, JSON.stringify(contentType.fields), slug],
   )
-  const updated = rowToContentType(rows[0])
-  await writeToDisk(updated)
-  return updated
+  return rowToContentType(rows[0])
 }
 
 export async function setDefaultContentType(slug: string): Promise<ContentType> {
@@ -109,9 +75,7 @@ export async function setDefaultContentType(slug: string): Promise<ContentType> 
     )
     if (!rows[0]) throw new Error(`Content type "${slug}" not found`)
     await client.query('COMMIT')
-    const updated = rowToContentType(rows[0])
-    await writeToDisk(updated)
-    return updated
+    return rowToContentType(rows[0])
   } catch (err) {
     await client.query('ROLLBACK')
     throw err
@@ -122,7 +86,4 @@ export async function setDefaultContentType(slug: string): Promise<ContentType> 
 
 export async function deleteContentType(slug: string): Promise<void> {
   await pool.query('DELETE FROM plank_content_types WHERE slug = $1', [slug])
-  // Disk file kept intentionally as a backup — core handles removal if needed.
 }
-
-export { readFromDisk as readContentTypeFromDisk }
