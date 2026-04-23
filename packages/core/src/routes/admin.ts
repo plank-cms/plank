@@ -17,7 +17,7 @@ import {
   deleteEntry,
   patchEntryStatus,
 } from '../controllers/entries.js'
-import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar } from '../controllers/users.js'
+import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar, deleteAvatar } from '../controllers/users.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
 import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
 import { uploadMedia, listMedia, deleteMedia, getMediaUrl } from '../controllers/media.js'
@@ -49,6 +49,7 @@ router.get('/users/me', getMe)
 router.patch('/users/me', updateMe)
 router.patch('/users/me/password', changePassword)
 router.post('/users/me/avatar', upload.single('file'), uploadAvatar)
+router.delete('/users/me/avatar', deleteAvatar)
 
 // Roles
 router.get('/roles', authorize('users:read'), listRoles)

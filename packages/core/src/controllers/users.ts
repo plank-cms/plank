@@ -77,16 +77,30 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
   }
 
   const provider = await getProvider()
-  const { url, key } = await provider.upload(req.file, { prefix: 'avatars' })
+  const { key } = await provider.upload(req.file, { prefix: 'avatars' })
 
   const { rows } = await pool.query<UserRow>(
     `UPDATE plank_users SET avatar_url = $1 WHERE id = $2
      RETURNING id, email, role_id, first_name, last_name, avatar_url, created_at`,
-    [url, req.user!.id],
+    [key, req.user!.id],
   )
 
   const avatarUrl = await provider.getUrl(key)
   res.json({ avatarUrl, user: await resolveAvatarUrl(rows[0]) })
+}
+
+export async function deleteAvatar(req: Request, res: Response): Promise<void> {
+  const { rows } = await pool.query<UserRow>(
+    'SELECT avatar_url FROM plank_users WHERE id = $1',
+    [req.user!.id],
+  )
+  const current = rows[0]?.avatar_url
+  if (current && !current.startsWith('http')) {
+    const provider = await getProvider()
+    await provider.delete(current).catch(() => { /* file may already be gone */ })
+  }
+  await pool.query('UPDATE plank_users SET avatar_url = NULL WHERE id = $1', [req.user!.id])
+  res.status(204).end()
 }
 
 export async function changePassword(req: Request, res: Response): Promise<void> {
