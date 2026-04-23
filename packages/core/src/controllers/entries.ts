@@ -87,10 +87,29 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
   if (!ct) { res.status(404).json({ error: 'Content type not found' }); return }
 
   assertSafeIdentifier(ct.tableName)
-  const { rows } = await pool.query(
-    `UPDATE ${ct.tableName} SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-    [status, req.params.id],
-  )
+
+  let sql: string
+  let values: unknown[]
+
+  if (status === 'published') {
+    // Snapshot current working-area fields into published_data
+    const excludedCols = ["'id'", "'status'", "'published_data'", "'created_at'", "'updated_at'"]
+    const stripExpr = excludedCols.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)
+    sql = `
+      UPDATE ${ct.tableName} SET
+        status = 'published',
+        published_data = (SELECT ${stripExpr} FROM ${ct.tableName} t WHERE t.id = $1),
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `
+    values = [req.params.id]
+  } else {
+    sql = `UPDATE ${ct.tableName} SET status = 'draft', published_data = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`
+    values = [req.params.id]
+  }
+
+  const { rows } = await pool.query(sql, values)
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
   res.json(rows[0])

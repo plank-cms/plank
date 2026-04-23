@@ -19,7 +19,10 @@ type ContentType = {
   fields: FieldDef[]
 }
 
-type Entry = Record<string, unknown> & { status?: 'draft' | 'published' }
+type Entry = Record<string, unknown> & {
+  status?: 'draft' | 'published'
+  published_data?: Record<string, unknown> | null
+}
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
@@ -39,6 +42,8 @@ export function EntryForm() {
 
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
+  // True when working area has been saved but not yet published
+  const [isPublishedStale, setIsPublishedStale] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const original = useRef<string>('{}')
   const skipBlocker = useRef(false)
@@ -49,15 +54,26 @@ export function EntryForm() {
       ct?.fields.forEach((f) => { empty[f.name] = f.type === 'boolean' ? false : '' })
       setValues(empty)
       setStatus('draft')
+      setIsPublishedStale(false)
       original.current = JSON.stringify(empty)
       return
     }
     if (!existing || !ct) return
+
     const initial: Record<string, unknown> = {}
     ct.fields.forEach((f) => { initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '') })
     setValues(initial)
     setStatus(existing.status ?? 'draft')
     original.current = JSON.stringify(initial)
+
+    // Detect if working area differs from the published snapshot
+    if (existing.status === 'published' && existing.published_data) {
+      const snap: Record<string, unknown> = {}
+      ct.fields.forEach((f) => { snap[f.name] = existing.published_data![f.name] ?? (f.type === 'boolean' ? false : '') })
+      setIsPublishedStale(JSON.stringify(initial) !== JSON.stringify(snap))
+    } else {
+      setIsPublishedStale(false)
+    }
   }, [existing, ct, isNew])
 
   const isDirty = JSON.stringify(values) !== original.current
@@ -95,6 +111,8 @@ export function EntryForm() {
   async function handleSaveDraft() {
     const saved = await saveFields()
     if (!saved) return
+    // Working area updated — published snapshot is now stale (if entry was published)
+    if (status === 'published') setIsPublishedStale(true)
     if (isNew) {
       skipBlocker.current = true
       navigate(`/content/${slug}/${saved.id}`, { replace: true })
@@ -102,24 +120,24 @@ export function EntryForm() {
   }
 
   async function handlePublish() {
-    const saved = await saveFields()
-    if (!saved) return
+    if (!slug) return
 
-    const entryId = isNew ? (saved.id as string) : id!
-    if (isNew) {
-      skipBlocker.current = true
+    // Save working area first if there are changes (or if it's a new entry)
+    let entryId = id
+    if (isDirty || isNew) {
+      const saved = await saveFields()
+      if (!saved) return
+      entryId = isNew ? (saved.id as string) : id!
+      if (isNew) skipBlocker.current = true
     }
 
     try {
       await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'published' })
       setStatus('published')
-      if (isNew) {
-        navigate(`/content/${slug}/${entryId}`, { replace: true })
-      }
+      setIsPublishedStale(false)
+      if (isNew) navigate(`/content/${slug}/${entryId}`, { replace: true })
     } catch {
-      if (isNew) {
-        navigate(`/content/${slug}/${entryId}`, { replace: true })
-      }
+      if (isNew && entryId) navigate(`/content/${slug}/${entryId}`, { replace: true })
     }
   }
 
@@ -128,6 +146,7 @@ export function EntryForm() {
     try {
       await requestStatus(`/cms/admin/entries/${slug}/${id}/status`, 'PATCH', { status: 'draft' })
       setStatus('draft')
+      setIsPublishedStale(false)
     } catch {
       // surfaced by useApi
     }
@@ -146,6 +165,9 @@ export function EntryForm() {
 
   const loading = loadingCt || (!isNew && loadingEntry)
   const busy = saving || patching
+
+  // "Publish" is available when: there's something new to publish
+  const canPublish = isDirty || status === 'draft' || isPublishedStale
 
   if (loading) {
     return (
@@ -168,7 +190,9 @@ export function EntryForm() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={status === 'published' ? 'default' : 'secondary'}>
-            {status === 'published' ? 'Published' : 'Draft'}
+            {status === 'published'
+              ? isPublishedStale ? 'Published (pending changes)' : 'Published'
+              : 'Draft'}
           </Badge>
           {!isNew && (
             <Button
@@ -191,8 +215,8 @@ export function EntryForm() {
             {saving ? <Spinner className="size-4" /> : null}
             Save draft
           </Button>
-          <Button onClick={handlePublish} disabled={(!isDirty && status === 'published') || busy}>
-            {saving || patching ? <Spinner className="size-4" /> : null}
+          <Button onClick={handlePublish} disabled={!canPublish || busy}>
+            {busy ? <Spinner className="size-4" /> : null}
             Publish
           </Button>
         </div>

@@ -18,9 +18,10 @@ export async function createTable(contentType: ContentType): Promise<void> {
     `CREATE TABLE IF NOT EXISTS ${contentType.tableName} (`,
     `  id         TEXT PRIMARY KEY,`,
     ...columns.map((col) => `  ${col},`),
-    `  status     VARCHAR(20) NOT NULL DEFAULT 'draft',`,
-    `  created_at TIMESTAMP NOT NULL DEFAULT NOW(),`,
-    `  updated_at TIMESTAMP NOT NULL DEFAULT NOW()`,
+    `  status         VARCHAR(20) NOT NULL DEFAULT 'draft',`,
+    `  published_data JSONB,`,
+    `  created_at     TIMESTAMP NOT NULL DEFAULT NOW(),`,
+    `  updated_at     TIMESTAMP NOT NULL DEFAULT NOW()`,
     `)`,
   ].join('\n')
 
