@@ -110,7 +110,7 @@ export function AccountCard() {
                 disabled={uploadingAvatar || deletingAvatar}
                 title="Change avatar"
               >
-                <Avatar className="size-20">
+                <Avatar key={user?.avatarUrl ?? 'fallback'} className="size-20">
                   {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
                   <AvatarFallback className="text-xl">
                     {getInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? '')}

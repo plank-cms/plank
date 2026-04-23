@@ -84,7 +84,7 @@ function LayoutShell() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <Avatar className="size-8">
+                <Avatar key={user?.avatarUrl ?? 'fallback'} className="size-8">
                   {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
                   <AvatarFallback className="text-[11px]">
                     {user ? initials(user) : '??'}
