@@ -2,11 +2,46 @@ import type { RequestHandler } from 'express'
 import { pool } from '@plank/db'
 import { findContentTypeBySlug, assertSafeIdentifier } from '@plank/schema'
 import type { ContentType } from '@plank/schema'
+import { getProvider } from '../media/index.js'
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
 
 type Row = Record<string, unknown> & { published_data?: Record<string, unknown> | null }
+
+// Resolves media IDs to fresh URLs in-place across a list of serialized entries
+async function resolveMediaFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
+  const mediaFieldNames = ct.fields.filter((f) => f.type === 'media').map((f) => f.name)
+  if (mediaFieldNames.length === 0) return
+
+  const idSet = new Set<string>()
+  for (const entry of entries) {
+    for (const name of mediaFieldNames) {
+      const val = entry[name]
+      // Only resolve IDs (non-URL strings) — legacy URLs starting with http pass through
+      if (typeof val === 'string' && val && !val.startsWith('http')) idSet.add(val)
+    }
+  }
+  if (idSet.size === 0) return
+
+  const { rows } = await pool.query<{ id: string; provider_key: string }>(
+    'SELECT id, provider_key FROM plank_media WHERE id = ANY($1)',
+    [[...idSet]],
+  )
+
+  const provider = await getProvider()
+  const urlMap = new Map<string, string>()
+  await Promise.all(rows.map(async (r) => {
+    urlMap.set(r.id, await provider.getUrl(r.provider_key))
+  }))
+
+  for (const entry of entries) {
+    for (const name of mediaFieldNames) {
+      const val = entry[name]
+      if (typeof val === 'string' && urlMap.has(val)) entry[name] = urlMap.get(val)
+    }
+  }
+}
 
 // Builds an ordered response: id first, then CT fields in builder order, then system fields
 function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<string, unknown> {
@@ -66,6 +101,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   ])
 
   const data = rows.map((row) => serializeEntry(row, ct, statusParam))
+  await resolveMediaFields(data, ct)
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
 
@@ -87,5 +123,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   )
 
   if (!rows[0]) { res.status(404).json({ error: 'Not found' }); return }
-  res.json(serializeEntry(rows[0], ct, statusParam))
+  const entry = serializeEntry(rows[0], ct, statusParam)
+  await resolveMediaFields([entry], ct)
+  res.json(entry)
 }

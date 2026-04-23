@@ -29,6 +29,12 @@ const UpdateMeSchema = z.object({
 
 type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; created_at: Date }
 
+async function resolveAvatarUrl(row: UserRow): Promise<UserRow> {
+  if (!row.avatar_url || row.avatar_url.startsWith('http')) return row
+  const provider = await getProvider()
+  return { ...row, avatar_url: await provider.getUrl(row.avatar_url) }
+}
+
 export async function listUsers(_req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow>(
     'SELECT id, email, role_id, first_name, last_name, created_at FROM plank_users ORDER BY created_at DESC',
@@ -42,7 +48,7 @@ export async function getMe(req: Request, res: Response): Promise<void> {
     [req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
-  res.json(rows[0])
+  res.json(await resolveAvatarUrl(rows[0]))
 }
 
 export async function updateMe(req: Request, res: Response): Promise<void> {
@@ -61,7 +67,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
     [firstName ?? null, lastName ?? null, req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
-  res.json(rows[0])
+  res.json(await resolveAvatarUrl(rows[0]))
 }
 
 export async function uploadAvatar(req: Request, res: Response): Promise<void> {
@@ -80,7 +86,7 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
   )
 
   const avatarUrl = await provider.getUrl(key)
-  res.json({ avatarUrl, user: rows[0] })
+  res.json({ avatarUrl, user: await resolveAvatarUrl(rows[0]) })
 }
 
 export async function changePassword(req: Request, res: Response): Promise<void> {

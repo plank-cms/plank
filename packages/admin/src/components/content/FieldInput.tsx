@@ -42,7 +42,23 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const isImage = value && /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i.test(value)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  // value is either null, a legacy URL (starts with http), or a media ID (UUID)
+  const isLegacyUrl = typeof value === 'string' && value.startsWith('http')
+
+  useEffect(() => {
+    if (!value) { setPreviewUrl(null); return }
+    if (isLegacyUrl) { setPreviewUrl(value); return }
+    // It's a media ID — fetch a fresh URL
+    const token = localStorage.getItem('plank_token')
+    fetch(`/cms/admin/media/${value}/url`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
+      .then((data) => setPreviewUrl(data?.url ?? null))
+      .catch(() => setPreviewUrl(null))
+  }, [value, isLegacyUrl])
 
   async function handleFile(file: File) {
     setUploading(true)
@@ -57,8 +73,9 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
         body,
       })
       if (!res.ok) throw new Error('Upload failed.')
-      const data = (await res.json()) as { url: string }
-      onChange(data.url)
+      const data = (await res.json()) as { id: string; url: string }
+      setPreviewUrl(data.url)
+      onChange(data.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {
@@ -67,15 +84,24 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
     }
   }
 
+  const isImage = previewUrl && /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i.test(previewUrl)
+
   if (value) {
     return (
       <div className="relative w-full rounded-md border bg-muted/30 overflow-hidden">
-        {isImage ? (
-          <img src={value} alt="Media" className="max-h-72 w-full object-contain" />
+        {previewUrl ? (
+          isImage ? (
+            <img src={previewUrl} alt="Media" className="max-h-72 w-full object-contain" />
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <ImageIcon className="size-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground truncate">{previewUrl}</span>
+            </div>
+          )
         ) : (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <ImageIcon className="size-4 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground truncate">{value}</span>
+          <div className="flex items-center gap-2 px-3 py-2 text-muted-foreground">
+            <ImageIcon className="size-4 shrink-0" />
+            <span className="text-xs">Loading…</span>
           </div>
         )}
         <Button
@@ -83,7 +109,7 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
           size="icon"
           variant="secondary"
           className="absolute top-1.5 right-1.5 size-6"
-          onClick={() => onChange(null)}
+          onClick={() => { onChange(null); setPreviewUrl(null) }}
         >
           <XIcon className="size-3.5" />
         </Button>
