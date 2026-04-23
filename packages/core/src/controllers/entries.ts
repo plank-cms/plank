@@ -92,20 +92,20 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
   let values: unknown[]
 
   if (status === 'published') {
-    // Snapshot current working-area fields into published_data
-    const excludedCols = ["'id'", "'status'", "'published_data'", "'created_at'", "'updated_at'"]
+    const excludedCols = ["'id'", "'status'", "'published_data'", "'published_at'", "'created_at'", "'updated_at'"]
     const stripExpr = excludedCols.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)
     sql = `
       UPDATE ${ct.tableName} SET
         status = 'published',
         published_data = (SELECT ${stripExpr} FROM ${ct.tableName} t WHERE t.id = $1),
+        published_at = NOW(),
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `
     values = [req.params.id]
   } else {
-    sql = `UPDATE ${ct.tableName} SET status = 'draft', published_data = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`
+    sql = `UPDATE ${ct.tableName} SET status = 'draft', published_data = NULL, published_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`
     values = [req.params.id]
   }
 

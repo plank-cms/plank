@@ -1,27 +1,28 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { PlusIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { PlusIcon, PencilIcon, Trash2Icon, FileTextIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
-import { FileTextIcon } from 'lucide-react'
-
-type FieldDefinition = {
-  name: string
-  type: string
-  width?: string
-}
 
 type ContentType = {
   name: string
   slug: string
-  fields: FieldDefinition[]
+  fields: { name: string; type: string }[]
 }
 
-type Entry = Record<string, unknown>
+type Entry = Record<string, unknown> & {
+  id: string
+  status: 'draft' | 'published'
+  published_data: Record<string, unknown> | null
+  published_at: string | null
+  created_at: string
+  updated_at: string
+}
 
 type EntriesResponse = {
   data: Entry[]
@@ -30,14 +31,14 @@ type EntriesResponse = {
   limit: number
 }
 
-const DISPLAY_TYPES = new Set(['string', 'text', 'number', 'boolean', 'datetime', 'uid'])
-
-function formatValue(value: unknown, type: string): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (type === 'boolean') return value ? 'Yes' : 'No'
-  if (type === 'datetime') return new Date(value as string).toLocaleString()
-  const str = String(value)
-  return str.length > 48 ? str.slice(0, 48) + '…' : str
+function StatusBadge({ entry, fields }: { entry: Entry; fields: { name: string }[] }) {
+  if (entry.status === 'draft') {
+    return <Badge variant="outline">Draft</Badge>
+  }
+  const isStale = entry.published_data != null && fields.some(
+    (f) => JSON.stringify(entry[f.name]) !== JSON.stringify(entry.published_data![f.name])
+  )
+  return <Badge variant={isStale ? 'secondary' : 'default'}>Published</Badge>
 }
 
 export function EntriesList() {
@@ -53,8 +54,6 @@ export function EntriesList() {
   const { data: entries, loading: loadingEntries, refetch } = useFetch<EntriesResponse>(
     slug ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=20` : null
   )
-
-  const displayFields = (ct?.fields ?? []).filter((f) => DISPLAY_TYPES.has(f.type)).slice(0, 4)
 
   async function handleDelete() {
     if (!deletingId || !slug) return
@@ -73,6 +72,10 @@ export function EntriesList() {
   }
 
   if (!ct) return null
+
+  const fieldNames = new Set(ct.fields.map((f) => f.name))
+  const hasTitle = fieldNames.has('title')
+  const hasSlug = fieldNames.has('slug')
 
   const totalPages = Math.ceil((entries?.total ?? 0) / (entries?.limit ?? 20))
 
@@ -112,31 +115,37 @@ export function EntriesList() {
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
-                  {displayFields.map((f) => (
-                    <th key={f.name} className="px-4 py-3 text-left font-medium text-muted-foreground capitalize">
-                      {f.name.replace(/_/g, ' ')}
-                    </th>
-                  ))}
+                  {hasTitle && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>}
+                  {hasSlug && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Slug</th>}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published at</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {(entries?.data ?? []).map((entry) => (
-                  <tr key={String(entry.id)} className="group hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {String(entry.id).slice(0, 8)}…
-                    </td>
-                    {displayFields.map((f) => (
-                      <td key={f.name} className="px-4 py-3 text-muted-foreground">
-                        {formatValue(entry[f.name], f.type)}
+                  <tr key={entry.id} className="group hover:bg-muted/30 transition-colors">
+                    {hasTitle && (
+                      <td className="px-4 py-3 font-bold">
+                        {entry.title ? String(entry.title) : <span className="text-muted-foreground font-normal">—</span>}
                       </td>
-                    ))}
+                    )}
+                    {hasSlug && (
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {entry.slug ? String(entry.slug) : '—'}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-muted-foreground">
-                      {entry.created_at
-                        ? new Date(entry.created_at as string).toLocaleDateString()
+                      {new Date(entry.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {entry.published_at
+                        ? new Date(entry.published_at).toLocaleDateString()
                         : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge entry={entry} fields={ct.fields} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -149,7 +158,7 @@ export function EntriesList() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDeletingId(String(entry.id))}
+                          onClick={() => setDeletingId(entry.id)}
                           className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2Icon className="size-3.5" />
