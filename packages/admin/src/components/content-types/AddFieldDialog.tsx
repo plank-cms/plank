@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   TypeIcon,
   AlignLeftIcon,
@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import type { FieldCardData } from './FieldCard.tsx'
+import type { FieldCardData, MediaAllowedType } from './FieldCard.tsx'
 
 type FieldType = FieldCardData['type']
 type StringField = { name: string }
@@ -57,14 +57,22 @@ const TYPE_OPTIONS: TypeOption[] = [
   { type: 'relation', icon: LinkIcon,        label: 'Relation',      description: 'Link to another content type',     color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
 ]
 
+const MEDIA_TYPE_OPTIONS: { value: MediaAllowedType; label: string }[] = [
+  { value: 'image', label: 'Images' },
+  { value: 'video', label: 'Videos' },
+  { value: 'audio', label: 'Audio' },
+  { value: 'document', label: 'Documents' },
+]
+
 type ConfigState = {
   name: string
   required: boolean
   relatedTable: string
   targetField: string
+  allowedTypes: MediaAllowedType[]
 }
 
-const EMPTY_CONFIG: ConfigState = { name: '', required: false, relatedTable: '', targetField: '' }
+const EMPTY_CONFIG: ConfigState = { name: '', required: false, relatedTable: '', targetField: '', allowedTypes: [] }
 
 type Props = {
   open: boolean
@@ -83,9 +91,8 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
 
   const isEditing = Boolean(initialField)
 
-  // When the dialog opens for editing, pre-populate step 2 directly
-  function handleOpenChange(val: boolean) {
-    if (!val) {
+  useEffect(() => {
+    if (!open) {
       setSelected(null)
       setConfig(EMPTY_CONFIG)
       setNameError('')
@@ -99,8 +106,12 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
         required: initialField.required ?? false,
         relatedTable: initialField.relatedTable ?? '',
         targetField: initialField.targetField ?? '',
+        allowedTypes: initialField.allowedTypes ?? [],
       })
     }
+  }, [open, initialField])
+
+  function handleOpenChange(val: boolean) {
     onOpenChange(val)
   }
 
@@ -138,6 +149,7 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
       required: config.required || undefined,
       relatedTable: selected.type === 'relation' ? config.relatedTable : undefined,
       targetField: selected.type === 'uid' ? config.targetField : undefined,
+      allowedTypes: selected.type === 'media' && config.allowedTypes.length > 0 ? config.allowedTypes : undefined,
       width: initialField?.width ?? 'full',
     })
     handleOpenChange(false)
@@ -209,6 +221,32 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
               {nameError && <p className="text-xs text-destructive">{nameError}</p>}
               <p className="text-xs text-muted-foreground">Lowercase letters, digits and underscores. Must start with a letter.</p>
             </div>
+
+            {selected?.type === 'media' && (
+              <div className="flex flex-col gap-2">
+                <Label>Allowed file types</Label>
+                <p className="text-xs text-muted-foreground -mt-1">Leave all unchecked to allow any file type.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MEDIA_TYPE_OPTIONS.map(({ value, label }) => (
+                    <div key={value} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`media-type-${value}`}
+                        checked={config.allowedTypes.includes(value)}
+                        onCheckedChange={(checked) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            allowedTypes: checked
+                              ? [...prev.allowedTypes, value]
+                              : prev.allowedTypes.filter((t) => t !== value),
+                          }))
+                        }
+                      />
+                      <Label htmlFor={`media-type-${value}`} className="cursor-pointer font-normal">{label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {selected?.type === 'uid' && (
               <div className="flex flex-col gap-1.5">

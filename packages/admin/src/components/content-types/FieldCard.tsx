@@ -19,6 +19,8 @@ type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'dateti
 type NumberSubtype = 'integer' | 'float'
 export type FieldWidth = 'full' | 'half' | 'third'
 
+export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
+
 export type FieldCardData = {
   name: string
   type: FieldType
@@ -26,6 +28,7 @@ export type FieldCardData = {
   subtype?: NumberSubtype
   relatedTable?: string
   targetField?: string
+  allowedTypes?: MediaAllowedType[]
   width?: FieldWidth
 }
 

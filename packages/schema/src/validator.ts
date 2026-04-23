@@ -43,9 +43,13 @@ export function validate(
         }
         break
       case 'media':
+        if (typeof value !== 'string' || !value.trim()) {
+          errors.push(`Field "${field.name}" must be a non-empty string URL`)
+        }
+        break
       case 'relation':
-        if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-          errors.push(`Field "${field.name}" must be a positive integer ID`)
+        if (typeof value !== 'string' || !value.trim()) {
+          errors.push(`Field "${field.name}" must be a non-empty string ID`)
         }
         break
     }

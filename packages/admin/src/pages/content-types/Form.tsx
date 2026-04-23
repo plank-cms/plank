@@ -182,6 +182,9 @@ export function ContentTypeForm() {
         isNew ? 'POST' : 'PUT',
         body
       )
+      setName(saved.name)
+      setSlug(saved.slug)
+      setFields(saved.fields)
       original.current = { name: saved.name, slug: saved.slug, fields: JSON.stringify(saved.fields) }
       if (isNew || saved.slug !== routeSlug) {
         skipBlocker.current = true

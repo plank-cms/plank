@@ -22,6 +22,7 @@ const FieldSchema = z.object({
   subtype: z.enum(['integer', 'float']).optional(),
   relatedTable: z.string().optional(),
   targetField: z.string().optional(),
+  allowedTypes: z.array(z.enum(['image', 'video', 'audio', 'document'])).optional(),
   width: z.enum(['full', 'half', 'third']).optional(),
 })
 

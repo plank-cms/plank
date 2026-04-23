@@ -13,14 +13,17 @@ export type NumberSubtype = 'integer' | 'float'
 
 export type FieldWidth = 'full' | 'half' | 'third'
 
+export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
+
 export interface FieldDefinition {
   name: string
   type: FieldType
   required?: boolean
-  subtype?: NumberSubtype   // only for 'number'
-  relatedTable?: string     // only for 'relation'
-  targetField?: string      // only for 'uid' — source field to derive the slug from
-  width?: FieldWidth        // layout width in the entry editor
+  subtype?: NumberSubtype
+  relatedTable?: string
+  targetField?: string
+  allowedTypes?: MediaAllowedType[]
+  width?: FieldWidth
 }
 
 export interface ContentType {
