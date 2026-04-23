@@ -4,7 +4,9 @@ import { Textarea } from '@/components/ui/textarea.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { UploadIcon, XIcon, ImageIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon } from 'lucide-react'
 
 type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
 
@@ -38,11 +40,89 @@ function buildAccept(allowedTypes?: FieldDef['allowedTypes']): string {
   return allowedTypes.map((t) => ACCEPT_MAP[t]).join(',')
 }
 
+type MediaItem = { id: string; filename: string; url: string; mime_type: string | null }
+
+function isImageMime(mime: string | null) {
+  return mime?.startsWith('image/') ?? false
+}
+
+function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  allowedTypes?: FieldDef['allowedTypes']
+  onSelect: (item: MediaItem) => void
+}) {
+  const [items, setItems] = useState<MediaItem[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    const token = localStorage.getItem('plank_token')
+    fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((r) => r.ok ? r.json() as Promise<{ items: MediaItem[] }> : { items: [] })
+      .then((data) => setItems(data.items))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false))
+  }, [open])
+
+  const filtered = items.filter((item) => {
+    if (!allowedTypes || allowedTypes.length === 0) return true
+    const mime = item.mime_type ?? ''
+    return allowedTypes.some((t) => {
+      if (t === 'image') return mime.startsWith('image/')
+      if (t === 'video') return mime.startsWith('video/')
+      if (t === 'audio') return mime.startsWith('audio/')
+      if (t === 'document') return mime.startsWith('application/') || mime.startsWith('text/')
+      return false
+    })
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Media Library</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Spinner className="size-5" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">No media found.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 max-h-[60vh] overflow-y-auto pr-1">
+            {filtered.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => { onSelect(item); onOpenChange(false) }}
+                className="group relative aspect-square overflow-hidden rounded-md border bg-muted transition-colors hover:border-primary"
+              >
+                {isImageMime(item.mime_type) ? (
+                  <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-1 p-2">
+                    <FileIcon className="size-6 text-muted-foreground" />
+                    <span className="w-full truncate text-center text-[10px] text-muted-foreground">{item.filename}</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 rounded-md ring-2 ring-primary ring-offset-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              </button>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function MediaInput({ value, onChange, allowedTypes }: { value: string | null; onChange: (v: unknown) => void; allowedTypes?: FieldDef['allowedTypes'] }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   // value is either null, a legacy URL (starts with http), or a media ID (UUID)
   const isLegacyUrl = typeof value === 'string' && value.startsWith('http')
@@ -120,18 +200,38 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   return (
     <div>
       <input ref={inputRef} type="file" accept={buildAccept(allowedTypes)} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-      <button
-        type="button"
-        disabled={uploading}
-        onClick={() => inputRef.current?.click()}
+      <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
-        className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed py-4 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+        className="flex w-full gap-2 rounded-md border border-dashed p-3"
       >
-        <UploadIcon className="size-4" />
-        {uploading ? 'Uploading…' : 'Upload file'}
-      </button>
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+        >
+          <UploadIcon className="size-4" />
+          {uploading ? 'Uploading…' : 'Upload'}
+        </button>
+        <div className="w-px bg-border" />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => setPickerOpen(true)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+        >
+          <FolderOpenIcon className="size-4" />
+          Library
+        </button>
+      </div>
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        allowedTypes={allowedTypes}
+        onSelect={(item) => { setPreviewUrl(item.url); onChange(item.id) }}
+      />
     </div>
   )
 }
