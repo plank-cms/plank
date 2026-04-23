@@ -108,6 +108,9 @@ export function ContentTypeForm() {
 
   useEffect(() => {
     if (isNew) {
+      setName('')
+      setSlug('')
+      setFields([])
       original.current = { name: '', slug: '', fields: '[]' }
       return
     }
