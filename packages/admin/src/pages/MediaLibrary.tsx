@@ -92,7 +92,11 @@ export function MediaLibrary() {
         if (!res.ok) {
           const text = await res.text()
           let msg = 'Upload failed.'
-          try { msg = (JSON.parse(text) as { error?: string }).error ?? msg } catch { /* ignore */ }
+          try {
+            msg = (JSON.parse(text) as { error?: string }).error ?? msg
+          } catch {
+            /* ignore */
+          }
           throw new Error(msg)
         }
       }
@@ -125,7 +129,7 @@ export function MediaLibrary() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold">Media Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -146,9 +150,7 @@ export function MediaLibrary() {
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      {uploadError && (
-        <p className="mb-4 text-sm text-destructive">{uploadError}</p>
-      )}
+      {uploadError && <p className="mb-4 text-sm text-destructive">{uploadError}</p>}
 
       {loading ? (
         <div className="flex items-center gap-2 py-16 justify-center text-muted-foreground">
@@ -177,19 +179,26 @@ export function MediaLibrary() {
         </div>
       )}
 
-      <Dialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null) }}>
+      <Dialog
+        open={!!toDelete}
+        onOpenChange={(o) => {
+          if (!o) setToDelete(null)
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete file</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete{' '}
-            <span className="font-medium text-foreground">{toDelete?.filename}</span>?
-            This action cannot be undone.
+            <span className="font-medium text-foreground">{toDelete?.filename}</span>? This action
+            cannot be undone.
           </p>
           {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setToDelete(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setToDelete(null)}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete'}
             </Button>
