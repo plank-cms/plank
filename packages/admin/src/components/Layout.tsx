@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/context/auth.tsx'
 import { SecondaryPanelProvider, useSecondaryPanelContext } from '@/context/secondaryPanel.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,6 +85,7 @@ function LayoutShell() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="size-8">
+                  {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
                   <AvatarFallback className="text-[11px]">
                     {user ? initials(user) : '??'}
                   </AvatarFallback>
