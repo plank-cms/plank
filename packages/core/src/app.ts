@@ -23,9 +23,13 @@ app.use('/cms/admin', cmsCorOptions, adminRouter)
 // /api/* is public — any origin can consume it (headless CMS)
 app.use('/api', cors(), publicRouter)
 
-// Serve admin panel static files in production
+// Serve admin panel static files in production.
+// PLANK_ADMIN_DIST is set by the CLI in the distributed package (bundled context).
+// Fallback resolves to packages/core/public/admin in the monorepo.
 if (process.env.NODE_ENV === 'production') {
-  const adminDist = join(dirname(fileURLToPath(import.meta.url)), '../../admin/dist')
+  const adminDist =
+    process.env.PLANK_ADMIN_DIST ??
+    join(dirname(fileURLToPath(import.meta.url)), '../public/admin')
   app.use('/admin', express.static(adminDist))
 }
 
