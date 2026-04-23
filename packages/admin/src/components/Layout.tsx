@@ -85,7 +85,9 @@ function LayoutShell() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar key={user?.avatarUrl ?? 'fallback'} className="size-8">
-                  {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
+                  {user?.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />
+                  )}
                   <AvatarFallback className="text-[11px]">
                     {user ? initials(user) : '??'}
                   </AvatarFallback>
@@ -115,7 +117,7 @@ function LayoutShell() {
         </aside>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl w-full mx-auto px-4 py-3">
+          <div className="max-w-7xl w-full mx-auto px-4 py-3 mb-16">
             <Outlet />
           </div>
         </main>
