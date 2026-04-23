@@ -216,7 +216,7 @@ export function SettingsUsers() {
             Manage who has access to the admin panel.
           </p>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)}>
           <PlusIcon className="size-4" />
           New user
         </Button>

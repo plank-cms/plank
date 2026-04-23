@@ -389,7 +389,7 @@ export function EntriesList() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">{ct.name}</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)} className="gap-1.5">
+          <Button variant="outline" onClick={() => setConfigOpen(true)} className="gap-1.5">
             <Settings2Icon className="size-3.5" />
             Configure the view
           </Button>
@@ -486,11 +486,11 @@ export function EntriesList() {
             <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
               <span>{entries?.total} entries</span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
                   Previous
                 </Button>
                 <span>Page {page} of {totalPages}</span>
-                <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+                <Button variant="outline" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
                   Next
                 </Button>
               </div>

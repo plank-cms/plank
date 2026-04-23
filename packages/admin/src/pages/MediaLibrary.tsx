@@ -136,7 +136,7 @@ export function MediaLibrary() {
             {data ? `${data.total} file${data.total !== 1 ? 's' : ''}` : ''}
           </p>
         </div>
-        <Button size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+        <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
           {uploading ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
           {uploading ? 'Uploading…' : 'Upload'}
         </Button>

@@ -94,7 +94,7 @@ export function SettingsRoles() {
           </p>
         </div>
         {isSuperAdmin && (
-          <Button size="sm" variant="outline" onClick={() => setResetOpen(true)}>
+          <Button variant="outline" onClick={() => setResetOpen(true)}>
             <RotateCcwIcon className="size-4" />
             Reset defaults
           </Button>

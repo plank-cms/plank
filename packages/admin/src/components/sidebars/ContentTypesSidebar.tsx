@@ -48,7 +48,6 @@ export function ContentTypesSidebar() {
       <div className="border-t border-sidebar-border p-3">
         <Button
           variant="outline"
-          size="sm"
           className="w-full justify-start gap-2"
           onClick={() => navigate('/content-types/new')}
         >

@@ -140,7 +140,7 @@ export function SettingsApiTokens() {
             Manage tokens for consuming the public API.
           </p>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)}>
           <PlusIcon className="size-4" />
           New token
         </Button>
