@@ -186,14 +186,16 @@ export function EntryForm() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">{ct.name}</p>
-          <h1 className="text-2xl font-bold">{isNew ? 'New entry' : 'Edit entry'}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">{isNew ? 'New entry' : 'Edit entry'}</h1>
+            <Badge variant={status === 'published' ? 'default' : 'secondary'}>
+              {status === 'published'
+                ? isPublishedStale ? 'Published (pending changes)' : 'Published'
+                : 'Draft'}
+            </Badge>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={status === 'published' ? 'default' : 'secondary'}>
-            {status === 'published'
-              ? isPublishedStale ? 'Published (pending changes)' : 'Published'
-              : 'Draft'}
-          </Badge>
           {!isNew && (
             <Button
               variant="ghost"
