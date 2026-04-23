@@ -186,6 +186,7 @@ export function ContentTypeForm() {
       setSlug(saved.slug)
       setFields(saved.fields)
       original.current = { name: saved.name, slug: saved.slug, fields: JSON.stringify(saved.fields) }
+      window.dispatchEvent(new CustomEvent('plank:content-types-changed'))
       if (isNew || saved.slug !== routeSlug) {
         skipBlocker.current = true
         navigate(`/content-types/${saved.slug}`, { replace: true })
@@ -198,6 +199,7 @@ export function ContentTypeForm() {
   async function handleDelete() {
     try {
       await requestDelete(`/cms/admin/content-types/${routeSlug}`, 'DELETE')
+      window.dispatchEvent(new CustomEvent('plank:content-types-changed'))
       navigate('/content-types', { replace: true })
     } catch {
       // error surfaced by useApi

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { PlusIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useFetch } from '@/hooks/useFetch.ts'
@@ -13,7 +14,12 @@ type ContentType = {
 
 export function ContentTypesSidebar() {
   const navigate = useNavigate()
-  const { data, loading, error } = useFetch<ContentType[]>('/cms/admin/content-types')
+  const { data, loading, error, refetch } = useFetch<ContentType[]>('/cms/admin/content-types')
+
+  useEffect(() => {
+    window.addEventListener('plank:content-types-changed', refetch)
+    return () => window.removeEventListener('plank:content-types-changed', refetch)
+  }, [refetch])
 
   const items = (data ?? []).map((ct) => ({
     label: ct.name,
