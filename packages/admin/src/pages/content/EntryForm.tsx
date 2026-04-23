@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { FieldInput } from '@/components/content/FieldInput.tsx'
 import type { FieldDef } from '@/components/content/FieldInput.tsx'
@@ -18,7 +19,7 @@ type ContentType = {
   fields: FieldDef[]
 }
 
-type Entry = Record<string, unknown>
+type Entry = Record<string, unknown> & { status?: 'draft' | 'published' }
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
@@ -33,19 +34,21 @@ export function EntryForm() {
   )
 
   const { loading: saving, request } = useApi<Entry>()
+  const { loading: patching, request: requestStatus } = useApi<Entry>()
   const { loading: deleting, request: requestDelete } = useApi()
 
   const [values, setValues] = useState<Record<string, unknown>>({})
+  const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const original = useRef<string>('{}')
   const skipBlocker = useRef(false)
 
-  // Initialize form values
   useEffect(() => {
     if (isNew) {
       const empty: Record<string, unknown> = {}
       ct?.fields.forEach((f) => { empty[f.name] = f.type === 'boolean' ? false : '' })
       setValues(empty)
+      setStatus('draft')
       original.current = JSON.stringify(empty)
       return
     }
@@ -53,6 +56,7 @@ export function EntryForm() {
     const initial: Record<string, unknown> = {}
     ct.fields.forEach((f) => { initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '') })
     setValues(initial)
+    setStatus(existing.status ?? 'draft')
     original.current = JSON.stringify(initial)
   }, [existing, ct, isNew])
 
@@ -67,8 +71,8 @@ export function EntryForm() {
     setValues((prev) => ({ ...prev, [name]: value }))
   }
 
-  async function handleSave() {
-    if (!slug || !ct) return
+  async function saveFields(): Promise<Entry | null> {
+    if (!slug || !ct) return null
     const body: Record<string, unknown> = {}
     ct.fields.forEach((f) => {
       const v = values[f.name]
@@ -82,10 +86,48 @@ export function EntryForm() {
         body
       )
       original.current = JSON.stringify(values)
+      return saved
+    } catch {
+      return null
+    }
+  }
+
+  async function handleSaveDraft() {
+    const saved = await saveFields()
+    if (!saved) return
+    if (isNew) {
+      skipBlocker.current = true
+      navigate(`/content/${slug}/${saved.id}`, { replace: true })
+    }
+  }
+
+  async function handlePublish() {
+    const saved = await saveFields()
+    if (!saved) return
+
+    const entryId = isNew ? (saved.id as string) : id!
+    if (isNew) {
+      skipBlocker.current = true
+    }
+
+    try {
+      await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'published' })
+      setStatus('published')
       if (isNew) {
-        skipBlocker.current = true
-        navigate(`/content/${slug}/${saved.id}`, { replace: true })
+        navigate(`/content/${slug}/${entryId}`, { replace: true })
       }
+    } catch {
+      if (isNew) {
+        navigate(`/content/${slug}/${entryId}`, { replace: true })
+      }
+    }
+  }
+
+  async function handleRevertToDraft() {
+    if (!slug || !id) return
+    try {
+      await requestStatus(`/cms/admin/entries/${slug}/${id}/status`, 'PATCH', { status: 'draft' })
+      setStatus('draft')
     } catch {
       // surfaced by useApi
     }
@@ -103,6 +145,7 @@ export function EntryForm() {
   }
 
   const loading = loadingCt || (!isNew && loadingEntry)
+  const busy = saving || patching
 
   if (loading) {
     return (
@@ -121,9 +164,12 @@ export function EntryForm() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">{ct.name}</p>
-          <h1 className="text-2xl font-bold">{isNew ? 'New entry' : `Edit entry`}</h1>
+          <h1 className="text-2xl font-bold">{isNew ? 'New entry' : 'Edit entry'}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Badge variant={status === 'published' ? 'default' : 'secondary'}>
+            {status === 'published' ? 'Published' : 'Draft'}
+          </Badge>
           {!isNew && (
             <Button
               variant="ghost"
@@ -135,9 +181,19 @@ export function EntryForm() {
               <Trash2Icon className="size-4" />
             </Button>
           )}
-          <Button onClick={handleSave} disabled={!isDirty || saving}>
+          {!isNew && status === 'published' && (
+            <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
+              {patching ? <Spinner className="size-4" /> : null}
+              Revert to draft
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleSaveDraft} disabled={!isDirty || busy}>
             {saving ? <Spinner className="size-4" /> : null}
-            Save
+            Save draft
+          </Button>
+          <Button onClick={handlePublish} disabled={(!isDirty && status === 'published') || busy}>
+            {saving || patching ? <Spinner className="size-4" /> : null}
+            Publish
           </Button>
         </div>
       </div>

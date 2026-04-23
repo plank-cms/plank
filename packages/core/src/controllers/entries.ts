@@ -77,6 +77,25 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   res.json(rows[0])
 }
 
+export const patchEntryStatus: SlugIdParam = async (req, res) => {
+  const { status } = req.body as { status: unknown }
+  if (status !== 'draft' && status !== 'published') {
+    res.status(400).json({ error: 'status must be draft or published' }); return
+  }
+
+  const ct = await findContentTypeBySlug(req.params.slug)
+  if (!ct) { res.status(404).json({ error: 'Content type not found' }); return }
+
+  assertSafeIdentifier(ct.tableName)
+  const { rows } = await pool.query(
+    `UPDATE ${ct.tableName} SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [status, req.params.id],
+  )
+
+  if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
+  res.json(rows[0])
+}
+
 export const deleteEntry: SlugIdParam = async (req, res) => {
   const ct = await findContentTypeBySlug(req.params.slug)
   if (!ct) { res.status(404).json({ error: 'Content type not found' }); return }

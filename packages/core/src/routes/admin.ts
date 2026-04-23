@@ -15,6 +15,7 @@ import {
   createEntry,
   updateEntry,
   deleteEntry,
+  patchEntryStatus,
 } from '../controllers/entries.js'
 import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar } from '../controllers/users.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
@@ -40,6 +41,7 @@ router.get('/content-types/:slug/entries', authorize('entries:read'), listEntrie
 router.post('/content-types/:slug/entries', authorize('entries:write'), createEntry)
 router.get('/entries/:slug/:id', authorize('entries:read'), getEntry)
 router.put('/entries/:slug/:id', authorize('entries:write'), updateEntry)
+router.patch('/entries/:slug/:id/status', authorize('entries:write'), patchEntryStatus)
 router.delete('/entries/:slug/:id', authorize('entries:write'), deleteEntry)
 
 // Current user profile
