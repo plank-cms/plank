@@ -1,15 +1,26 @@
 {
-  "name": "@plank/cli",
+  "name": "@am25/plank-cms",
   "version": "0.1.0",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Headless CMS — plug and play",
   "bin": {
     "plank": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.9.1",
+    "@plank/core": "workspace:*",
+    "chalk": "^5.4.1",
+    "dotenv": "^16.5.0",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.3.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "tsup": "^8.5.0"
   }
 }
