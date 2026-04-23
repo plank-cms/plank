@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import { pool, createId } from '@plank/db'
 import { z, flattenError } from 'zod'
+import { getProvider } from '../media/index.js'
 
 const CreateUserSchema = z.object({
   email: z.email(),
@@ -26,7 +27,7 @@ const UpdateMeSchema = z.object({
   lastName: z.string().max(100).optional(),
 })
 
-type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; created_at: Date }
+type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; created_at: Date }
 
 export async function listUsers(_req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow>(
@@ -37,7 +38,7 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
 
 export async function getMe(req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, role_id, first_name, last_name, created_at FROM plank_users WHERE id = $1',
+    'SELECT id, email, role_id, first_name, last_name, avatar_url, created_at FROM plank_users WHERE id = $1',
     [req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
@@ -56,11 +57,30 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
     `UPDATE plank_users
      SET first_name = COALESCE($1, first_name), last_name = COALESCE($2, last_name)
      WHERE id = $3
-     RETURNING id, email, role_id, first_name, last_name, created_at`,
+     RETURNING id, email, role_id, first_name, last_name, avatar_url, created_at`,
     [firstName ?? null, lastName ?? null, req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
   res.json(rows[0])
+}
+
+export async function uploadAvatar(req: Request, res: Response): Promise<void> {
+  if (!req.file) {
+    res.status(400).json({ error: 'No file provided' })
+    return
+  }
+
+  const provider = await getProvider()
+  const { url, key } = await provider.upload(req.file, { prefix: 'avatars' })
+
+  const { rows } = await pool.query<UserRow>(
+    `UPDATE plank_users SET avatar_url = $1 WHERE id = $2
+     RETURNING id, email, role_id, first_name, last_name, avatar_url, created_at`,
+    [url, req.user!.id],
+  )
+
+  const avatarUrl = await provider.getUrl(key)
+  res.json({ avatarUrl, user: rows[0] })
 }
 
 export async function changePassword(req: Request, res: Response): Promise<void> {

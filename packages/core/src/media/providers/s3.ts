@@ -3,7 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { getSetting } from '../../lib/settings.js'
-import type { MediaProvider } from '../index.js'
+import type { MediaProvider, UploadOptions } from '../index.js'
 
 const SIGNED_URL_TTL = 3600 // 1 hour
 
@@ -33,13 +33,14 @@ function buildClient(cfg: Awaited<ReturnType<typeof getConfig>>) {
 }
 
 export const s3Provider: MediaProvider = {
-  async upload(file) {
+  async upload(file, options?: UploadOptions) {
     const cfg = await getConfig()
     const client = buildClient(cfg)
 
     const ext = extname(file.originalname)
     const filename = `${randomBytes(16).toString('hex')}${ext}`
-    const key = cfg.pathPrefix ? `${cfg.pathPrefix.replace(/\/$/, '')}/${filename}` : filename
+    const parts = [cfg.pathPrefix?.replace(/\/$/, ''), options?.prefix, filename].filter(Boolean)
+    const key = parts.join('/')
 
     await client.send(new PutObjectCommand({
       Bucket: cfg.bucket!,

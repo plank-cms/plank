@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '@/context/auth.tsx'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Card, CardHeader, CardTitle, CardContent, CardAction } from '@/components/ui/card.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible.tsx'
-import { PencilIcon, XIcon } from 'lucide-react'
+import { PencilIcon, XIcon, CameraIcon } from 'lucide-react'
 
-type MeResponse = { first_name: string | null; last_name: string | null }
+type MeResponse = { first_name: string | null; last_name: string | null; avatar_url: string | null }
+type AvatarResponse = { avatarUrl: string }
 
 function getInitials(firstName: string | null, lastName: string | null, email: string) {
   if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase()
@@ -21,6 +22,9 @@ function getInitials(firstName: string | null, lastName: string | null, email: s
 export function AccountCard() {
   const { user, updateUser } = useAuth()
   const { loading: saving, error: saveError, request } = useApi<MeResponse>()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   const [editing, setEditing] = useState(false)
   const [firstName, setFirstName] = useState(user?.firstName ?? '')
@@ -32,6 +36,31 @@ export function AccountCard() {
       setLastName(user?.lastName ?? '')
     }
     setEditing(!editing)
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    const token = localStorage.getItem('plank_token')
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/cms/admin/users/me/avatar', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      })
+      if (!res.ok) throw new Error('Upload failed.')
+      const data = (await res.json()) as AvatarResponse
+      updateUser({ avatarUrl: data.avatarUrl })
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
@@ -58,12 +87,28 @@ export function AccountCard() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 -mt-4">
-            <Avatar className="size-20">
-              <AvatarFallback className="text-xl">
-                {getInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? '')}
-              </AvatarFallback>
-            </Avatar>
+            <button
+              type="button"
+              className="group relative shrink-0"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              title="Change avatar"
+            >
+              <Avatar className="size-20">
+                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
+                <AvatarFallback className="text-xl">
+                  {getInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? '')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                {uploadingAvatar
+                  ? <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  : <CameraIcon className="size-5 text-white" />}
+              </div>
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             <div>
+              {avatarError && <p className="text-xs text-destructive mb-1">{avatarError}</p>}
               <p className="font-bold text-xl">
                 {user?.firstName || user?.lastName
                   ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()

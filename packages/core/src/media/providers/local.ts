@@ -2,7 +2,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { join, extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { getSetting } from '../../lib/settings.js'
-import type { MediaProvider } from '../index.js'
+import type { MediaProvider, UploadOptions } from '../index.js'
 
 async function uploadsDir(): Promise<string> {
   const fromSettings = await getSetting('media', 'local.uploads_dir')
@@ -15,13 +15,15 @@ async function publicUrl(): Promise<string> {
 }
 
 export const localProvider: MediaProvider = {
-  async upload(file) {
-    const dir = await uploadsDir()
-    await mkdir(dir, { recursive: true })
+  async upload(file, options?: UploadOptions) {
+    const base_dir = await uploadsDir()
+    const subdir = options?.prefix ? join(base_dir, options.prefix) : base_dir
+    await mkdir(subdir, { recursive: true })
 
     const ext = extname(file.originalname)
-    const key = `${randomBytes(16).toString('hex')}${ext}`
-    await writeFile(join(dir, key), file.buffer)
+    const filename = `${randomBytes(16).toString('hex')}${ext}`
+    const key = options?.prefix ? `${options.prefix}/${filename}` : filename
+    await writeFile(join(base_dir, key), file.buffer)
 
     const base = await publicUrl()
     return { url: `${base}/uploads/${key}`, key }

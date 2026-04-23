@@ -4,8 +4,12 @@ import { localProvider } from './providers/local.js'
 import { s3Provider } from './providers/s3.js'
 import { r2Provider } from './providers/r2.js'
 
+export interface UploadOptions {
+  prefix?: string
+}
+
 export interface MediaProvider {
-  upload(file: Express.Multer.File): Promise<{ url: string; key: string }>
+  upload(file: Express.Multer.File, options?: UploadOptions): Promise<{ url: string; key: string }>
   delete(key: string): Promise<void>
   getUrl(key: string): Promise<string>
 }
