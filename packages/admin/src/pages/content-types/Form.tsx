@@ -96,7 +96,6 @@ export function ContentTypeForm() {
   // Local form state
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
-  const [slugManual, setSlugManual] = useState(false)
   const [fields, setFields] = useState<FieldCardData[]>([])
 
   // Dialog state
@@ -115,7 +114,6 @@ export function ContentTypeForm() {
     if (!existing) return
     setName(existing.name)
     setSlug(existing.slug)
-    setSlugManual(true)
     setFields(existing.fields)
     original.current = {
       name: existing.name,
@@ -124,14 +122,13 @@ export function ContentTypeForm() {
     }
   }, [existing, isNew])
 
-  // Auto-derive slug from name unless manually edited
+  // Auto-derive slug from name (only for new CTs — existing slug is fixed)
   useEffect(() => {
-    if (!slugManual && name) setSlug(toSlug(name))
-  }, [name, slugManual])
+    if (isNew && name) setSlug(toSlug(name))
+  }, [isNew, name])
 
   const isDirty =
     name !== original.current.name ||
-    slug !== original.current.slug ||
     JSON.stringify(fields) !== original.current.fields
 
   // Ref that disables the blocker during a programmatic save+navigate.
@@ -228,22 +225,13 @@ export function ContentTypeForm() {
         <div className="flex flex-col gap-1.5">
           <input
             value={name}
-            onChange={(e) => {
-              setName(e.target.value)
-              setSlugManual(false)
-            }}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Content type name"
             className="bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/40"
           />
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-muted-foreground">API ID:</span>
-            <input
-              value={slug}
-              onChange={(e) => { setSlug(e.target.value); setSlugManual(true) }}
-              className="bg-transparent text-sm text-muted-foreground outline-none hover:text-foreground focus:text-foreground"
-              placeholder="slug"
-              spellCheck={false}
-            />
+            <span className="text-sm text-muted-foreground">{slug || '—'}</span>
           </div>
         </div>
 
