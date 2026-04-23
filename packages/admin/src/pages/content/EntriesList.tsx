@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { PlusIcon, PencilIcon, Trash2Icon, FileTextIcon } from 'lucide-react'
+import {
+  PlusIcon, PencilIcon, Trash2Icon, FileTextIcon, ImageIcon,
+  CheckIcon, Settings2Icon, ChevronUpIcon, ChevronDownIcon,
+  PlusCircleIcon, MinusCircleIcon, FileIcon,
+} from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -8,12 +12,15 @@ import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
 
-type ContentType = {
-  name: string
-  slug: string
-  fields: { name: string; type: string }[]
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
+
+type FieldDef = { name: string; type: FieldType }
+
+type ContentType = { name: string; slug: string; fields: FieldDef[] }
 
 type Entry = Record<string, unknown> & {
   id: string
@@ -24,35 +31,327 @@ type Entry = Record<string, unknown> & {
   updated_at: string
 }
 
-type EntriesResponse = {
-  data: Entry[]
-  total: number
-  page: number
-  limit: number
+type EntriesResponse = { data: Entry[]; total: number; page: number; limit: number }
+
+type ColSort = { field: string; dir: 'asc' | 'desc' }
+type ViewConfig = { visibleFields: string[]; sort: ColSort }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const DEFAULT_VISIBLE = 4
+const DEFAULT_SORT: ColSort = { field: 'created_at', dir: 'desc' }
+
+const SYSTEM_SORT_OPTIONS = [
+  { name: 'created_at', label: 'Created' },
+  { name: 'updated_at', label: 'Updated' },
+  { name: 'published_at', label: 'Published' },
+]
+
+function humanize(name: string) {
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function StatusBadge({ entry, fields }: { entry: Entry; fields: { name: string }[] }) {
-  if (entry.status === 'draft') {
-    return <Badge variant="outline">Draft</Badge>
+function loadViewConfig(slug: string, allFields: FieldDef[]): ViewConfig {
+  try {
+    const raw = localStorage.getItem(`plank_view_${slug}`)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<ViewConfig>
+      const visible = (parsed.visibleFields ?? []).filter((n) => allFields.some((f) => f.name === n))
+      return {
+        visibleFields: visible.length > 0 ? visible : allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
+        sort: parsed.sort ?? DEFAULT_SORT,
+      }
+    }
+  } catch {}
+  return { visibleFields: allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name), sort: DEFAULT_SORT }
+}
+
+function saveViewConfig(slug: string, config: ViewConfig) {
+  localStorage.setItem(`plank_view_${slug}`, JSON.stringify(config))
+}
+
+// ─── MediaThumbnail ───────────────────────────────────────────────────────────
+
+function MediaThumbnail({ value }: { value: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (value.startsWith('http')) {
+      setUrl(value)
+      return
+    }
+    const token = localStorage.getItem('plank_token')
+    fetch(`/cms/admin/media/${value}/url`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
+      .then((data) => setUrl(data?.url ?? null))
+      .catch(() => {})
+  }, [value])
+
+  if (!url) {
+    return <ImageIcon className="size-4 text-muted-foreground" />
   }
+
+  const isImage = /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i.test(url)
+  if (isImage) {
+    return <img src={url} alt="" className="size-8 rounded object-cover" />
+  }
+
+  return (
+    <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+      <FileIcon className="size-3.5 shrink-0" />
+      <span className="truncate max-w-30">File</span>
+    </span>
+  )
+}
+
+// ─── FieldCell ────────────────────────────────────────────────────────────────
+
+function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
+  if (value === null || value === undefined || value === '') {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  if (field.type === 'boolean') {
+    return value ? <CheckIcon className="size-4 text-primary" /> : <span className="text-muted-foreground">—</span>
+  }
+
+  if (field.type === 'datetime') {
+    const date = new Date(String(value))
+    return <span>{isNaN(date.getTime()) ? String(value) : date.toLocaleDateString()}</span>
+  }
+
+  if (field.type === 'number') {
+    return <span>{String(value)}</span>
+  }
+
+  if (field.type === 'media') {
+    return <MediaThumbnail value={String(value)} />
+  }
+
+  if (field.type === 'text' || field.type === 'richtext') {
+    const text = String(value)
+    return (
+      <span className="text-muted-foreground truncate max-w-50 block">
+        {text.length > 60 ? text.slice(0, 60) + '…' : text}
+      </span>
+    )
+  }
+
+  const text = String(value)
+  const isUid = field.type === 'uid'
+  return (
+    <span className={isUid ? 'font-mono text-xs text-muted-foreground truncate max-w-40 block' : 'font-medium truncate max-w-50 block'}>
+      {text.length > 60 ? text.slice(0, 60) + '…' : text}
+    </span>
+  )
+}
+
+// ─── StatusBadge ──────────────────────────────────────────────────────────────
+
+function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
+  if (entry.status === 'draft') return <Badge variant="outline">Draft</Badge>
   const isStale = entry.published_data != null && fields.some(
     (f) => JSON.stringify(entry[f.name]) !== JSON.stringify(entry.published_data![f.name])
   )
   return <Badge variant={isStale ? 'secondary' : 'default'}>Published</Badge>
 }
 
+// ─── ConfigureViewDialog ──────────────────────────────────────────────────────
+
+function ConfigureViewDialog({
+  open,
+  onOpenChange,
+  allFields,
+  config,
+  onApply,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  allFields: FieldDef[]
+  config: ViewConfig
+  onApply: (cfg: ViewConfig) => void
+}) {
+  const [visible, setVisible] = useState<string[]>(config.visibleFields)
+  const [sort, setSort] = useState<ColSort>(config.sort)
+
+  useEffect(() => {
+    if (open) {
+      setVisible(config.visibleFields)
+      setSort(config.sort)
+    }
+  }, [open, config])
+
+  const hidden = allFields.filter((f) => !visible.includes(f.name))
+
+  function move(name: string, dir: -1 | 1) {
+    setVisible((prev) => {
+      const idx = prev.indexOf(name)
+      if (idx === -1) return prev
+      const next = [...prev]
+      const swap = idx + dir
+      if (swap < 0 || swap >= next.length) return prev
+      ;[next[idx], next[swap]] = [next[swap], next[idx]]
+      return next
+    })
+  }
+
+  function add(name: string) {
+    setVisible((prev) => [...prev, name])
+  }
+
+  function remove(name: string) {
+    setVisible((prev) => prev.filter((n) => n !== name))
+  }
+
+  const sortOptions = [
+    ...SYSTEM_SORT_OPTIONS,
+    ...allFields
+      .filter((f) => !['media', 'text', 'richtext', 'relation'].includes(f.type))
+      .map((f) => ({ name: f.name, label: humanize(f.name) })),
+  ]
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Configure the view</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5 py-1">
+          {/* Displayed fields */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Displayed fields</p>
+            {visible.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No fields selected.</p>
+            ) : (
+              <ul className="space-y-1">
+                {visible.map((name, idx) => {
+                  const field = allFields.find((f) => f.name === name)
+                  return (
+                    <li key={name} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                      <span className="flex-1 font-medium">{humanize(name)}</span>
+                      {field && (
+                        <span className="text-xs text-muted-foreground">{field.type}</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => move(name, -1)}
+                        className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent disabled:opacity-30"
+                      >
+                        <ChevronUpIcon className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === visible.length - 1}
+                        onClick={() => move(name, 1)}
+                        className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent disabled:opacity-30"
+                      >
+                        <ChevronDownIcon className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(name)}
+                        className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <MinusCircleIcon className="size-3.5" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Available fields */}
+          {hidden.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Available fields</p>
+              <ul className="space-y-1">
+                {hidden.map((field) => (
+                  <li key={field.name} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                    <span className="flex-1">{humanize(field.name)}</span>
+                    <span className="text-xs">{field.type}</span>
+                    <button
+                      type="button"
+                      onClick={() => add(field.name)}
+                      className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <PlusCircleIcon className="size-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Sort */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort entries</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={sort.field} onValueChange={(v) => setSort((s) => ({ ...s, field: v }))}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((opt) => (
+                    <SelectItem key={opt.name} value={opt.name}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sort.dir} onValueChange={(v) => setSort((s) => ({ ...s, dir: v as 'asc' | 'desc' }))}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => { onApply({ visibleFields: visible, sort }); onOpenChange(false) }}>
+            Apply
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── EntriesList ──────────────────────────────────────────────────────────────
+
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [configOpen, setConfigOpen] = useState(false)
+  const [viewConfig, setViewConfig] = useState<ViewConfig | null>(null)
   const { loading: deleting, request: requestDelete } = useApi()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null
   )
+
+  useEffect(() => {
+    if (!ct || !slug) return
+    setViewConfig(loadViewConfig(slug, ct.fields))
+  }, [ct?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const config = viewConfig ?? { visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [], sort: DEFAULT_SORT }
+  const { sort } = config
+
   const { data: entries, loading: loadingEntries, refetch } = useFetch<EntriesResponse>(
-    slug ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=20` : null
+    slug
+      ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=20&sort=${sort.field}&order=${sort.dir}`
+      : null
   )
 
   async function handleDelete() {
@@ -60,6 +359,12 @@ export function EntriesList() {
     await requestDelete(`/cms/admin/entries/${slug}/${deletingId}`, 'DELETE')
     setDeletingId(null)
     refetch()
+  }
+
+  function handleApplyConfig(cfg: ViewConfig) {
+    setViewConfig(cfg)
+    if (slug) saveViewConfig(slug, cfg)
+    setPage(1)
   }
 
   if (loadingCt) {
@@ -73,9 +378,9 @@ export function EntriesList() {
 
   if (!ct) return null
 
-  const fieldNames = new Set(ct.fields.map((f) => f.name))
-  const hasTitle = fieldNames.has('title')
-  const hasSlug = fieldNames.has('slug')
+  const visibleFields = config.visibleFields
+    .map((name) => ct.fields.find((f) => f.name === name))
+    .filter(Boolean) as FieldDef[]
 
   const totalPages = Math.ceil((entries?.total ?? 0) / (entries?.limit ?? 20))
 
@@ -83,10 +388,16 @@ export function EntriesList() {
     <>
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">{ct.name}</h1>
-        <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
-          <PlusIcon className="size-4" />
-          New entry
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)} className="gap-1.5">
+            <Settings2Icon className="size-3.5" />
+            Configure the view
+          </Button>
+          <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
+            <PlusIcon className="size-4" />
+            New entry
+          </Button>
+        </div>
       </div>
 
       {loadingEntries && (
@@ -115,10 +426,14 @@ export function EntriesList() {
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/50">
                 <tr>
-                  {hasTitle && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Title</th>}
-                  {hasSlug && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Slug</th>}
+                  {visibleFields.map((field) => (
+                    <th key={field.name} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      {humanize(field.name)}
+                    </th>
+                  ))}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published at</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -126,23 +441,19 @@ export function EntriesList() {
               <tbody className="divide-y divide-border">
                 {(entries?.data ?? []).map((entry) => (
                   <tr key={entry.id} className="group hover:bg-muted/30 transition-colors">
-                    {hasTitle && (
-                      <td className="px-4 py-3 font-bold">
-                        {entry.title ? String(entry.title) : <span className="text-muted-foreground font-normal">—</span>}
+                    {visibleFields.map((field) => (
+                      <td key={field.name} className="px-4 py-3">
+                        <FieldCell field={field} value={entry[field.name]} />
                       </td>
-                    )}
-                    {hasSlug && (
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {entry.slug ? String(entry.slug) : '—'}
-                      </td>
-                    )}
-                    <td className="px-4 py-3 text-muted-foreground">
+                    ))}
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {new Date(entry.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {entry.published_at
-                        ? new Date(entry.published_at).toLocaleDateString()
-                        : '—'}
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {new Date(entry.updated_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {entry.published_at ? new Date(entry.published_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge entry={entry} fields={ct.fields} />
@@ -188,6 +499,18 @@ export function EntriesList() {
         </>
       )}
 
+      {/* Configure view dialog */}
+      {viewConfig && (
+        <ConfigureViewDialog
+          open={configOpen}
+          onOpenChange={setConfigOpen}
+          allFields={ct.fields}
+          config={viewConfig}
+          onApply={handleApplyConfig}
+        />
+      )}
+
+      {/* Delete dialog */}
       <Dialog open={Boolean(deletingId)} onOpenChange={(v) => { if (!v) setDeletingId(null) }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
