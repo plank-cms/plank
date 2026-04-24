@@ -10,6 +10,10 @@
       "persistent": true,
       "outputLogs": "errors-only"
     },
+    "@plank/admin#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["../core/public/admin/**"]
+    },
     "@am25/plank-cms#build": {
       "dependsOn": ["^build", "@plank/admin#build"],
       "outputs": ["dist/**"]
