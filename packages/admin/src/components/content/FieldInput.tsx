@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import { format } from 'date-fns'
 import { useSettings } from '@/context/settings.tsx'
-import { isoToInputValue, inputValueToISO } from '@/lib/formatDate.ts'
+import { getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { Calendar } from '@/components/ui/calendar.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon } from 'lucide-react'
+import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon } from 'lucide-react'
 
 type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
 
@@ -238,6 +241,75 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   )
 }
 
+function DateTimeInput({ value, onChange, timezone }: {
+  value: string | null | undefined
+  onChange: (v: unknown) => void
+  timezone: string
+}) {
+  const [calOpen, setCalOpen] = useState(false)
+  const [date, setDate] = useState<Date | undefined>()
+  const [time, setTime] = useState('00:00')
+
+  useEffect(() => {
+    if (!value) { setDate(undefined); setTime('00:00'); return }
+    const d = new Date(value)
+    if (!isNaN(d.getTime())) {
+      setDate(d)
+      setTime(getTimeInTimezone(value, timezone))
+    }
+  }, [value, timezone])
+
+  function handleDateSelect(d: Date | undefined) {
+    setDate(d)
+    setCalOpen(false)
+    if (d) onChange(combineDateAndTime(d, time, timezone))
+  }
+
+  function handleTimeChange(t: string) {
+    setTime(t)
+    if (date) onChange(combineDateAndTime(date, t, timezone))
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Popover open={calOpen} onOpenChange={setCalOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="w-40 justify-between font-normal">
+            {date ? format(date, 'MMM d, yyyy') : 'Select date'}
+            <ChevronDownIcon className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={date}
+            captionLayout="dropdown"
+            defaultMonth={date ?? new Date()}
+            onSelect={handleDateSelect}
+          />
+        </PopoverContent>
+      </Popover>
+      <Input
+        type="time"
+        className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        value={time}
+        onChange={(e) => handleTimeChange(e.target.value)}
+      />
+      {value && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground hover:text-foreground"
+          onClick={() => { setDate(undefined); setTime('00:00'); onChange(null) }}
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function toSlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '')
 }
@@ -299,13 +371,11 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   }
 
   if (field.type === 'datetime') {
-    const inputValue = value ? isoToInputValue(String(value), timezone) : ''
     return (
-      <Input
-        type="datetime-local"
-        className={sharedClass}
-        value={inputValue}
-        onChange={(e) => onChange(e.target.value ? inputValueToISO(e.target.value, timezone) : null)}
+      <DateTimeInput
+        value={value as string | null | undefined}
+        onChange={onChange}
+        timezone={timezone}
       />
     )
   }
