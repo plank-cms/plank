@@ -9,6 +9,7 @@ build/
 # Vite
 packages/admin/dist/
 packages/core/public/dist/
+packages/core/public/admin/
 
 # Environment
 .env
