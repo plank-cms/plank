@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/auth.tsx'
+import { SettingsProvider } from './context/settings.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
 import { Layout } from './components/Layout.tsx'
 import { Login } from './pages/Login.tsx'
@@ -91,7 +92,9 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <RouterProvider router={router} />
+      <SettingsProvider>
+        <RouterProvider router={router} />
+      </SettingsProvider>
     </AuthProvider>
   )
 }

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSettings } from '@/context/settings.tsx'
+import { isoToInputValue, inputValueToISO } from '@/lib/formatDate.ts'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
@@ -242,6 +244,7 @@ function toSlug(value: string): string {
 
 export function FieldInput({ field, value, onChange, allValues }: FieldInputProps) {
   const uidManual = useRef(false)
+  const { timezone } = useSettings()
 
   // Auto-derive UID from targetField while user hasn't manually edited it
   useEffect(() => {
@@ -296,12 +299,13 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   }
 
   if (field.type === 'datetime') {
+    const inputValue = value ? isoToInputValue(String(value), timezone) : ''
     return (
       <Input
         type="datetime-local"
         className={sharedClass}
-        value={value ? String(value).slice(0, 16) : ''}
-        onChange={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
+        value={inputValue}
+        onChange={(e) => onChange(e.target.value ? inputValueToISO(e.target.value, timezone) : null)}
       />
     )
   }

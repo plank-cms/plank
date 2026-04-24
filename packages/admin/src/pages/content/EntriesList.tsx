@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
+import { useSettings } from '@/context/settings.tsx'
+import { formatDate, formatDatetime } from '@/lib/formatDate.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -109,6 +111,8 @@ function MediaThumbnail({ value }: { value: string }) {
 // ─── FieldCell ────────────────────────────────────────────────────────────────
 
 function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
+  const { timezone } = useSettings()
+
   if (value === null || value === undefined || value === '') {
     return <span className="text-muted-foreground">—</span>
   }
@@ -118,8 +122,7 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   }
 
   if (field.type === 'datetime') {
-    const date = new Date(String(value))
-    return <span>{isNaN(date.getTime()) ? String(value) : date.toLocaleDateString()}</span>
+    return <span>{formatDatetime(String(value), timezone)}</span>
   }
 
   if (field.type === 'number') {
@@ -330,6 +333,7 @@ function ConfigureViewDialog({
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const { timezone } = useSettings()
   const [page, setPage] = useState(1)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
@@ -447,13 +451,13 @@ export function EntriesList() {
                       </td>
                     ))}
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.created_at).toLocaleDateString()}
+                      {formatDate(entry.created_at, timezone)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {new Date(entry.updated_at).toLocaleDateString()}
+                      {formatDate(entry.updated_at, timezone)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {entry.published_at ? new Date(entry.published_at).toLocaleDateString() : '—'}
+                      {entry.published_at ? formatDate(entry.published_at, timezone) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge entry={entry} fields={ct.fields} />
