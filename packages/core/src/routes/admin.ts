@@ -16,6 +16,7 @@ import {
   updateEntry,
   deleteEntry,
   patchEntryStatus,
+  runScheduledPublish,
 } from '../controllers/entries.js'
 import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar, deleteAvatar } from '../controllers/users.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
@@ -43,6 +44,9 @@ router.get('/entries/:slug/:id', authorize('entries:read'), getEntry)
 router.put('/entries/:slug/:id', authorize('entries:write'), updateEntry)
 router.patch('/entries/:slug/:id/status', authorize('entries:write'), patchEntryStatus)
 router.delete('/entries/:slug/:id', authorize('entries:write'), deleteEntry)
+
+// Cron — publish scheduled entries whose scheduled_for <= NOW()
+router.post('/cron/publish', authorize('entries:write'), runScheduledPublish)
 
 // Current user profile
 router.get('/users/me', getMe)

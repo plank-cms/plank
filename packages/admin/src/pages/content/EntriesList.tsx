@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   PlusIcon, PencilIcon, Trash2Icon, FileTextIcon, ImageIcon,
   CheckIcon, Settings2Icon, ChevronUpIcon, ChevronDownIcon,
-  PlusCircleIcon, MinusCircleIcon, FileIcon,
+  PlusCircleIcon, MinusCircleIcon, FileIcon, CalendarClockIcon,
 } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
@@ -26,9 +26,10 @@ type ContentType = { name: string; slug: string; fields: FieldDef[] }
 
 type Entry = Record<string, unknown> & {
   id: string
-  status: 'draft' | 'published'
+  status: 'draft' | 'scheduled' | 'published'
   published_data: Record<string, unknown> | null
   published_at: string | null
+  scheduled_for: string | null
   created_at: string
   updated_at: string
 }
@@ -154,7 +155,19 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
 // ─── StatusBadge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
+  const { timezone } = useSettings()
+
+  if (entry.status === 'scheduled') {
+    return (
+      <Badge variant="outline" className="border-blue-500 text-blue-600">
+        <CalendarClockIcon className="size-3 mr-1" />
+        {entry.scheduled_for ? formatDate(entry.scheduled_for, timezone) : 'Scheduled'}
+      </Badge>
+    )
+  }
+
   if (entry.status === 'draft') return <Badge variant="outline">Draft</Badge>
+
   const isStale = entry.published_data != null && fields.some(
     (f) => JSON.stringify(entry[f.name]) !== JSON.stringify(entry.published_data![f.name])
   )
@@ -437,7 +450,7 @@ export function EntriesList() {
                   ))}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published / Scheduled</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -457,7 +470,11 @@ export function EntriesList() {
                       {formatDate(entry.updated_at, timezone)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {entry.published_at ? formatDate(entry.published_at, timezone) : '—'}
+                      {entry.status === 'scheduled' && entry.scheduled_for
+                        ? formatDate(entry.scheduled_for, timezone)
+                        : entry.published_at
+                          ? formatDate(entry.published_at, timezone)
+                          : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge entry={entry} fields={ct.fields} />

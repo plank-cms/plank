@@ -77,10 +77,27 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   res.json(rows[0])
 }
 
+// Columns excluded from the published_data snapshot
+const SNAPSHOT_EXCLUDED = ["'id'", "'status'", "'published_data'", "'published_at'", "'scheduled_for'", "'created_at'", "'updated_at'"]
+
+function buildSnapshotExpr(tableName: string): string {
+  const strip = SNAPSHOT_EXCLUDED.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)
+  return `(SELECT ${strip} FROM ${tableName} t WHERE t.id = $1)`
+}
+
 export const patchEntryStatus: SlugIdParam = async (req, res) => {
-  const { status } = req.body as { status: unknown }
-  if (status !== 'draft' && status !== 'published') {
-    res.status(400).json({ error: 'status must be draft or published' }); return
+  const { status, scheduled_for } = req.body as { status: unknown; scheduled_for?: unknown }
+  if (status !== 'draft' && status !== 'published' && status !== 'scheduled') {
+    res.status(400).json({ error: 'status must be draft, published, or scheduled' }); return
+  }
+
+  if (status === 'scheduled') {
+    if (!scheduled_for || typeof scheduled_for !== 'string' || isNaN(Date.parse(scheduled_for))) {
+      res.status(400).json({ error: 'scheduled_for must be a valid ISO date string' }); return
+    }
+    if (new Date(scheduled_for) <= new Date()) {
+      res.status(400).json({ error: 'scheduled_for must be in the future' }); return
+    }
   }
 
   const ct = await findContentTypeBySlug(req.params.slug)
@@ -92,20 +109,38 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
   let values: unknown[]
 
   if (status === 'published') {
-    const excludedCols = ["'id'", "'status'", "'published_data'", "'published_at'", "'created_at'", "'updated_at'"]
-    const stripExpr = excludedCols.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)
     sql = `
       UPDATE ${ct.tableName} SET
         status = 'published',
-        published_data = (SELECT ${stripExpr} FROM ${ct.tableName} t WHERE t.id = $1),
+        published_data = ${buildSnapshotExpr(ct.tableName)},
         published_at = NOW(),
+        scheduled_for = NULL,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `
     values = [req.params.id]
+  } else if (status === 'scheduled') {
+    sql = `
+      UPDATE ${ct.tableName} SET
+        status = 'scheduled',
+        scheduled_for = $2,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `
+    values = [req.params.id, scheduled_for]
   } else {
-    sql = `UPDATE ${ct.tableName} SET status = 'draft', published_data = NULL, published_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`
+    sql = `
+      UPDATE ${ct.tableName} SET
+        status = 'draft',
+        published_data = NULL,
+        published_at = NULL,
+        scheduled_for = NULL,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `
     values = [req.params.id]
   }
 
@@ -113,6 +148,42 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
   res.json(rows[0])
+}
+
+export const runScheduledPublish: RequestHandler = async (_req, res) => {
+  const { rows: cts } = await pool.query<{ slug: string; table_name: string }>(
+    'SELECT slug, table_name FROM plank_content_types',
+  )
+
+  const published: Array<{ slug: string; id: string }> = []
+
+  for (const ct of cts) {
+    assertSafeIdentifier(ct.table_name)
+
+    const { rows: due } = await pool.query<{ id: string }>(
+      `SELECT id FROM ${ct.table_name} WHERE status = 'scheduled' AND scheduled_for <= NOW()`,
+    )
+
+    if (due.length === 0) continue
+
+    const snapshotExpr = buildSnapshotExpr(ct.table_name)
+
+    for (const { id } of due) {
+      await pool.query(
+        `UPDATE ${ct.table_name} SET
+          status = 'published',
+          published_data = ${snapshotExpr},
+          published_at = NOW(),
+          scheduled_for = NULL,
+          updated_at = NOW()
+        WHERE id = $1`,
+        [id],
+      )
+      published.push({ slug: ct.slug, id })
+    }
+  }
+
+  res.json({ published })
 }
 
 export const deleteEntry: SlugIdParam = async (req, res) => {

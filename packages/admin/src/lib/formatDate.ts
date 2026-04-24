@@ -26,6 +26,17 @@ export function formatDatetime(value: string | Date, timezone: string): string {
   return formatDate(value, timezone, DATETIME_OPTS)
 }
 
+// Extract "HH:MM" time from a UTC ISO string displayed in the given timezone
+export function getTimeInTimezone(isoString: string, timezone: string): string {
+  return isoToInputValue(isoString, timezone).slice(11, 16)
+}
+
+// Combine a Date object (date part) + "HH:MM" string in the given timezone → UTC ISO
+export function combineDateAndTime(date: Date, timeStr: string, timezone: string): string {
+  const dateOnly = isoToInputValue(date.toISOString(), timezone).slice(0, 10)
+  return inputValueToISO(`${dateOnly}T${timeStr}`, timezone)
+}
+
 // Convert a UTC ISO string to a datetime-local input value (YYYY-MM-DDTHH:MM)
 // interpreted in the given timezone.
 export function isoToInputValue(isoString: string, timezone: string): string {

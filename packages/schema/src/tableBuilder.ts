@@ -21,6 +21,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
     `  status         VARCHAR(20) NOT NULL DEFAULT 'draft',`,
     `  published_data JSONB,`,
     `  published_at   TIMESTAMP,`,
+    `  scheduled_for  TIMESTAMP,`,
     `  created_at     TIMESTAMP NOT NULL DEFAULT NOW(),`,
     `  updated_at     TIMESTAMP NOT NULL DEFAULT NOW()`,
     `)`,

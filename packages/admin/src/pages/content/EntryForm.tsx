@@ -1,17 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useBlocker } from 'react-router-dom'
-import { Trash2Icon } from 'lucide-react'
+import { format } from 'date-fns'
+import { Trash2Icon, CalendarClockIcon, ChevronDownIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
+import { useSettings } from '@/context/settings.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
+import { Calendar } from '@/components/ui/calendar.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { FieldInput } from '@/components/content/FieldInput.tsx'
 import type { FieldDef } from '@/components/content/FieldInput.tsx'
 import { FIELD_WIDTH_SPAN } from '@/components/content-types/FieldCard.tsx'
 import type { FieldWidth } from '@/components/content-types/FieldCard.tsx'
+import { formatDatetime, getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
 
 type ContentType = {
   name: string
@@ -20,14 +26,16 @@ type ContentType = {
 }
 
 type Entry = Record<string, unknown> & {
-  status?: 'draft' | 'published'
+  status?: 'draft' | 'scheduled' | 'published'
   published_data?: Record<string, unknown> | null
+  scheduled_for?: string | null
 }
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
   const navigate = useNavigate()
   const isNew = !id
+  const { timezone } = useSettings()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null
@@ -41,10 +49,17 @@ export function EntryForm() {
   const { loading: deleting, request: requestDelete } = useApi()
 
   const [values, setValues] = useState<Record<string, unknown>>({})
-  const [status, setStatus] = useState<'draft' | 'published'>('draft')
-  // True when working area has been saved but not yet published
+  const [status, setStatus] = useState<'draft' | 'scheduled' | 'published'>('draft')
+  const [scheduledFor, setScheduledFor] = useState<string>('')
   const [isPublishedStale, setIsPublishedStale] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+
+  // Scheduler panel state
+  const [showScheduler, setShowScheduler] = useState(false)
+  const [calOpen, setCalOpen] = useState(false)
+  const [schedDate, setSchedDate] = useState<Date | undefined>()
+  const [schedTime, setSchedTime] = useState('09:00')
+
   const original = useRef<string>('{}')
   const skipBlocker = useRef(false)
 
@@ -54,6 +69,7 @@ export function EntryForm() {
       ct?.fields.forEach((f) => { empty[f.name] = f.type === 'boolean' ? false : '' })
       setValues(empty)
       setStatus('draft')
+      setScheduledFor('')
       setIsPublishedStale(false)
       original.current = JSON.stringify(empty)
       return
@@ -66,7 +82,14 @@ export function EntryForm() {
     setStatus(existing.status ?? 'draft')
     original.current = JSON.stringify(initial)
 
-    // Detect if working area differs from the published snapshot
+    if (existing.scheduled_for) {
+      setScheduledFor(existing.scheduled_for)
+      setSchedDate(new Date(existing.scheduled_for))
+      setSchedTime(getTimeInTimezone(existing.scheduled_for, timezone))
+    } else {
+      setScheduledFor('')
+    }
+
     if (existing.status === 'published' && existing.published_data) {
       const snap: Record<string, unknown> = {}
       ct.fields.forEach((f) => { snap[f.name] = existing.published_data![f.name] ?? (f.type === 'boolean' ? false : '') })
@@ -85,6 +108,20 @@ export function EntryForm() {
 
   function handleChange(name: string, value: unknown) {
     setValues((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function openScheduler() {
+    // Pre-fill with existing scheduled_for or sensible defaults
+    if (scheduledFor) {
+      setSchedDate(new Date(scheduledFor))
+      setSchedTime(getTimeInTimezone(scheduledFor, timezone))
+    } else {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      setSchedDate(tomorrow)
+      setSchedTime('09:00')
+    }
+    setShowScheduler(true)
   }
 
   async function saveFields(): Promise<Entry | null> {
@@ -111,8 +148,21 @@ export function EntryForm() {
   async function handleSaveDraft() {
     const saved = await saveFields()
     if (!saved) return
-    // Working area updated — published snapshot is now stale (if entry was published)
-    if (status === 'published') setIsPublishedStale(true)
+
+    if (status === 'scheduled') {
+      const entryId = isNew ? (saved.id as string) : id!
+      try {
+        await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'draft' })
+        setStatus('draft')
+        setScheduledFor('')
+        setShowScheduler(false)
+      } catch {
+        // surfaced by useApi
+      }
+    } else if (status === 'published') {
+      setIsPublishedStale(true)
+    }
+
     if (isNew) {
       skipBlocker.current = true
       navigate(`/content/${slug}/${saved.id}`, { replace: true })
@@ -122,7 +172,6 @@ export function EntryForm() {
   async function handlePublish() {
     if (!slug) return
 
-    // Save working area first if there are changes (or if it's a new entry)
     let entryId = id
     if (isDirty || isNew) {
       const saved = await saveFields()
@@ -134,7 +183,37 @@ export function EntryForm() {
     try {
       await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'published' })
       setStatus('published')
+      setScheduledFor('')
       setIsPublishedStale(false)
+      setShowScheduler(false)
+      if (isNew) navigate(`/content/${slug}/${entryId}`, { replace: true })
+    } catch {
+      if (isNew && entryId) navigate(`/content/${slug}/${entryId}`, { replace: true })
+    }
+  }
+
+  async function handleSchedule() {
+    if (!slug || !schedDate || !schedTime) return
+
+    const newScheduledFor = combineDateAndTime(schedDate, schedTime, timezone)
+    if (new Date(newScheduledFor) <= new Date()) return
+
+    let entryId = id
+    if (isDirty || isNew) {
+      const saved = await saveFields()
+      if (!saved) return
+      entryId = isNew ? (saved.id as string) : id!
+      if (isNew) skipBlocker.current = true
+    }
+
+    try {
+      await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', {
+        status: 'scheduled',
+        scheduled_for: newScheduledFor,
+      })
+      setStatus('scheduled')
+      setScheduledFor(newScheduledFor)
+      setShowScheduler(false)
       if (isNew) navigate(`/content/${slug}/${entryId}`, { replace: true })
     } catch {
       if (isNew && entryId) navigate(`/content/${slug}/${entryId}`, { replace: true })
@@ -146,6 +225,7 @@ export function EntryForm() {
     try {
       await requestStatus(`/cms/admin/entries/${slug}/${id}/status`, 'PATCH', { status: 'draft' })
       setStatus('draft')
+      setScheduledFor('')
       setIsPublishedStale(false)
     } catch {
       // surfaced by useApi
@@ -165,9 +245,8 @@ export function EntryForm() {
 
   const loading = loadingCt || (!isNew && loadingEntry)
   const busy = saving || patching
-
-  // "Publish" is available when: there's something new to publish
-  const canPublish = isDirty || status === 'draft' || isPublishedStale
+  const canPublish = isDirty || status === 'draft' || status === 'scheduled' || isPublishedStale
+  const canSchedule = !!(schedDate && schedTime)
 
   if (loading) {
     return (
@@ -180,19 +259,35 @@ export function EntryForm() {
 
   if (!ct) return null
 
+  // ─── Status badge ──────────────────────────────────────────────────────────
+
+  let statusBadge: React.ReactNode
+  if (status === 'scheduled') {
+    statusBadge = (
+      <Badge variant="outline" className="border-blue-500 text-blue-600">
+        <CalendarClockIcon className="size-3 mr-1" />
+        {scheduledFor ? `Scheduled · ${formatDatetime(scheduledFor, timezone)}` : 'Scheduled'}
+      </Badge>
+    )
+  } else if (status === 'published') {
+    statusBadge = (
+      <Badge variant={isPublishedStale ? 'secondary' : 'default'}>
+        {isPublishedStale ? 'Published (pending changes)' : 'Published'}
+      </Badge>
+    )
+  } else {
+    statusBadge = <Badge variant="secondary">Draft</Badge>
+  }
+
   return (
     <>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs text-muted-foreground mb-0.5">{ct.name}</p>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">{isNew ? 'New entry' : 'Edit entry'}</h1>
-            <Badge variant={status === 'published' ? 'default' : 'secondary'}>
-              {status === 'published'
-                ? isPublishedStale ? 'Published (pending changes)' : 'Published'
-                : 'Draft'}
-            </Badge>
+            {statusBadge}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -213,16 +308,78 @@ export function EntryForm() {
               Revert to draft
             </Button>
           )}
-          <Button variant="outline" onClick={handleSaveDraft} disabled={!isDirty || busy}>
+          {!isNew && status === 'scheduled' && (
+            <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
+              {patching ? <Spinner className="size-4" /> : null}
+              Cancel schedule
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={status === 'scheduled' ? busy : (!isDirty || busy)}
+          >
             {saving ? <Spinner className="size-4" /> : null}
-            Save draft
+            {status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft'}
           </Button>
+          {status !== 'scheduled' && (
+            <Button variant="outline" onClick={openScheduler} disabled={busy}>
+              <CalendarClockIcon className="size-4" />
+              Schedule
+            </Button>
+          )}
           <Button onClick={handlePublish} disabled={!canPublish || busy}>
-            {busy ? <Spinner className="size-4" /> : null}
-            Publish
+            {patching ? <Spinner className="size-4" /> : null}
+            {status === 'scheduled' ? 'Publish now' : status === 'published' && !isPublishedStale ? 'Republish' : 'Publish'}
           </Button>
         </div>
       </div>
+
+      {/* Inline scheduler panel */}
+      {showScheduler && (
+        <div className="mb-6 flex items-end gap-2 rounded-lg border p-4 bg-muted/30">
+          <div className="flex flex-col gap-1.5">
+            <Label>Date</Label>
+            <Popover open={calOpen} onOpenChange={setCalOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-40 justify-between font-normal">
+                  {schedDate ? format(schedDate, 'MMM d, yyyy') : 'Select date'}
+                  <ChevronDownIcon className="size-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={schedDate}
+                  captionLayout="dropdown"
+                  defaultMonth={schedDate ?? new Date()}
+                  disabled={{ before: new Date() }}
+                  onSelect={(d) => {
+                    setSchedDate(d)
+                    setCalOpen(false)
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Time <span className="text-muted-foreground font-normal">(24h)</span></Label>
+            <Input
+              type="time"
+              className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+              value={schedTime}
+              onChange={(e) => setSchedTime(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleSchedule} disabled={!canSchedule || busy}>
+            {patching ? <Spinner className="size-4" /> : null}
+            Confirm
+          </Button>
+          <Button variant="ghost" onClick={() => setShowScheduler(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
 
       {/* Fields grid */}
       <div className="grid grid-cols-6 gap-4">
