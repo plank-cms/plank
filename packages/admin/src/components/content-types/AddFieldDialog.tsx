@@ -37,6 +37,7 @@ type TypeOption = {
   description: string
   color: string
   bg: string
+  disabled?: boolean
 }
 
 const TYPE_OPTIONS: TypeOption[] = [
@@ -121,6 +122,7 @@ const TYPE_OPTIONS: TypeOption[] = [
     description: 'Link to another content type',
     color: 'text-indigo-600',
     bg: 'bg-indigo-50',
+    disabled: true,
   },
 ]
 
@@ -279,8 +281,9 @@ export function AddFieldDialog({
                 <button
                   key={key}
                   type="button"
-                  onClick={() => handleSelectType(option)}
-                  className="flex flex-col items-start gap-2 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent"
+                  disabled={option.disabled}
+                  onClick={() => !option.disabled && handleSelectType(option)}
+                  className="flex flex-col items-start gap-2 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <div
                     className={`flex size-8 items-center justify-center rounded-md ${option.bg}`}
@@ -289,7 +292,9 @@ export function AddFieldDialog({
                   </div>
                   <div>
                     <p className="text-sm font-medium">{option.label}</p>
-                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {option.disabled ? 'Coming soon' : option.description}
+                    </p>
                   </div>
                 </button>
               )
