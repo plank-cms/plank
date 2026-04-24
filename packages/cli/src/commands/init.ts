@@ -38,30 +38,35 @@ function buildPackageJson(name: string): object {
 export async function init(projectName?: string): Promise<void> {
   intro(chalk.bold('▲ Plank CMS'))
 
-  let name = projectName
+  const useCurrentDir = projectName === '.'
+  let name = useCurrentDir ? undefined : projectName
 
   if (!name) {
-    const answer = await text({
-      message: 'Project name',
-      placeholder: 'my-plank-cms',
-      defaultValue: 'my-plank-cms',
-      validate(value) {
-        if (!value.trim()) return 'Project name is required'
-        if (!/^[a-z0-9-_]+$/.test(value)) return 'Use only lowercase letters, numbers, hyphens, and underscores'
-      },
-    })
+    if (useCurrentDir) {
+      name = process.cwd().split('/').pop() ?? 'plank-cms'
+    } else {
+      const answer = await text({
+        message: 'Project name',
+        placeholder: 'my-plank-cms',
+        defaultValue: 'my-plank-cms',
+        validate(value) {
+          if (!value.trim()) return 'Project name is required'
+          if (!/^[a-z0-9-_]+$/.test(value)) return 'Use only lowercase letters, numbers, hyphens, and underscores'
+        },
+      })
 
-    if (isCancel(answer)) {
-      cancel('Cancelled.')
-      process.exit(0)
+      if (isCancel(answer)) {
+        cancel('Cancelled.')
+        process.exit(0)
+      }
+
+      name = answer as string
     }
-
-    name = answer as string
   }
 
-  const projectDir = resolve(process.cwd(), name)
+  const projectDir = useCurrentDir ? process.cwd() : resolve(process.cwd(), name)
 
-  if (await fs.pathExists(projectDir)) {
+  if (!useCurrentDir && await fs.pathExists(projectDir)) {
     const entries = await fs.readdir(projectDir)
     if (entries.length > 0) {
       cancel(`Directory "${name}" already exists and is not empty.`)
@@ -92,11 +97,11 @@ export async function init(projectName?: string): Promise<void> {
       '',
       `Then start your CMS:`,
       '',
-      `  ${chalk.cyan(`cd ${name}`)}`,
+      ...(!useCurrentDir ? [`  ${chalk.cyan(`cd ${name}`)}`, ''] : []),
       `  ${chalk.cyan('npm start')}`,
     ].join('\n'),
     'Next steps'
   )
 
-  outro(`Your Plank CMS is ready at ${chalk.cyan(`./${name}`)}`)
+  outro(`Your Plank CMS is ready${useCurrentDir ? '' : ` at ${chalk.cyan(`./${name}`)}`}`)
 }
