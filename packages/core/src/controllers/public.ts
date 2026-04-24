@@ -16,15 +16,23 @@ type Row = Record<string, unknown> & {
 
 // Resolves media IDs to fresh URLs in-place across a list of serialized entries
 async function resolveMediaFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
-  const mediaFieldNames = ct.fields.filter((f) => f.type === 'media').map((f) => f.name)
-  if (mediaFieldNames.length === 0) return
+  const singleFields = ct.fields.filter((f) => f.type === 'media').map((f) => f.name)
+  const galleryFields = ct.fields.filter((f) => f.type === 'media-gallery').map((f) => f.name)
+  if (singleFields.length === 0 && galleryFields.length === 0) return
 
   const idSet = new Set<string>()
   for (const entry of entries) {
-    for (const name of mediaFieldNames) {
+    for (const name of singleFields) {
       const val = entry[name]
-      // Only resolve IDs (non-URL strings) — legacy URLs starting with http pass through
       if (typeof val === 'string' && val && !val.startsWith('http')) idSet.add(val)
+    }
+    for (const name of galleryFields) {
+      const val = entry[name]
+      if (Array.isArray(val)) {
+        for (const id of val) {
+          if (typeof id === 'string' && id && !id.startsWith('http')) idSet.add(id)
+        }
+      }
     }
   }
   if (idSet.size === 0) return
@@ -41,9 +49,17 @@ async function resolveMediaFields(entries: Record<string, unknown>[], ct: Conten
   }))
 
   for (const entry of entries) {
-    for (const name of mediaFieldNames) {
+    for (const name of singleFields) {
       const val = entry[name]
       if (typeof val === 'string' && urlMap.has(val)) entry[name] = urlMap.get(val)
+    }
+    for (const name of galleryFields) {
+      const val = entry[name]
+      if (Array.isArray(val)) {
+        entry[name] = val.map((id) =>
+          typeof id === 'string' && urlMap.has(id) ? urlMap.get(id) : id,
+        )
+      }
     }
   }
 }

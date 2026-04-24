@@ -6,6 +6,7 @@ export type FieldType =
   | 'boolean'
   | 'datetime'
   | 'media'
+  | 'media-gallery'
   | 'relation'
   | 'uid'
 

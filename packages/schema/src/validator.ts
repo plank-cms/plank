@@ -47,6 +47,13 @@ export function validate(
           errors.push(`Field "${field.name}" must be a non-empty string URL`)
         }
         break
+      case 'media-gallery':
+        if (!Array.isArray(value) || value.some((v) => typeof v !== 'string' || !v.trim())) {
+          errors.push(`Field "${field.name}" must be an array of media IDs`)
+        } else if (field.required && value.length === 0) {
+          errors.push(`Field "${field.name}" is required`)
+        }
+        break
       case 'relation':
         if (typeof value !== 'string' || !value.trim()) {
           errors.push(`Field "${field.name}" must be a non-empty string ID`)

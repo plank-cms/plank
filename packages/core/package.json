@@ -20,8 +20,8 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1034.0",
-    "@aws-sdk/s3-request-presigner": "3.1034.0",
+    "@aws-sdk/client-s3": "3.995.0",
+    "@aws-sdk/s3-request-presigner": "3.995.0",
     "@plank/db": "workspace:*",
     "@plank/schema": "workspace:*",
     "bcryptjs": "3.0.3",

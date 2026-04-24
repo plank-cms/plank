@@ -32,15 +32,27 @@ function buildClient(cfg: Awaited<ReturnType<typeof getConfig>>) {
   })
 }
 
+function buildKey(cfg: Awaited<ReturnType<typeof getConfig>>, filename: string, prefix?: string): string {
+  const ext = extname(filename)
+  const name = `${randomBytes(16).toString('hex')}${ext}`
+  const parts = [cfg.pathPrefix?.replace(/\/$/, ''), prefix, name].filter(Boolean)
+  return parts.join('/')
+}
+
+function buildStoredUrl(cfg: Awaited<ReturnType<typeof getConfig>>, key: string): string {
+  return cfg.accessMode === 'private'
+    ? key
+    : cfg.publicUrl
+      ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
+      : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
+}
+
 export const s3Provider: MediaProvider = {
   async upload(file, options?: UploadOptions) {
     const cfg = await getConfig()
     const client = buildClient(cfg)
 
-    const ext = extname(file.originalname)
-    const filename = `${randomBytes(16).toString('hex')}${ext}`
-    const parts = [cfg.pathPrefix?.replace(/\/$/, ''), options?.prefix, filename].filter(Boolean)
-    const key = parts.join('/')
+    const key = buildKey(cfg, file.originalname, options?.prefix)
 
     await client.send(new PutObjectCommand({
       Bucket: cfg.bucket!,
@@ -49,13 +61,7 @@ export const s3Provider: MediaProvider = {
       ContentType: file.mimetype,
     }))
 
-    const url = cfg.accessMode === 'private'
-      ? key  // store key only; URL generated on-demand
-      : cfg.publicUrl
-        ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-        : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
-
-    return { url, key }
+    return { url: buildStoredUrl(cfg, key), key }
   },
 
   async delete(key) {
@@ -77,5 +83,17 @@ export const s3Provider: MediaProvider = {
     return cfg.publicUrl
       ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
       : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
+  },
+
+  async presignUpload(filename, mimeType) {
+    const cfg = await getConfig()
+    const client = buildClient(cfg)
+    const key = buildKey(cfg, filename)
+    const upload_url = await getSignedUrl(
+      client,
+      new PutObjectCommand({ Bucket: cfg.bucket!, Key: key }),
+      { expiresIn: 300 },
+    )
+    return { upload_url, key, stored_url: buildStoredUrl(cfg, key) }
   },
 }

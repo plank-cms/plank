@@ -17,7 +17,7 @@ import { z, flattenError } from 'zod'
 
 const FieldSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'Field name must be lowercase with underscores'),
-  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media', 'relation', 'uid']),
+  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media', 'media-gallery', 'relation', 'uid']),
   required: z.boolean().optional(),
   subtype: z.enum(['integer', 'float']).optional(),
   relatedTable: z.string().optional(),

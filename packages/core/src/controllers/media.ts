@@ -101,3 +101,41 @@ export async function getMediaUrl(req: Request, res: Response): Promise<void> {
 
   res.json({ id, url })
 }
+
+export async function presignMedia(req: Request, res: Response): Promise<void> {
+  const { filename, mime_type } = req.body as { filename?: string; mime_type?: string }
+  if (!filename || !mime_type) {
+    res.status(400).json({ error: 'filename and mime_type are required' })
+    return
+  }
+
+  const provider = await getProvider()
+  if (!provider.presignUpload) {
+    res.status(501).json({ error: 'Direct upload not supported for this provider' })
+    return
+  }
+
+  const { upload_url, key, stored_url } = await provider.presignUpload(filename, mime_type)
+  const id = createId()
+  res.json({ id, upload_url, key, stored_url })
+}
+
+export async function completeMedia(req: Request, res: Response): Promise<void> {
+  const { id, key, stored_url, filename, mime_type, size } = req.body as {
+    id?: string; key?: string; stored_url?: string; filename?: string; mime_type?: string; size?: number
+  }
+  if (!id || !key || !stored_url || !filename) {
+    res.status(400).json({ error: 'id, key, stored_url, and filename are required' })
+    return
+  }
+
+  await pool.query(
+    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, filename, stored_url, key, mime_type ?? null, size ?? null, req.user!.id],
+  )
+
+  const provider = await getProvider()
+  const url = await provider.getUrl(key)
+  res.status(201).json({ id, url, filename })
+}

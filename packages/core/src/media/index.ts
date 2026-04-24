@@ -12,6 +12,8 @@ export interface MediaProvider {
   upload(file: Express.Multer.File, options?: UploadOptions): Promise<{ url: string; key: string }>
   delete(key: string): Promise<void>
   getUrl(key: string): Promise<string>
+  // Returns presigned PUT URL + the key to store in DB — only for remote providers
+  presignUpload?(filename: string, mimeType: string): Promise<{ upload_url: string; key: string; stored_url: string }>
 }
 
 const providers: Record<string, MediaProvider> = {

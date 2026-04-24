@@ -1,5 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useSettings } from '@/context/settings.tsx'
 import { getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
 import { Input } from '@/components/ui/input.tsx'
@@ -12,9 +27,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { RichTextEditor } from '@/components/ui/custom/RichTextEditor.tsx'
-import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon } from 'lucide-react'
+import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon, GripVerticalIcon } from 'lucide-react'
 
-type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
+type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'media-gallery' | 'relation' | 'uid'
 
 export type FieldDef = {
   name: string
@@ -50,6 +65,51 @@ type MediaItem = { id: string; filename: string; url: string; mime_type: string 
 
 function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
+}
+
+function xhrPut(url: string, file: File): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)))
+    xhr.onerror = () => reject(new Error('Upload failed.'))
+    xhr.send(file)
+  })
+}
+
+async function uploadFile(file: File): Promise<{ id: string; url: string }> {
+  const token = localStorage.getItem('plank_token')
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
+  const presignRes = await fetch('/cms/admin/media/presign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ filename: file.name, mime_type: file.type, size: file.size }),
+  })
+
+  if (presignRes.ok) {
+    const { id, upload_url, key, stored_url } = await presignRes.json() as {
+      id: string; upload_url: string; key: string; stored_url: string
+    }
+    await xhrPut(upload_url, file)
+    const completeRes = await fetch('/cms/admin/media/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ id, key, stored_url, filename: file.name, mime_type: file.type, size: file.size }),
+    })
+    if (!completeRes.ok) throw new Error('Upload failed.')
+    return completeRes.json() as Promise<{ id: string; url: string }>
+  }
+
+  if (presignRes.status === 501) {
+    const body = new FormData()
+    body.append('file', file)
+    const res = await fetch('/cms/admin/media', { method: 'POST', headers: authHeaders, body })
+    if (!res.ok) throw new Error('Upload failed.')
+    return res.json() as Promise<{ id: string; url: string }>
+  }
+
+  throw new Error('Upload failed.')
 }
 
 function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
@@ -149,17 +209,8 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   async function handleFile(file: File) {
     setUploading(true)
     setError(null)
-    const token = localStorage.getItem('plank_token')
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const res = await fetch('/cms/admin/media', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body,
-      })
-      if (!res.ok) throw new Error('Upload failed.')
-      const data = (await res.json()) as { id: string; url: string }
+      const data = await uploadFile(file)
       setPreviewUrl(data.url)
       onChange(data.id)
     } catch (err) {
@@ -237,6 +288,186 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
         onOpenChange={setPickerOpen}
         allowedTypes={allowedTypes}
         onSelect={(item) => { setPreviewUrl(item.url); onChange(item.id) }}
+      />
+    </div>
+  )
+}
+
+function SortableGalleryItem({ id, previewUrl, onRemove }: {
+  id: string
+  previewUrl: string | null
+  onRemove: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative aspect-square overflow-hidden rounded-md border bg-muted"
+    >
+      {previewUrl ? (
+        <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full items-center justify-center">
+          <ImageIcon className="size-5 text-muted-foreground" />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
+      >
+        <XIcon className="size-3" />
+      </button>
+      <button
+        type="button"
+        className="absolute bottom-1 left-1 flex size-5 cursor-grab items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm active:cursor-grabbing"
+        {...listeners}
+        {...attributes}
+      >
+        <GripVerticalIcon className="size-3" />
+      </button>
+    </div>
+  )
+}
+
+function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChange: (v: unknown) => void }) {
+  const ids = Array.isArray(value) ? value : []
+  const [urlCache, setUrlCache] = useState<Record<string, string>>({})
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  // Fetch preview URLs for IDs not yet in cache
+  useEffect(() => {
+    const missing = ids.filter((id) => !id.startsWith('http') && !(id in urlCache))
+    if (missing.length === 0) return
+    const token = localStorage.getItem('plank_token')
+    Promise.all(
+      missing.map((id) =>
+        fetch(`/cms/admin/media/${id}/url`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+          .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
+          .then((data) => (data ? ([id, data.url] as const) : null))
+          .catch(() => null),
+      ),
+    ).then((results) => {
+      const updates: Record<string, string> = {}
+      for (const r of results) {
+        if (r) updates[r[0]] = r[1]
+      }
+      if (Object.keys(updates).length > 0) setUrlCache((prev) => ({ ...prev, ...updates }))
+    })
+  }, [ids.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function getPreviewUrl(id: string): string | null {
+    if (id.startsWith('http')) return id
+    return urlCache[id] ?? null
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = ids.indexOf(active.id as string)
+    const newIndex = ids.indexOf(over.id as string)
+    onChange(arrayMove(ids, oldIndex, newIndex))
+  }
+
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return
+    setUploading(true)
+    setError(null)
+    let currentIds = ids
+    try {
+      for (const file of files) {
+        const data = await uploadFile(file)
+        setUrlCache((prev) => ({ ...prev, [data.id]: data.url }))
+        currentIds = [...currentIds, data.id]
+        onChange(currentIds)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? [])
+          handleFiles(files)
+        }}
+      />
+
+      {ids.length > 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={ids} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {ids.map((id) => (
+                <SortableGalleryItem
+                  key={id}
+                  id={id}
+                  previewUrl={getPreviewUrl(id)}
+                  onRemove={() => onChange(ids.filter((i) => i !== id))}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      <div className="flex w-full gap-2 rounded-md border border-dashed p-3">
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+        >
+          <UploadIcon className="size-4" />
+          {uploading ? 'Uploading…' : 'Upload'}
+        </button>
+        <div className="w-px bg-border" />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => setPickerOpen(true)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+        >
+          <FolderOpenIcon className="size-4" />
+          Library
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        allowedTypes={['image']}
+        onSelect={(item) => {
+          if (!ids.includes(item.id)) {
+            setUrlCache((prev) => ({ ...prev, [item.id]: item.url }))
+            onChange([...ids, item.id])
+          }
+        }}
       />
     </div>
   )
@@ -407,6 +638,10 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
 
   if (field.type === 'media') {
     return <MediaInput value={value as string | null} onChange={onChange} allowedTypes={field.allowedTypes} />
+  }
+
+  if (field.type === 'media-gallery') {
+    return <MediaGalleryInput value={value as string[] | null} onChange={onChange} />
   }
 
   if (field.type === 'relation') {

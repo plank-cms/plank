@@ -30,7 +30,24 @@ function buildClient(cfg: Awaited<ReturnType<typeof getConfig>>) {
     region: 'auto',
     endpoint: `https://${cfg.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   })
+}
+
+function buildKey(cfg: Awaited<ReturnType<typeof getConfig>>, filename: string, prefix?: string): string {
+  const ext = extname(filename)
+  const name = `${randomBytes(16).toString('hex')}${ext}`
+  const parts = [cfg.pathPrefix?.replace(/\/$/, ''), prefix, name].filter(Boolean)
+  return parts.join('/')
+}
+
+function buildStoredUrl(cfg: Awaited<ReturnType<typeof getConfig>>, key: string): string {
+  return cfg.accessMode === 'private'
+    ? key
+    : cfg.publicUrl
+      ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
+      : key
 }
 
 export const r2Provider: MediaProvider = {
@@ -38,10 +55,7 @@ export const r2Provider: MediaProvider = {
     const cfg = await getConfig()
     const client = buildClient(cfg)
 
-    const ext = extname(file.originalname)
-    const filename = `${randomBytes(16).toString('hex')}${ext}`
-    const parts = [cfg.pathPrefix?.replace(/\/$/, ''), options?.prefix, filename].filter(Boolean)
-    const key = parts.join('/')
+    const key = buildKey(cfg, file.originalname, options?.prefix)
 
     await client.send(new PutObjectCommand({
       Bucket: cfg.bucket!,
@@ -50,13 +64,7 @@ export const r2Provider: MediaProvider = {
       ContentType: file.mimetype,
     }))
 
-    const url = cfg.accessMode === 'private'
-      ? key  // store key only; URL generated on-demand
-      : cfg.publicUrl
-        ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-        : key  // R2 has no default public URL — require publicUrl for public buckets
-
-    return { url, key }
+    return { url: buildStoredUrl(cfg, key), key }
   },
 
   async delete(key) {
@@ -79,5 +87,17 @@ export const r2Provider: MediaProvider = {
       throw new Error('R2 public bucket requires a public_url configured in Settings > Media.')
     }
     return `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
+  },
+
+  async presignUpload(filename, mimeType) {
+    const cfg = await getConfig()
+    const client = buildClient(cfg)
+    const key = buildKey(cfg, filename)
+    const upload_url = await getSignedUrl(
+      client,
+      new PutObjectCommand({ Bucket: cfg.bucket!, Key: key }),
+      { expiresIn: 300 },
+    )
+    return { upload_url, key, stored_url: buildStoredUrl(cfg, key) }
   },
 }

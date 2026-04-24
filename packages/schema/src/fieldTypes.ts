@@ -15,6 +15,8 @@ export function toPostgresType(field: FieldDefinition): string {
       return 'TIMESTAMP'
     case 'media':
       return 'TEXT'
+    case 'media-gallery':
+      return 'JSONB'
     case 'relation':
       return 'TEXT'
     case 'uid':

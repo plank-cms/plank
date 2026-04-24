@@ -7,6 +7,7 @@ import {
   ToggleLeftIcon,
   CalendarIcon,
   ImageIcon,
+  LayoutGridIcon,
   LinkIcon,
   FingerprintIcon,
   ArrowLeftIcon,
@@ -106,6 +107,14 @@ const TYPE_OPTIONS: TypeOption[] = [
     description: 'Images, videos or files',
     color: 'text-rose-600',
     bg: 'bg-rose-50',
+  },
+  {
+    type: 'media-gallery',
+    icon: LayoutGridIcon,
+    label: 'Media Gallery',
+    description: 'Multiple images for galleries',
+    color: 'text-pink-600',
+    bg: 'bg-pink-50',
   },
   {
     type: 'uid',
@@ -243,7 +252,9 @@ export function AddFieldDialog({
       allowedTypes:
         selected.type === 'media' && config.allowedTypes.length > 0
           ? config.allowedTypes
-          : undefined,
+          : selected.type === 'media-gallery'
+            ? ['image']
+            : undefined,
       width: initialField?.width ?? 'full',
     })
     handleOpenChange(false)

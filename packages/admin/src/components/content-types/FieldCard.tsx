@@ -6,6 +6,7 @@ import {
   ToggleLeftIcon,
   CalendarIcon,
   ImageIcon,
+  LayoutGridIcon,
   LinkIcon,
   FingerprintIcon,
   GripVerticalIcon,
@@ -23,6 +24,7 @@ type FieldType =
   | 'boolean'
   | 'datetime'
   | 'media'
+  | 'media-gallery'
   | 'relation'
   | 'uid'
 type NumberSubtype = 'integer' | 'float'
@@ -84,6 +86,8 @@ function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
       }
     case 'media':
       return { icon: ImageIcon, label: 'Media', color: 'text-rose-600', bg: 'bg-rose-50' }
+    case 'media-gallery':
+      return { icon: LayoutGridIcon, label: 'Media Gallery', color: 'text-pink-600', bg: 'bg-pink-50' }
     case 'relation':
       return { icon: LinkIcon, label: 'Relation', color: 'text-indigo-600', bg: 'bg-indigo-50' }
     case 'uid':

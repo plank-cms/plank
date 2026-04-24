@@ -70,8 +70,13 @@ export const createEntry: SlugParam = async (req, res) => {
   const id = createId()
   const userId = req.user?.id ?? null
   const cols = ['id', 'created_by', ...fields.map((f) => f.name)].join(', ')
-  const placeholders = ['$1', '$2', ...fields.map((_, i) => `$${i + 3}`)].join(', ')
-  const values = [id, userId, ...fields.map((f) => req.body[f.name])]
+  const placeholders = ['$1', '$2', ...fields.map((f, i) =>
+    f.type === 'media-gallery' ? `$${i + 3}::jsonb` : `$${i + 3}`,
+  )].join(', ')
+  const values = [id, userId, ...fields.map((f) => {
+    const v = req.body[f.name]
+    return f.type === 'media-gallery' ? JSON.stringify(v) : v
+  })]
 
   const { rows } = await pool.query(
     `INSERT INTO ${ct.tableName} (${cols}) VALUES (${placeholders}) RETURNING *`,
@@ -90,8 +95,13 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   const fields = ct.fields.filter((f) => req.body[f.name] !== undefined)
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
-  const setClauses = fields.map((f, i) => `${f.name} = $${i + 1}`).join(', ')
-  const values = [...fields.map((f) => req.body[f.name]), req.params.id]
+  const setClauses = fields.map((f, i) =>
+    f.type === 'media-gallery' ? `${f.name} = $${i + 1}::jsonb` : `${f.name} = $${i + 1}`,
+  ).join(', ')
+  const values = [...fields.map((f) => {
+    const v = req.body[f.name]
+    return f.type === 'media-gallery' ? JSON.stringify(v) : v
+  }), req.params.id]
 
   const { rows } = await pool.query(
     `UPDATE ${ct.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
