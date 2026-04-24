@@ -1,6 +1,6 @@
 {
   "name": "@am25/plank-cms",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Self-hosted headless CMS. Deploy in minutes on your own infrastructure.",
   "type": "module",
   "files": [
