@@ -15,6 +15,8 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip.tsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,9 @@ type Entry = Record<string, unknown> & {
   scheduled_for: string | null
   created_at: string
   updated_at: string
+  _author_first_name: string | null
+  _author_last_name: string | null
+  _author_avatar_url: string | null
 }
 
 type EntriesResponse = { data: Entry[]; total: number; page: number; limit: number }
@@ -149,6 +154,40 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
     <span className={isUid ? 'font-mono text-xs text-muted-foreground truncate max-w-40 block' : 'font-medium truncate max-w-50 block'}>
       {text.length > 60 ? text.slice(0, 60) + '…' : text}
     </span>
+  )
+}
+
+// ─── AuthorAvatar ─────────────────────────────────────────────────────────────
+
+function authorInitials(firstName: string | null, lastName: string | null): string {
+  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase()
+  if (firstName) return firstName.slice(0, 2).toUpperCase()
+  return '?'
+}
+
+function AuthorAvatar({ entry }: { entry: Entry }) {
+  const first = entry._author_first_name
+  const last = entry._author_last_name
+  const avatarUrl = entry._author_avatar_url
+
+  const label = first || last
+    ? [first, last].filter(Boolean).join(' ')
+    : null
+
+  const avatar = (
+    <Avatar key={avatarUrl ?? 'fallback'} className="size-7">
+      {avatarUrl && <AvatarImage src={avatarUrl} alt="" className="object-cover" />}
+      <AvatarFallback className="text-[10px]">{authorInitials(first, last)}</AvatarFallback>
+    </Avatar>
+  )
+
+  if (!label) return avatar
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{avatar}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -445,7 +484,7 @@ export function EntriesList() {
       )}
 
       {!loadingEntries && (entries?.data ?? []).length > 0 && (
-        <>
+        <TooltipProvider>
           <div className="overflow-hidden rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/50">
@@ -459,6 +498,7 @@ export function EntriesList() {
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published / Scheduled</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -487,7 +527,10 @@ export function EntriesList() {
                       <StatusBadge entry={entry} fields={ct.fields} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <AuthorAvatar entry={entry} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => navigate(`/content/${slug}/${entry.id}`)}
@@ -524,7 +567,7 @@ export function EntriesList() {
               </div>
             </div>
           )}
-        </>
+        </TooltipProvider>
       )}
 
       {/* Configure view dialog */}

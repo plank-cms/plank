@@ -22,6 +22,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
     `  published_data JSONB,`,
     `  published_at   TIMESTAMP,`,
     `  scheduled_for  TIMESTAMP,`,
+    `  created_by     TEXT REFERENCES plank_users(id) ON DELETE SET NULL,`,
     `  created_at     TIMESTAMP NOT NULL DEFAULT NOW(),`,
     `  updated_at     TIMESTAMP NOT NULL DEFAULT NOW()`,
     `)`,

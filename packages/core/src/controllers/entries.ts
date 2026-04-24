@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express'
 import { pool, createId } from '@plank/db'
 import { findContentTypeBySlug, validate, assertSafeIdentifier } from '@plank/schema'
+import { getProvider } from '../media/index.js'
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
@@ -14,12 +15,35 @@ export const listEntries: SlugParam = async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? 20))))
   const offset = (page - 1) * limit
 
+  const allowedSort = ['created_at', 'updated_at', 'published_at', ...ct.fields.map((f) => f.name)]
+  const sortField = allowedSort.includes(String(req.query.sort ?? '')) ? String(req.query.sort) : 'created_at'
+  const sortDir = req.query.order === 'asc' ? 'ASC' : 'DESC'
+  assertSafeIdentifier(sortField)
+
   const [{ rows }, { rows: countRows }] = await Promise.all([
-    pool.query(`SELECT * FROM ${ct.tableName} ORDER BY created_at DESC LIMIT $1 OFFSET $2`, [limit, offset]),
+    pool.query(
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+       FROM ${ct.tableName} e
+       LEFT JOIN plank_users u ON u.id = e.created_by
+       ORDER BY e.${sortField} ${sortDir}
+       LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    ),
     pool.query(`SELECT COUNT(*) as count FROM ${ct.tableName}`),
   ])
 
-  res.json({ data: rows, total: parseInt(countRows[0].count), page, limit })
+  const provider = await getProvider()
+  const data = await Promise.all(
+    rows.map(async (row) => {
+      const key = row._author_avatar_url as string | null
+      if (key && !key.startsWith('http')) {
+        return { ...row, _author_avatar_url: await provider.getUrl(key) }
+      }
+      return row
+    }),
+  )
+
+  res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
 
 export const getEntry: SlugIdParam = async (req, res) => {
@@ -44,9 +68,10 @@ export const createEntry: SlugParam = async (req, res) => {
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   const id = createId()
-  const cols = ['id', ...fields.map((f) => f.name)].join(', ')
-  const placeholders = ['$1', ...fields.map((_, i) => `$${i + 2}`)].join(', ')
-  const values = [id, ...fields.map((f) => req.body[f.name])]
+  const userId = req.user?.id ?? null
+  const cols = ['id', 'created_by', ...fields.map((f) => f.name)].join(', ')
+  const placeholders = ['$1', '$2', ...fields.map((_, i) => `$${i + 3}`)].join(', ')
+  const values = [id, userId, ...fields.map((f) => req.body[f.name])]
 
   const { rows } = await pool.query(
     `INSERT INTO ${ct.tableName} (${cols}) VALUES (${placeholders}) RETURNING *`,
