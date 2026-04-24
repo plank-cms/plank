@@ -56,7 +56,9 @@ function LayoutShell() {
     <TooltipProvider delayDuration={300}>
       <div className="flex h-svh overflow-hidden bg-background">
         <aside className="flex h-full w-14 shrink-0 flex-col items-center gap-4 border-r border-sidebar-border bg-sidebar py-4">
-          <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="px-3 pb-4" />
+          <NavLink to="/">
+            <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="px-3 pb-4" />
+          </NavLink>
 
           {/* Nav */}
           <nav className="flex flex-1 flex-col items-center gap-1 pt-2">
