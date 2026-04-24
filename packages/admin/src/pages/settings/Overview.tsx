@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useSettings } from '@/context/settings.tsx'
+import { Card, CardContent } from '@/components/ui/card.tsx'
+import pkg from '../../../package.json'
 
 // Common IANA timezone identifiers with friendly labels
 const TIMEZONES = [
@@ -79,6 +81,15 @@ function GeneralSettings() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardContent className="flex items-center gap-4 py-2">
+          <img src="/plank-logo-w.svg" alt="Plank CMS" className="h-10 w-auto" />
+          <div>
+            <p className="font-bold">Plank CMS by AM25</p>
+            <p className="text-sm text-muted-foreground">Version {pkg.version}</p>
+          </div>
+        </CardContent>
+      </Card>
       <div className="border-b pb-4">
         <h2 className="text-2xl font-semibold">Commons</h2>
         <p className="text-sm text-muted-foreground">General settings that apply across the CMS.</p>
