@@ -45,7 +45,7 @@ function ToolbarButton({ onClick, active, disabled, title, children }: ToolbarBu
         onClick()
       }}
       className={cn(
-        'flex size-7 items-center justify-center rounded text-sm transition-colors',
+        'flex size-7 items-center justify-center rounded transition-colors',
         active
           ? 'bg-foreground text-background'
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -70,11 +70,15 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     ],
     content: (() => {
       if (!value) return ''
-      try { return JSON.parse(value) } catch { return value }
+      try {
+        return JSON.parse(value)
+      } catch {
+        return value
+      }
     })(),
     editorProps: {
       attributes: {
-        class: 'min-h-40 px-3 py-2.5 text-sm focus:outline-none',
+        class: 'h-96 px-3 py-2.5 focus:outline-none',
       },
     },
     onUpdate({ editor }) {
@@ -84,7 +88,15 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
   useEffect(() => {
     if (!editor) return
-    const incoming = value ? (() => { try { return JSON.parse(value) } catch { return value } })() : ''
+    const incoming = value
+      ? (() => {
+          try {
+            return JSON.parse(value)
+          } catch {
+            return value
+          }
+        })()
+      : ''
     const current = JSON.stringify(editor.getJSON())
     if (current !== value) editor.commands.setContent(incoming, { emitUpdate: false })
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,7 +106,10 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     const prev = editor.getAttributes('link').href as string | undefined
     const url = window.prompt('URL', prev ?? 'https://')
     if (url === null) return
-    if (!url) { editor.chain().focus().unsetLink().run(); return }
+    if (!url) {
+      editor.chain().focus().unsetLink().run()
+      return
+    }
     editor.chain().focus().setLink({ href: url }).run()
   }
 
@@ -103,7 +118,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   return (
     <div className="overflow-hidden rounded-md border border-input bg-background focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-background px-2 py-1.5">
         <ToolbarButton
           title="Bold"
           active={editor.isActive('bold')}
@@ -200,11 +215,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
         <ToolbarDivider />
 
-        <ToolbarButton
-          title="Add link"
-          active={editor.isActive('link')}
-          onClick={handleSetLink}
-        >
+        <ToolbarButton title="Add link" active={editor.isActive('link')} onClick={handleSetLink}>
           <LinkIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
@@ -226,9 +237,9 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       </div>
 
       {/* Editor area */}
-      <div className="relative">
+      <div className="relative overflow-y-auto">
         {editor.isEmpty && placeholder && (
-          <p className="pointer-events-none absolute left-3 top-2.5 text-sm text-muted-foreground select-none">
+          <p className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground select-none">
             {placeholder}
           </p>
         )}
