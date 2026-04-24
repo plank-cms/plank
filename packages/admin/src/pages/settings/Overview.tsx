@@ -5,7 +5,13 @@ import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Label } from '@/components/ui/label.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useSettings } from '@/context/settings.tsx'
 
@@ -72,11 +78,15 @@ function GeneralSettings() {
   if (loading) return <Spinner />
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="space-y-6">
+      <div className="border-b pb-4">
+        <h2 className="text-2xl font-semibold">Commons</h2>
+        <p className="text-sm text-muted-foreground">General settings that apply across the CMS.</p>
+      </div>
       <div className="space-y-1.5">
         <Label htmlFor="timezone">Timezone</Label>
         <Select value={timezone} onValueChange={setTimezone}>
-          <SelectTrigger id="timezone">
+          <SelectTrigger id="timezone" className="w-1/2">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="max-h-72">

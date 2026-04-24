@@ -22,7 +22,13 @@ const MASKED = '••••••••'
 
 // ─── Local fields ─────────────────────────────────────────────────────────────
 
-function LocalFields({ values, onChange }: { values: Settings; onChange: (k: string, v: string) => void }) {
+function LocalFields({
+  values,
+  onChange,
+}: {
+  values: Settings
+  onChange: (k: string, v: string) => void
+}) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -96,7 +102,9 @@ function SecretInput({
         </button>
       </div>
       {isAlreadySet && (
-        <p className="text-xs text-muted-foreground">A value is already saved. Enter a new one to replace it.</p>
+        <p className="text-xs text-muted-foreground">
+          A value is already saved. Enter a new one to replace it.
+        </p>
       )}
     </div>
   )
@@ -104,7 +112,13 @@ function SecretInput({
 
 // ─── S3 fields ────────────────────────────────────────────────────────────────
 
-function S3Fields({ values, onChange }: { values: Settings; onChange: (k: string, v: string) => void }) {
+function S3Fields({
+  values,
+  onChange,
+}: {
+  values: Settings
+  onChange: (k: string, v: string) => void
+}) {
   const isPrivate = values['s3.access_mode'] === 'private'
 
   return (
@@ -128,16 +142,17 @@ function S3Fields({ values, onChange }: { values: Settings; onChange: (k: string
         />
       </div>
 
+      <div className="space-y-1.5">
+        <Label htmlFor="s3-region">Region</Label>
+        <Input
+          id="s3-region"
+          placeholder="us-east-1"
+          value={values['s3.region'] ?? ''}
+          onChange={(e) => onChange('s3.region', e.target.value)}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="s3-region">Region</Label>
-          <Input
-            id="s3-region"
-            placeholder="us-east-1"
-            value={values['s3.region'] ?? ''}
-            onChange={(e) => onChange('s3.region', e.target.value)}
-          />
-        </div>
         <div className="space-y-1.5">
           <Label htmlFor="s3-bucket">Bucket</Label>
           <Input
@@ -147,19 +162,16 @@ function S3Fields({ values, onChange }: { values: Settings; onChange: (k: string
             onChange={(e) => onChange('s3.bucket', e.target.value)}
           />
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="s3-path-prefix">Path prefix</Label>
-        <Input
-          id="s3-path-prefix"
-          placeholder="cms/media"
-          value={values['s3.path_prefix'] ?? ''}
-          onChange={(e) => onChange('s3.path_prefix', e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Optional. Use this if the bucket is shared with other projects.
-        </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="s3-path-prefix">Path prefix</Label>
+          <Input
+            id="s3-path-prefix"
+            placeholder="cms/media"
+            value={values['s3.path_prefix'] ?? ''}
+            onChange={(e) => onChange('s3.path_prefix', e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Optional. Shared bucket subfolder.</p>
+        </div>
       </div>
 
       <div className="flex items-center justify-between rounded-lg border p-4">
@@ -195,24 +207,17 @@ function S3Fields({ values, onChange }: { values: Settings; onChange: (k: string
 
 // ─── R2 fields ────────────────────────────────────────────────────────────────
 
-function R2Fields({ values, onChange }: { values: Settings; onChange: (k: string, v: string) => void }) {
+function R2Fields({
+  values,
+  onChange,
+}: {
+  values: Settings
+  onChange: (k: string, v: string) => void
+}) {
   const isPrivate = values['r2.access_mode'] === 'private'
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="r2-account-id">Account ID</Label>
-        <Input
-          id="r2-account-id"
-          placeholder="023e105f4ecef8ad9ca31a8372d0c353"
-          value={values['r2.account_id'] ?? ''}
-          onChange={(e) => onChange('r2.account_id', e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Found in the Cloudflare dashboard under R2 &gt; Overview.
-        </p>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="r2-access-key">Access key ID</Label>
@@ -232,27 +237,26 @@ function R2Fields({ values, onChange }: { values: Settings; onChange: (k: string
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="r2-bucket">Bucket</Label>
-        <Input
-          id="r2-bucket"
-          placeholder="my-bucket"
-          value={values['r2.bucket'] ?? ''}
-          onChange={(e) => onChange('r2.bucket', e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="r2-path-prefix">Path prefix</Label>
-        <Input
-          id="r2-path-prefix"
-          placeholder="cms/media"
-          value={values['r2.path_prefix'] ?? ''}
-          onChange={(e) => onChange('r2.path_prefix', e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Optional. Use this if the bucket is shared with other projects.
-        </p>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="r2-bucket">Bucket</Label>
+          <Input
+            id="r2-bucket"
+            placeholder="my-bucket"
+            value={values['r2.bucket'] ?? ''}
+            onChange={(e) => onChange('r2.bucket', e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="r2-path-prefix">Path prefix</Label>
+          <Input
+            id="r2-path-prefix"
+            placeholder="cms/media"
+            value={values['r2.path_prefix'] ?? ''}
+            onChange={(e) => onChange('r2.path_prefix', e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Optional. Shared bucket subfolder.</p>
+        </div>
       </div>
 
       <div className="flex items-center justify-between rounded-lg border p-4">
@@ -268,22 +272,22 @@ function R2Fields({ values, onChange }: { values: Settings; onChange: (k: string
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="r2-public-url">
-          Public URL{!isPrivate && <span className="ml-1 text-destructive">*</span>}
-        </Label>
-        <Input
-          id="r2-public-url"
-          placeholder="https://assets.example.com"
-          value={values['r2.public_url'] ?? ''}
-          onChange={(e) => onChange('r2.public_url', e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          {isPrivate
-            ? 'Optional. Custom domain for the bucket.'
-            : 'Required for public buckets. R2 does not generate public URLs automatically.'}
-        </p>
-      </div>
+      {!isPrivate && (
+        <div className="space-y-1.5">
+          <Label htmlFor="r2-public-url">
+            Public URL <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="r2-public-url"
+            placeholder="https://assets.example.com"
+            value={values['r2.public_url'] ?? ''}
+            onChange={(e) => onChange('r2.public_url', e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Required for public buckets. R2 does not generate public URLs automatically.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -334,19 +338,40 @@ export function MediaSettings() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl">
-      <div className="space-y-1.5">
-        <Label htmlFor="provider">Storage provider</Label>
-        <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
-          <SelectTrigger id="provider" className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="local">Local</SelectItem>
-            <SelectItem value="s3">Amazon S3</SelectItem>
-            <SelectItem value="r2">Cloudflare R2</SelectItem>
-          </SelectContent>
-        </Select>
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="border-b pb-4">
+        <h2 className="text-2xl font-semibold">Storage</h2>
+        <p className="text-sm text-muted-foreground">Configure where uploaded files are stored.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="provider">Storage provider</Label>
+          <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
+            <SelectTrigger id="provider">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="local">Local</SelectItem>
+              <SelectItem value="s3">Amazon S3</SelectItem>
+              <SelectItem value="r2">Cloudflare R2</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {provider === 'r2' && (
+          <div className="space-y-1.5">
+            <Label htmlFor="r2-account-id">Account ID</Label>
+            <Input
+              id="r2-account-id"
+              placeholder="023e105f4ecef8ad9ca31a8372d0c353"
+              value={values['r2.account_id'] ?? ''}
+              onChange={(e) => handleChange('r2.account_id', e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Found in the Cloudflare dashboard under R2 &gt; Overview.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="border-t pt-6">
