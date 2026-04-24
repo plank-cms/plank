@@ -11,7 +11,14 @@ import { errorHandler } from './middlewares/errorHandler.js'
 
 const app: Express = express()
 
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'img-src': ["'self'", 'data:', 'https:'],
+    },
+  },
+}))
 app.use(express.json())
 
 // /cms/* is only accessible from the admin panel origin

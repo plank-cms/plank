@@ -83,7 +83,7 @@ function GeneralSettings() {
     <div className="space-y-6">
       <Card>
         <CardContent className="flex items-center gap-4 py-2">
-          <img src="/plank-logo-w.svg" alt="Plank CMS" className="h-10 w-auto" />
+          <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="h-10 w-auto" />
           <div>
             <p className="font-bold">Plank CMS by AM25</p>
             <p className="text-sm text-muted-foreground">Version {pkg.version}</p>
