@@ -298,14 +298,14 @@ export function MediaSettings() {
   const { data: saved, loading } = useFetch<Settings>('/cms/admin/settings/media')
   const { loading: saving, error, request } = useApi<Settings>()
 
-  const [values, setValues] = useState<Settings>({})
-  const [provider, setProvider] = useState<Provider>('local')
+  const [values, setValues] = useState<Settings>({ provider: 'local' })
   const [saved_, setSaved] = useState(false)
+
+  const provider = (values['provider'] as Provider) || 'local'
 
   useEffect(() => {
     if (!saved) return
     setValues(saved)
-    setProvider((saved['provider'] as Provider) ?? 'local')
   }, [saved])
 
   function handleChange(key: string, value: string) {
@@ -313,14 +313,13 @@ export function MediaSettings() {
   }
 
   function handleProviderChange(p: Provider) {
-    setProvider(p)
     setValues((prev) => ({ ...prev, provider: p }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      await request('/cms/admin/settings/media', 'PUT', { ...values, provider })
+      await request('/cms/admin/settings/media', 'PUT', values)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch {
@@ -349,9 +348,7 @@ export function MediaSettings() {
           <Label htmlFor="provider">Storage provider</Label>
           <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
             <SelectTrigger id="provider">
-              <SelectValue>
-                {provider === 'local' ? 'Local' : provider === 's3' ? 'Amazon S3' : 'Cloudflare R2'}
-              </SelectValue>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="local">Local</SelectItem>
