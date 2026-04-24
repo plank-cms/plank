@@ -1,1 +1,17 @@
 /* Custom styles for Plank CMS admin panel */
+
+/* Rich text editor content styles */
+.tiptap h1 { @apply text-2xl font-bold mt-4 mb-2; }
+.tiptap h2 { @apply text-xl font-bold mt-3 mb-2; }
+.tiptap h3 { @apply text-lg font-semibold mt-3 mb-1.5; }
+.tiptap p { @apply leading-relaxed; }
+.tiptap p + p { @apply mt-2; }
+.tiptap ul { @apply list-disc pl-5 my-2 space-y-1; }
+.tiptap ol { @apply list-decimal pl-5 my-2 space-y-1; }
+.tiptap blockquote { @apply border-l-2 border-border pl-4 text-muted-foreground my-2 italic; }
+.tiptap code { @apply bg-muted rounded px-1 py-0.5 font-mono text-xs; }
+.tiptap pre { @apply bg-muted rounded-md p-3 my-2 overflow-x-auto; }
+.tiptap pre code { @apply bg-transparent p-0 text-xs; }
+.tiptap a { @apply text-primary underline; }
+.tiptap strong { @apply font-semibold; }
+.tiptap em { @apply italic; }

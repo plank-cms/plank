@@ -57,7 +57,7 @@ function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
     case 'richtext':
       return {
         icon: FileTextIcon,
-        label: 'Rich text (string)',
+        label: 'Rich text (blocks)',
         color: 'text-violet-600',
         bg: 'bg-violet-50',
       }

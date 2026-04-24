@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { RichTextEditor } from '@/components/ui/rich-text-editor.tsx'
 import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon } from 'lucide-react'
 
 type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
@@ -342,7 +343,17 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
     )
   }
 
-  if (field.type === 'text' || field.type === 'richtext') {
+  if (field.type === 'richtext') {
+    return (
+      <RichTextEditor
+        value={String(value ?? '')}
+        onChange={onChange}
+        placeholder={field.name}
+      />
+    )
+  }
+
+  if (field.type === 'text') {
     return (
       <Textarea
         className={sharedClass}

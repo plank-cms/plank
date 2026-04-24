@@ -59,7 +59,7 @@ const TYPE_OPTIONS: TypeOption[] = [
   {
     type: 'richtext',
     icon: FileTextIcon,
-    label: 'Rich text (string)',
+    label: 'Rich text (blocks)',
     description: 'Formatted HTML content',
     color: 'text-violet-600',
     bg: 'bg-violet-50',
