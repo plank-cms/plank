@@ -26,7 +26,7 @@ export function Login() {
     fetch('/cms/auth/setup')
       .then((r) => r.json())
       .then((data: { needsSetup: boolean }) => setNeedsSetup(data.needsSetup))
-      .catch(() => setNeedsSetup(false))
+      .catch(() => setNeedsSetup(true))
   }, [])
 
   async function handleSubmit(e: { preventDefault(): void }) {

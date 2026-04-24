@@ -35,6 +35,8 @@ app.use('/cms/cron', cors(), cronRouter)
 // /api/* is public — any origin can consume it (headless CMS)
 app.use('/api', cors(), publicRouter)
 
+app.get('/', (_req, res) => res.redirect('/admin'))
+
 // Serve admin panel static files in production.
 // PLANK_ADMIN_DIST is set by the CLI in the distributed package (bundled context).
 // Fallback resolves to packages/core/public/admin in the monorepo.
