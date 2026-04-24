@@ -33,4 +33,10 @@ for (const pkg of PACKAGES) {
   console.log(`  ${json.name.padEnd(24)} ${prev} → ${newVersion}`)
 }
 
+const initPath = resolve('packages/cli/src/commands/init.ts')
+let initSrc = readFileSync(initPath, 'utf8')
+initSrc = initSrc.replace(/const PACKAGE_VERSION = '[^']+'/, `const PACKAGE_VERSION = '${newVersion}'`)
+writeFileSync(initPath, initSrc)
+console.log(`  ${'PACKAGE_VERSION in init.ts'.padEnd(24)} → ${newVersion}`)
+
 console.log('\nDone. Commit, push, then create a GitHub Release to publish.\n')
