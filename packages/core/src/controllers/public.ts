@@ -7,7 +7,12 @@ import { getProvider } from '../media/index.js'
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
 
-type Row = Record<string, unknown> & { published_data?: Record<string, unknown> | null }
+type Row = Record<string, unknown> & {
+  published_data?: Record<string, unknown> | null
+  _author_first_name?: string | null
+  _author_last_name?: string | null
+  _author_avatar_url?: string | null
+}
 
 // Resolves media IDs to fresh URLs in-place across a list of serialized entries
 async function resolveMediaFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
@@ -43,9 +48,21 @@ async function resolveMediaFields(entries: Record<string, unknown>[], ct: Conten
   }
 }
 
+async function resolveAuthorAvatars(entries: Record<string, unknown>[]): Promise<void> {
+  const provider = await getProvider()
+  await Promise.all(
+    entries.map(async (entry) => {
+      const author = entry.author as { avatar_url: string | null } | null
+      if (author?.avatar_url && !author.avatar_url.startsWith('http')) {
+        author.avatar_url = await provider.getUrl(author.avatar_url)
+      }
+    }),
+  )
+}
+
 // Builds an ordered response: id first, then CT fields in builder order, then system fields
 function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<string, unknown> {
-  const { published_data, ...rest } = row
+  const { published_data, _author_first_name, _author_last_name, _author_avatar_url, ...rest } = row
   const source = statusParam === 'published' && published_data ? published_data : rest
 
   const out: Record<string, unknown> = { id: row.id }
@@ -55,6 +72,9 @@ function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<
   out.status = row.status
   out.created_at = row.created_at
   out.updated_at = row.updated_at
+  out.author = _author_first_name || _author_last_name
+    ? { first_name: _author_first_name ?? null, last_name: _author_last_name ?? null, avatar_url: _author_avatar_url ?? null }
+    : null
   return out
 }
 
@@ -74,7 +94,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   // Status filter: default published, opt-in to draft or all
   const statusParam = String(req.query.status ?? 'published')
   if (statusParam === 'published' || statusParam === 'draft') {
-    filterClauses.push(`status = $${filterValues.length + 1}`)
+    filterClauses.push(`e.status = $${filterValues.length + 1}`)
     filterValues.push(statusParam)
   }
   // statusParam === 'all' skips the filter entirely
@@ -83,7 +103,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     if (key === 'page' || key === 'limit' || key === 'status') continue
     if (knownFields.has(key)) {
       assertSafeIdentifier(key)
-      filterClauses.push(`${key} = $${filterValues.length + 1}`)
+      filterClauses.push(`e.${key} = $${filterValues.length + 1}`)
       filterValues.push(value)
     }
   }
@@ -94,14 +114,18 @@ export const listPublicEntries: SlugParam = async (req, res) => {
 
   const [{ rows }, { rows: countRows }] = await Promise.all([
     pool.query(
-      `SELECT * FROM ${ct.tableName} ${where} ORDER BY created_at DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+       FROM ${ct.tableName} e
+       LEFT JOIN plank_users u ON u.id = e.created_by
+       ${where} ORDER BY e.created_at DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
       [...filterValues, limit, offset],
     ),
-    pool.query(`SELECT COUNT(*) as count FROM ${ct.tableName} ${where}`, filterValues),
+    pool.query(`SELECT COUNT(*) as count FROM ${ct.tableName} e ${where}`, filterValues),
   ])
 
   const data = rows.map((row) => serializeEntry(row, ct, statusParam))
   await resolveMediaFields(data, ct)
+  await resolveAuthorAvatars(data)
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
 
@@ -113,17 +137,21 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   const statusParam = String(req.query.status ?? 'published')
   const statusClause =
     statusParam === 'published' || statusParam === 'draft'
-      ? ` AND status = $2`
+      ? ` AND e.status = $2`
       : ''
   const values: unknown[] = statusClause ? [req.params.id, statusParam] : [req.params.id]
 
   const { rows } = await pool.query(
-    `SELECT * FROM ${ct.tableName} WHERE id = $1${statusClause}`,
+    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+     FROM ${ct.tableName} e
+     LEFT JOIN plank_users u ON u.id = e.created_by
+     WHERE e.id = $1${statusClause}`,
     values,
   )
 
   if (!rows[0]) { res.status(404).json({ error: 'Not found' }); return }
   const entry = serializeEntry(rows[0], ct, statusParam)
   await resolveMediaFields([entry], ct)
+  await resolveAuthorAvatars([entry])
   res.json(entry)
 }
