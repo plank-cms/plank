@@ -1,8 +1,8 @@
 {
   "name": "@am25/plank-cms",
   "version": "0.1.0",
+  "description": "Self-hosted headless CMS. Deploy in minutes on your own infrastructure.",
   "type": "module",
-  "description": "Headless CMS — plug and play",
   "files": [
     "dist"
   ],
@@ -13,6 +13,32 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint src/"
+  },
+  "author": {
+    "name": "Alejandro Mártir",
+    "url": "https://alemartir.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/am25-labs/plank-cms#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/am25-labs/plank-cms.git"
+  },
+  "bugs": {
+    "url": "https://github.com/am25-labs/plank-cms/issues"
+  },
+  "keywords": [
+    "cms",
+    "headless-cms",
+    "self-hosted",
+    "express",
+    "postgresql",
+    "nodejs",
+    "typescript",
+    "am25"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1034.0",
