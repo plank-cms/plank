@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
@@ -298,22 +298,18 @@ export function MediaSettings() {
   const { data: saved, loading } = useFetch<Settings>('/cms/admin/settings/media')
   const { loading: saving, error, request } = useApi<Settings>()
 
-  const [values, setValues] = useState<Settings>({ provider: 'local' })
+  const [localValues, setLocalValues] = useState<Settings | null>(null)
   const [saved_, setSaved] = useState(false)
 
+  const values: Settings = localValues ?? saved ?? { provider: 'local' }
   const provider = (values['provider'] as Provider) || 'local'
 
-  useEffect(() => {
-    if (!saved) return
-    setValues(saved)
-  }, [saved])
-
   function handleChange(key: string, value: string) {
-    setValues((prev) => ({ ...prev, [key]: value }))
+    setLocalValues({ ...values, [key]: value })
   }
 
   function handleProviderChange(p: Provider) {
-    setValues((prev) => ({ ...prev, provider: p }))
+    setLocalValues({ ...values, provider: p })
   }
 
   async function handleSubmit(e: React.FormEvent) {

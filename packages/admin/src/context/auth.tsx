@@ -56,6 +56,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const user = JSON.parse(raw) as User
         dispatch({ type: 'LOGIN', payload: { user, token } })
+        // Refresh avatar URL — pre-signed URLs expire, so always fetch fresh on startup
+        fetch('/cms/admin/users/me', { headers: { Authorization: `Bearer ${token}` } })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data: { avatar_url?: string | null } | null) => {
+            if (!data) return
+            const avatarUrl = data.avatar_url ?? null
+            dispatch({ type: 'UPDATE_USER', payload: { avatarUrl } })
+            const stored = localStorage.getItem(USER_KEY)
+            if (stored) {
+              localStorage.setItem(USER_KEY, JSON.stringify({ ...JSON.parse(stored), avatarUrl }))
+            }
+          })
+          .catch(() => {})
       } catch {
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(USER_KEY)

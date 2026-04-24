@@ -29,4 +29,12 @@ export async function getProvider(): Promise<MediaProvider> {
   return provider
 }
 
+export async function isPrivateProvider(): Promise<boolean> {
+  const fromSettings = await getSetting('media', 'provider')
+  const name = fromSettings ?? process.env.PLANK_MEDIA_PROVIDER ?? 'local'
+  if (name === 'local') return false
+  const mode = await getSetting('media', `${name}.access_mode`)
+  return mode === 'private'
+}
+
 export const upload = multer({ storage: multer.memoryStorage() })
