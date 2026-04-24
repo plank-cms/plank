@@ -86,7 +86,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     if (!editor) return
     const incoming = value ? (() => { try { return JSON.parse(value) } catch { return value } })() : ''
     const current = JSON.stringify(editor.getJSON())
-    if (current !== value) editor.commands.setContent(incoming, false)
+    if (current !== value) editor.commands.setContent(incoming, { emitUpdate: false })
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSetLink() {
