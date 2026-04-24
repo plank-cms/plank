@@ -5,6 +5,7 @@ async function reset(): Promise<void> {
   await pool.query(`
     DROP TABLE IF EXISTS
       plank_migrations,
+      plank_settings,
       plank_media,
       plank_api_tokens,
       plank_content_types,
