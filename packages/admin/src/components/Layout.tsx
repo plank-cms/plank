@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/context/auth.tsx'
 import { SecondaryPanelProvider, useSecondaryPanelContext } from '@/context/secondaryPanel.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,12 +37,6 @@ const ADMIN_ITEMS = [
   { to: '/settings', icon: Settings2Icon, label: 'Settings' },
 ]
 
-function initials(user: { email: string; firstName?: string | null; lastName?: string | null }) {
-  if (user.firstName && user.lastName)
-    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-  if (user.firstName) return user.firstName.slice(0, 2).toUpperCase()
-  return user.email.slice(0, 2).toUpperCase()
-}
 
 function LayoutShell() {
   const { user, logout } = useAuth()
@@ -84,14 +78,12 @@ function LayoutShell() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <Avatar key={user?.avatarUrl ?? 'fallback'} className="size-8">
-                  {user?.avatarUrl && (
-                    <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />
-                  )}
-                  <AvatarFallback className="text-[11px]">
-                    {user ? initials(user) : '??'}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={user?.avatarUrl}
+                  firstName={user?.firstName}
+                  lastName={user?.lastName}
+                  email={user?.email}
+                />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="right" align="end" className="w-52">

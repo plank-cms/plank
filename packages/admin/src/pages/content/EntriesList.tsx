@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip.tsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -159,26 +159,19 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
 
 // ─── AuthorAvatar ─────────────────────────────────────────────────────────────
 
-function authorInitials(firstName: string | null, lastName: string | null): string {
-  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase()
-  if (firstName) return firstName.slice(0, 2).toUpperCase()
-  return '?'
-}
-
 function AuthorAvatar({ entry }: { entry: Entry }) {
   const first = entry._author_first_name
   const last = entry._author_last_name
-  const avatarUrl = entry._author_avatar_url
-
-  const label = first || last
-    ? [first, last].filter(Boolean).join(' ')
-    : null
+  const label = first || last ? [first, last].filter(Boolean).join(' ') : null
 
   const avatar = (
-    <Avatar key={avatarUrl ?? 'fallback'} className="size-7">
-      {avatarUrl && <AvatarImage src={avatarUrl} alt="" className="object-cover" />}
-      <AvatarFallback className="text-[10px]">{authorInitials(first, last)}</AvatarFallback>
-    </Avatar>
+    <UserAvatar
+      avatarUrl={entry._author_avatar_url}
+      firstName={first}
+      lastName={last}
+      className="size-7"
+      fallbackClassName="text-[10px]"
+    />
   )
 
   if (!label) return avatar

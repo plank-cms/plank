@@ -6,18 +6,13 @@ import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Card, CardHeader, CardTitle, CardContent, CardAction } from '@/components/ui/card.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar.tsx'
+import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible.tsx'
 import { PencilIcon, XIcon, CameraIcon, Trash2Icon } from 'lucide-react'
 
 type MeResponse = { first_name: string | null; last_name: string | null; avatar_url: string | null }
 type AvatarResponse = { avatarUrl: string }
 
-function getInitials(firstName: string | null, lastName: string | null, email: string) {
-  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase()
-  if (firstName) return firstName.slice(0, 2).toUpperCase()
-  return email.slice(0, 2).toUpperCase()
-}
 
 export function AccountCard() {
   const { user, updateUser } = useAuth()
@@ -110,12 +105,14 @@ export function AccountCard() {
                 disabled={uploadingAvatar || deletingAvatar}
                 title="Change avatar"
               >
-                <Avatar key={user?.avatarUrl ?? 'fallback'} className="size-20">
-                  {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt="Avatar" className="object-cover" />}
-                  <AvatarFallback className="text-xl">
-                    {getInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? '')}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={user?.avatarUrl}
+                  firstName={user?.firstName}
+                  lastName={user?.lastName}
+                  email={user?.email}
+                  className="size-20"
+                  fallbackClassName="text-xl"
+                />
                 <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                   {uploadingAvatar || deletingAvatar
                     ? <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
