@@ -349,7 +349,9 @@ export function MediaSettings() {
           <Label htmlFor="provider">Storage provider</Label>
           <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
             <SelectTrigger id="provider">
-              <SelectValue />
+              <SelectValue>
+                {provider === 'local' ? 'Local' : provider === 's3' ? 'Amazon S3' : 'Cloudflare R2'}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="local">Local</SelectItem>

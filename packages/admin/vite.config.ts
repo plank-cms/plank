@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), react()],
-  base: '/admin',
+  base: command === 'build' ? '/admin/' : '/',
   resolve: {
     alias: {
       '@': resolve(import.meta.dirname, 'src'),
@@ -22,4 +22,4 @@ export default defineConfig({
     outDir: '../core/public/admin',
     emptyOutDir: true,
   },
-})
+}))

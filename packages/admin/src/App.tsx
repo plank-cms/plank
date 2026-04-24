@@ -87,7 +87,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
-], { basename: '/admin' })
+], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' })
 
 export default function App() {
   return (
