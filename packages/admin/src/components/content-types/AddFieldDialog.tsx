@@ -12,12 +12,7 @@ import {
   ArrowLeftIcon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog.tsx'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -45,16 +40,88 @@ type TypeOption = {
 }
 
 const TYPE_OPTIONS: TypeOption[] = [
-  { type: 'string',   icon: TypeIcon,       label: 'Short text',    description: 'Titles, names, labels',           color: 'text-blue-600',    bg: 'bg-blue-50'    },
-  { type: 'text',     icon: AlignLeftIcon,  label: 'Long text',     description: 'Plain text, paragraphs',          color: 'text-sky-600',     bg: 'bg-sky-50'     },
-  { type: 'richtext', icon: FileTextIcon,   label: 'Rich text',     description: 'Formatted HTML content',          color: 'text-violet-600',  bg: 'bg-violet-50'  },
-  { type: 'number',   subtype: 'integer',   icon: HashIcon,         label: 'Integer',         description: 'Whole numbers',                    color: 'text-orange-600',  bg: 'bg-orange-50'  },
-  { type: 'number',   subtype: 'float',     icon: HashIcon,         label: 'Decimal',         description: 'Numbers with decimals',            color: 'text-orange-600',  bg: 'bg-orange-50'  },
-  { type: 'boolean',  icon: ToggleLeftIcon, label: 'Boolean',       description: 'True or false',                   color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { type: 'datetime', icon: CalendarIcon,   label: 'Date & time',   description: 'Timestamps and dates',            color: 'text-amber-600',   bg: 'bg-amber-50'   },
-  { type: 'media',    icon: ImageIcon,      label: 'Media',         description: 'Images, videos or files',         color: 'text-rose-600',    bg: 'bg-rose-50'    },
-  { type: 'uid',      icon: FingerprintIcon, label: 'UID',           description: 'Unique slug from a field',         color: 'text-teal-600',    bg: 'bg-teal-50'    },
-  { type: 'relation', icon: LinkIcon,        label: 'Relation',      description: 'Link to another content type',     color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+  {
+    type: 'string',
+    icon: TypeIcon,
+    label: 'Text',
+    description: 'Titles, names, labels',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+  },
+  {
+    type: 'text',
+    icon: AlignLeftIcon,
+    label: 'Long text',
+    description: 'Plain text, paragraphs',
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+  },
+  {
+    type: 'richtext',
+    icon: FileTextIcon,
+    label: 'Rich text',
+    description: 'Formatted HTML content',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+  },
+  {
+    type: 'number',
+    subtype: 'integer',
+    icon: HashIcon,
+    label: 'Integer',
+    description: 'Whole numbers',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'number',
+    subtype: 'float',
+    icon: HashIcon,
+    label: 'Decimal',
+    description: 'Numbers with decimals',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'boolean',
+    icon: ToggleLeftIcon,
+    label: 'Boolean',
+    description: 'True or false',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+  },
+  {
+    type: 'datetime',
+    icon: CalendarIcon,
+    label: 'Date & time',
+    description: 'Timestamps and dates',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+  },
+  {
+    type: 'media',
+    icon: ImageIcon,
+    label: 'Media',
+    description: 'Images, videos or files',
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+  },
+  {
+    type: 'uid',
+    icon: FingerprintIcon,
+    label: 'UID',
+    description: 'Unique slug from a field',
+    color: 'text-teal-600',
+    bg: 'bg-teal-50',
+  },
+  {
+    type: 'relation',
+    icon: LinkIcon,
+    label: 'Relation',
+    description: 'Link to another content type',
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+  },
 ]
 
 const MEDIA_TYPE_OPTIONS: { value: MediaAllowedType; label: string }[] = [
@@ -72,7 +139,13 @@ type ConfigState = {
   allowedTypes: MediaAllowedType[]
 }
 
-const EMPTY_CONFIG: ConfigState = { name: '', required: false, relatedTable: '', targetField: '', allowedTypes: [] }
+const EMPTY_CONFIG: ConfigState = {
+  name: '',
+  required: false,
+  relatedTable: '',
+  targetField: '',
+  allowedTypes: [],
+}
 
 type Props = {
   open: boolean
@@ -84,7 +157,15 @@ type Props = {
   onConfirm: (field: FieldCardData) => void
 }
 
-export function AddFieldDialog({ open, onOpenChange, existingNames, availableTables, stringFields, initialField, onConfirm }: Props) {
+export function AddFieldDialog({
+  open,
+  onOpenChange,
+  existingNames,
+  availableTables,
+  stringFields,
+  initialField,
+  onConfirm,
+}: Props) {
   const [selected, setSelected] = useState<TypeOption | null>(null)
   const [config, setConfig] = useState<ConfigState>(EMPTY_CONFIG)
   const [nameError, setNameError] = useState('')
@@ -98,7 +179,9 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
       setNameError('')
     } else if (initialField) {
       const match = TYPE_OPTIONS.find(
-        (o) => o.type === initialField.type && (o.subtype ?? undefined) === (initialField.subtype ?? undefined)
+        (o) =>
+          o.type === initialField.type &&
+          (o.subtype ?? undefined) === (initialField.subtype ?? undefined),
       )
       setSelected(match ?? null)
       setConfig({
@@ -131,8 +214,14 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
 
   function validate() {
     const trimmed = config.name.trim()
-    if (!trimmed) { setNameError('Name is required'); return false }
-    if (!/^[a-z][a-z0-9_]*$/.test(trimmed)) { setNameError('Lowercase letters, digits and underscores only'); return false }
+    if (!trimmed) {
+      setNameError('Name is required')
+      return false
+    }
+    if (!/^[a-z][a-z0-9_]*$/.test(trimmed)) {
+      setNameError('Lowercase letters, digits and underscores only')
+      return false
+    }
     if (existingNames.includes(trimmed) && trimmed !== initialField?.name) {
       setNameError('A field with this name already exists')
       return false
@@ -149,7 +238,10 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
       required: config.required || undefined,
       relatedTable: selected.type === 'relation' ? config.relatedTable : undefined,
       targetField: selected.type === 'uid' ? config.targetField : undefined,
-      allowedTypes: selected.type === 'media' && config.allowedTypes.length > 0 ? config.allowedTypes : undefined,
+      allowedTypes:
+        selected.type === 'media' && config.allowedTypes.length > 0
+          ? config.allowedTypes
+          : undefined,
       width: initialField?.width ?? 'full',
     })
     handleOpenChange(false)
@@ -189,7 +281,9 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
                   onClick={() => handleSelectType(option)}
                   className="flex flex-col items-start gap-2 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent"
                 >
-                  <div className={`flex size-8 items-center justify-center rounded-md ${option.bg}`}>
+                  <div
+                    className={`flex size-8 items-center justify-center rounded-md ${option.bg}`}
+                  >
                     <Icon className={`size-4 ${option.color}`} />
                   </div>
                   <div>
@@ -216,16 +310,22 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
                   setConfig((prev) => ({ ...prev, name: e.target.value }))
                   setNameError('')
                 }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleConfirm() }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirm()
+                }}
               />
               {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-              <p className="text-xs text-muted-foreground">Lowercase letters, digits and underscores. Must start with a letter.</p>
+              <p className="text-xs text-muted-foreground">
+                Lowercase letters, digits and underscores. Must start with a letter.
+              </p>
             </div>
 
             {selected?.type === 'media' && (
               <div className="flex flex-col gap-2">
                 <Label>Allowed file types</Label>
-                <p className="text-xs text-muted-foreground -mt-1">Leave all unchecked to allow any file type.</p>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Leave all unchecked to allow any file type.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {MEDIA_TYPE_OPTIONS.map(({ value, label }) => (
                     <div key={value} className="flex items-center gap-2">
@@ -241,7 +341,9 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
                           }))
                         }
                       />
-                      <Label htmlFor={`media-type-${value}`} className="cursor-pointer font-normal">{label}</Label>
+                      <Label htmlFor={`media-type-${value}`} className="cursor-pointer font-normal">
+                        {label}
+                      </Label>
                     </div>
                   ))}
                 </div>
@@ -251,15 +353,22 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
             {selected?.type === 'uid' && (
               <div className="flex flex-col gap-1.5">
                 <Label>Source field</Label>
-                <p className="text-xs text-muted-foreground">The slug will be auto-generated from this field's value.</p>
+                <p className="text-xs text-muted-foreground">
+                  The slug will be auto-generated from this field's value.
+                </p>
                 {stringFields.length > 0 ? (
-                  <Select value={config.targetField} onValueChange={(v) => setConfig((prev) => ({ ...prev, targetField: v }))}>
+                  <Select
+                    value={config.targetField}
+                    onValueChange={(v) => setConfig((prev) => ({ ...prev, targetField: v }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a text field" />
                     </SelectTrigger>
                     <SelectContent>
                       {stringFields.map((f) => (
-                        <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -275,13 +384,18 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
               <div className="flex flex-col gap-1.5">
                 <Label>Related content type</Label>
                 {availableTables.length > 0 ? (
-                  <Select value={config.relatedTable} onValueChange={(v) => setConfig((prev) => ({ ...prev, relatedTable: v }))}>
+                  <Select
+                    value={config.relatedTable}
+                    onValueChange={(v) => setConfig((prev) => ({ ...prev, relatedTable: v }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a content type" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTables.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -289,7 +403,9 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
                   <Input
                     placeholder="table_name"
                     value={config.relatedTable}
-                    onChange={(e) => setConfig((prev) => ({ ...prev, relatedTable: e.target.value }))}
+                    onChange={(e) =>
+                      setConfig((prev) => ({ ...prev, relatedTable: e.target.value }))
+                    }
                   />
                 )}
               </div>
@@ -299,13 +415,19 @@ export function AddFieldDialog({ open, onOpenChange, existingNames, availableTab
               <Checkbox
                 id="field-required"
                 checked={config.required}
-                onCheckedChange={(val) => setConfig((prev) => ({ ...prev, required: Boolean(val) }))}
+                onCheckedChange={(val) =>
+                  setConfig((prev) => ({ ...prev, required: Boolean(val) }))
+                }
               />
-              <Label htmlFor="field-required" className="cursor-pointer font-normal">Required field</Label>
+              <Label htmlFor="field-required" className="cursor-pointer font-normal">
+                Required field
+              </Label>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border pt-3">
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
               <Button onClick={handleConfirm}>{isEditing ? 'Save changes' : 'Add field'}</Button>
             </div>
           </div>

@@ -15,7 +15,16 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import type { DraggableSyntheticListeners } from '@dnd-kit/core'
 
-type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
+type FieldType =
+  | 'string'
+  | 'text'
+  | 'richtext'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'media'
+  | 'relation'
+  | 'uid'
 type NumberSubtype = 'integer' | 'float'
 export type FieldWidth = 'full' | 'half' | 'third'
 
@@ -42,11 +51,16 @@ type FieldMeta = {
 function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
   switch (type) {
     case 'string':
-      return { icon: TypeIcon, label: 'Short text', color: 'text-blue-600', bg: 'bg-blue-50' }
+      return { icon: TypeIcon, label: 'Text', color: 'text-blue-600', bg: 'bg-blue-50' }
     case 'text':
       return { icon: AlignLeftIcon, label: 'Long text', color: 'text-sky-600', bg: 'bg-sky-50' }
     case 'richtext':
-      return { icon: FileTextIcon, label: 'Rich text', color: 'text-violet-600', bg: 'bg-violet-50' }
+      return {
+        icon: FileTextIcon,
+        label: 'Rich text',
+        color: 'text-violet-600',
+        bg: 'bg-violet-50',
+      }
     case 'number':
       return {
         icon: HashIcon,
@@ -55,9 +69,19 @@ function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
         bg: 'bg-orange-50',
       }
     case 'boolean':
-      return { icon: ToggleLeftIcon, label: 'Boolean', color: 'text-emerald-600', bg: 'bg-emerald-50' }
+      return {
+        icon: ToggleLeftIcon,
+        label: 'Boolean',
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50',
+      }
     case 'datetime':
-      return { icon: CalendarIcon, label: 'Date & time', color: 'text-amber-600', bg: 'bg-amber-50' }
+      return {
+        icon: CalendarIcon,
+        label: 'Date & time',
+        color: 'text-amber-600',
+        bg: 'bg-amber-50',
+      }
     case 'media':
       return { icon: ImageIcon, label: 'Media', color: 'text-rose-600', bg: 'bg-rose-50' }
     case 'relation':
@@ -112,7 +136,14 @@ type FieldCardProps = {
   dragAttributes?: React.HTMLAttributes<HTMLElement>
 }
 
-export function FieldCard({ field, onWidthChange, onEdit, onDelete, dragListeners, dragAttributes }: FieldCardProps) {
+export function FieldCard({
+  field,
+  onWidthChange,
+  onEdit,
+  onDelete,
+  dragListeners,
+  dragAttributes,
+}: FieldCardProps) {
   const { icon: Icon, label, color, bg } = getFieldMeta(field.type, field.subtype)
   const currentWidth = field.width ?? 'full'
   const isDraggable = Boolean(dragListeners)
