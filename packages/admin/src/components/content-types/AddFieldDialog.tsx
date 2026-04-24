@@ -43,7 +43,7 @@ const TYPE_OPTIONS: TypeOption[] = [
   {
     type: 'string',
     icon: TypeIcon,
-    label: 'Text',
+    label: 'Text (string)',
     description: 'Titles, names, labels',
     color: 'text-blue-600',
     bg: 'bg-blue-50',
@@ -51,7 +51,7 @@ const TYPE_OPTIONS: TypeOption[] = [
   {
     type: 'text',
     icon: AlignLeftIcon,
-    label: 'Long text',
+    label: 'Long text (string)',
     description: 'Plain text, paragraphs',
     color: 'text-sky-600',
     bg: 'bg-sky-50',
@@ -59,7 +59,7 @@ const TYPE_OPTIONS: TypeOption[] = [
   {
     type: 'richtext',
     icon: FileTextIcon,
-    label: 'Rich text',
+    label: 'Rich text (string)',
     description: 'Formatted HTML content',
     color: 'text-violet-600',
     bg: 'bg-violet-50',
@@ -68,7 +68,7 @@ const TYPE_OPTIONS: TypeOption[] = [
     type: 'number',
     subtype: 'integer',
     icon: HashIcon,
-    label: 'Integer',
+    label: 'Integer (number)',
     description: 'Whole numbers',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
@@ -77,7 +77,7 @@ const TYPE_OPTIONS: TypeOption[] = [
     type: 'number',
     subtype: 'float',
     icon: HashIcon,
-    label: 'Decimal',
+    label: 'Decimal (number)',
     description: 'Numbers with decimals',
     color: 'text-orange-600',
     bg: 'bg-orange-50',
@@ -93,7 +93,7 @@ const TYPE_OPTIONS: TypeOption[] = [
   {
     type: 'datetime',
     icon: CalendarIcon,
-    label: 'Date & time',
+    label: 'Date & time (datetime)',
     description: 'Timestamps and dates',
     color: 'text-amber-600',
     bg: 'bg-amber-50',
@@ -248,7 +248,8 @@ export function AddFieldDialog({
   }
 
   const showStep2 = Boolean(selected)
-  const title = isEditing ? 'Edit field' : showStep2 ? `${selected!.label} field` : 'Add a field'
+  const baseLabel = selected?.label.replace(/\s*\(.*?\)/, '') ?? ''
+  const title = isEditing ? 'Edit field' : showStep2 ? `${baseLabel} field` : 'Add a field'
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

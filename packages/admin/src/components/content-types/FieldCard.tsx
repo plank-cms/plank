@@ -51,20 +51,20 @@ type FieldMeta = {
 function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
   switch (type) {
     case 'string':
-      return { icon: TypeIcon, label: 'Text', color: 'text-blue-600', bg: 'bg-blue-50' }
+      return { icon: TypeIcon, label: 'Text (string)', color: 'text-blue-600', bg: 'bg-blue-50' }
     case 'text':
-      return { icon: AlignLeftIcon, label: 'Long text', color: 'text-sky-600', bg: 'bg-sky-50' }
+      return { icon: AlignLeftIcon, label: 'Long text (string)', color: 'text-sky-600', bg: 'bg-sky-50' }
     case 'richtext':
       return {
         icon: FileTextIcon,
-        label: 'Rich text',
+        label: 'Rich text (string)',
         color: 'text-violet-600',
         bg: 'bg-violet-50',
       }
     case 'number':
       return {
         icon: HashIcon,
-        label: subtype === 'float' ? 'Decimal number' : 'Integer',
+        label: subtype === 'float' ? 'Decimal (number)' : 'Integer (number)',
         color: 'text-orange-600',
         bg: 'bg-orange-50',
       }
@@ -78,7 +78,7 @@ function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
     case 'datetime':
       return {
         icon: CalendarIcon,
-        label: 'Date & time',
+        label: 'Date & time (datetime)',
         color: 'text-amber-600',
         bg: 'bg-amber-50',
       }
