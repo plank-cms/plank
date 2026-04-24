@@ -35,6 +35,7 @@ const adminDist =
   process.env.PLANK_ADMIN_DIST ??
   join(dirname(fileURLToPath(import.meta.url)), '../public/admin')
 app.use('/admin', express.static(adminDist))
+app.get('/admin/*', (_req, res) => res.sendFile(join(adminDist, 'index.html')))
 
 app.use(errorHandler)
 

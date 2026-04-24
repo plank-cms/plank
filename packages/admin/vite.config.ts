@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+  base: '/admin',
   resolve: {
     alias: {
       '@': resolve(import.meta.dirname, 'src'),
