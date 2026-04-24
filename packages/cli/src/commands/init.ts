@@ -7,14 +7,15 @@ import { execa } from 'execa'
 
 const PACKAGE_VERSION = '0.1.0'
 
-function generateJwtSecret(): string {
+function generateSecret(): string {
   return randomBytes(32).toString('hex')
 }
 
-function buildEnv(jwtSecret: string): string {
+function buildEnv(jwtSecret: string, cronSecret: string): string {
   return [
     `PLANK_DATABASE_URL=postgresql://user:password@localhost:5432/plank`,
     `PLANK_JWT_SECRET=${jwtSecret}`,
+    `PLANK_CRON_SECRET=${cronSecret}`,
     `PLANK_PORT=5500`,
   ].join('\n') + '\n'
 }
@@ -71,7 +72,7 @@ export async function init(projectName?: string): Promise<void> {
 
   s.start('Creating project...')
   await fs.ensureDir(projectDir)
-  await fs.writeFile(join(projectDir, '.env'), buildEnv(generateJwtSecret()))
+  await fs.writeFile(join(projectDir, '.env'), buildEnv(generateSecret(), generateSecret()))
   await fs.writeJSON(join(projectDir, 'package.json'), buildPackageJson(name), { spaces: 2 })
   await fs.writeFile(join(projectDir, '.gitignore'), '.env\nnode_modules\n')
   s.stop('Project created')
