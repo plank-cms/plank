@@ -489,7 +489,7 @@ export function EntriesList() {
                   ))}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Published / Scheduled</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Pub / Sch</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
                   <th className="px-4 py-3" />
