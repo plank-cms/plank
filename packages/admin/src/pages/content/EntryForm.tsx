@@ -91,9 +91,20 @@ export function EntryForm() {
     }
 
     if (existing.status === 'published' && existing.published_data) {
+      const normalize = (v: unknown, type: string) => {
+        if (type === 'datetime' && v && typeof v === 'string') {
+          const d = new Date(v)
+          return isNaN(d.getTime()) ? v : d.toISOString()
+        }
+        return v
+      }
       const snap: Record<string, unknown> = {}
-      ct.fields.forEach((f) => { snap[f.name] = existing.published_data![f.name] ?? (f.type === 'boolean' ? false : '') })
-      setIsPublishedStale(JSON.stringify(initial) !== JSON.stringify(snap))
+      ct.fields.forEach((f) => {
+        snap[f.name] = normalize(existing.published_data![f.name] ?? (f.type === 'boolean' ? false : ''), f.type)
+      })
+      const normalizedInitial: Record<string, unknown> = {}
+      ct.fields.forEach((f) => { normalizedInitial[f.name] = normalize(initial[f.name], f.type) })
+      setIsPublishedStale(JSON.stringify(normalizedInitial) !== JSON.stringify(snap))
     } else {
       setIsPublishedStale(false)
     }

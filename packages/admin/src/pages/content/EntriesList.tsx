@@ -168,8 +168,15 @@ function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
 
   if (entry.status === 'draft') return <Badge variant="outline">Draft</Badge>
 
+  const normalize = (v: unknown, type: string) => {
+    if (type === 'datetime' && v && typeof v === 'string') {
+      const d = new Date(v)
+      return isNaN(d.getTime()) ? v : d.toISOString()
+    }
+    return v
+  }
   const isStale = entry.published_data != null && fields.some(
-    (f) => JSON.stringify(entry[f.name]) !== JSON.stringify(entry.published_data![f.name])
+    (f) => JSON.stringify(normalize(entry[f.name], f.type)) !== JSON.stringify(normalize(entry.published_data![f.name], f.type))
   )
   return <Badge variant={isStale ? 'secondary' : 'default'}>Published</Badge>
 }
