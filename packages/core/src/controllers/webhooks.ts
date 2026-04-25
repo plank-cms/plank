@@ -18,10 +18,14 @@ const CreateWebhookSchema = z.object({
 })
 
 export async function listWebhooks(_req: Request, res: Response): Promise<void> {
-  const { rows } = await pool.query<WebhookRow>(
-    'SELECT id, name, url, events, enabled, created_at FROM plank_webhooks ORDER BY created_at DESC',
-  )
-  res.json(rows)
+  try {
+    const { rows } = await pool.query<WebhookRow>(
+      'SELECT id, name, url, events, enabled, created_at FROM plank_webhooks ORDER BY created_at DESC',
+    )
+    res.json(rows)
+  } catch {
+    res.status(500).json({ error: 'Failed to list webhooks' })
+  }
 }
 
 export async function createWebhook(req: Request, res: Response): Promise<void> {
@@ -34,18 +38,25 @@ export async function createWebhook(req: Request, res: Response): Promise<void> 
   const { name, url, events } = parsed.data
   const id = createId()
 
-  const { rows } = await pool.query<WebhookRow>(
-    'INSERT INTO plank_webhooks (id, name, url, events) VALUES ($1, $2, $3, $4) RETURNING *',
-    [id, name, url, events],
-  )
-
-  res.status(201).json(rows[0])
+  try {
+    const { rows } = await pool.query<WebhookRow>(
+      'INSERT INTO plank_webhooks (id, name, url, events) VALUES ($1, $2, $3, $4) RETURNING *',
+      [id, name, url, events],
+    )
+    res.status(201).json(rows[0])
+  } catch {
+    res.status(500).json({ error: 'Failed to create webhook' })
+  }
 }
 
 export async function deleteWebhook(req: Request, res: Response): Promise<void> {
-  const { rowCount } = await pool.query('DELETE FROM plank_webhooks WHERE id = $1', [req.params.id])
-  if (!rowCount) { res.status(404).json({ error: 'Webhook not found' }); return }
-  res.status(204).end()
+  try {
+    const { rowCount } = await pool.query('DELETE FROM plank_webhooks WHERE id = $1', [req.params.id])
+    if (!rowCount) { res.status(404).json({ error: 'Webhook not found' }); return }
+    res.status(204).end()
+  } catch {
+    res.status(500).json({ error: 'Failed to delete webhook' })
+  }
 }
 
 export async function triggerWebhooks(
