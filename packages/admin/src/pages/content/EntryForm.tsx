@@ -93,7 +93,10 @@ export function EntryForm() {
     if (existing.status === 'published' && existing.published_data) {
       const normalize = (v: unknown, type: string) => {
         if (type === 'datetime' && v && typeof v === 'string') {
-          const d = new Date(v)
+          // TIMESTAMP columns (no timezone) serialize to JSONB without a TZ indicator;
+          // append 'Z' so new Date() parses as UTC instead of local time.
+          const s = /Z|[+-]\d{2}:\d{2}$/.test(v) ? v : v + 'Z'
+          const d = new Date(s)
           return isNaN(d.getTime()) ? v : d.toISOString()
         }
         return v
