@@ -19,6 +19,7 @@ import { SettingsOverview } from './pages/settings/Overview.tsx'
 import { SettingsUsers } from './pages/settings/Users.tsx'
 import { SettingsRoles } from './pages/settings/Roles.tsx'
 import { SettingsApiTokens } from './pages/settings/ApiTokens.tsx'
+import { SettingsWebhooks } from './pages/settings/Webhooks.tsx'
 import { Profile } from './pages/Profile.tsx'
 
 const router = createBrowserRouter([
@@ -79,6 +80,14 @@ const router = createBrowserRouter([
             element: (
               <ProtectedRoute roles={['super admin']}>
                 <SettingsApiTokens />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'webhooks',
+            element: (
+              <ProtectedRoute roles={['super admin']}>
+                <SettingsWebhooks />
               </ProtectedRoute>
             ),
           },

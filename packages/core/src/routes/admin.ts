@@ -24,6 +24,7 @@ import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/ap
 import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, completeMedia } from '../controllers/media.js'
 import { upload } from '../media/index.js'
 import { getNamespaceSettings, updateNamespaceSettings } from '../controllers/settings.js'
+import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
 
 const router: IRouter = Router()
 
@@ -80,5 +81,10 @@ router.delete('/media/:id', authorize('media:write'), deleteMedia)
 // Settings
 router.get('/settings/:namespace', authorize('settings:read'), getNamespaceSettings)
 router.put('/settings/:namespace', authorize('settings:write'), updateNamespaceSettings)
+
+// Webhooks
+router.get('/webhooks', authorize('settings:read'), listWebhooks)
+router.post('/webhooks', authorize('settings:write'), createWebhook)
+router.delete('/webhooks/:id', authorize('settings:write'), deleteWebhook)
 
 export default router

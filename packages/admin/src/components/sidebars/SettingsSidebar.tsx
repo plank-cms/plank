@@ -1,4 +1,4 @@
-import { Settings2Icon, UsersRoundIcon, ShieldIcon, KeyRoundIcon } from 'lucide-react'
+import { Settings2Icon, UsersRoundIcon, ShieldIcon, KeyRoundIcon, WebhookIcon } from 'lucide-react'
 import { useAuth } from '@/context/auth.tsx'
 import { SidebarNav } from './SidebarNav.tsx'
 
@@ -9,6 +9,7 @@ const BASE_ITEMS = [
 const SUPER_ADMIN_ITEMS = [
   { label: 'Roles', to: '/settings/roles', icon: ShieldIcon },
   { label: 'API Tokens', to: '/settings/api-tokens', icon: KeyRoundIcon },
+  { label: 'Webhooks', to: '/settings/webhooks', icon: WebhookIcon },
 ]
 
 export function SettingsSidebar() {

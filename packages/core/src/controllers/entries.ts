@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express'
 import { pool, createId } from '@plank/db'
 import { findContentTypeBySlug, validate, assertSafeIdentifier } from '@plank/schema'
 import { getProvider } from '../media/index.js'
+import { triggerWebhooks } from './webhooks.js'
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
@@ -104,6 +105,7 @@ export const createEntry: SlugParam = async (req, res) => {
     values,
   )
   res.status(201).json(rows[0])
+  triggerWebhooks('entry.created', { content_type: req.params.slug, entry_id: rows[0].id })
 }
 
 export const getSingleEntry: SlugParam = async (req, res) => {
@@ -143,6 +145,7 @@ export const updateEntry: SlugIdParam = async (req, res) => {
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
   res.json(rows[0])
+  triggerWebhooks('entry.updated', { content_type: req.params.slug, entry_id: req.params.id })
 }
 
 // Columns excluded from the published_data snapshot
@@ -216,6 +219,9 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
   res.json(rows[0])
+
+  const webhookEvent = status === 'published' ? 'entry.published' : status === 'draft' ? 'entry.unpublished' : null
+  if (webhookEvent) triggerWebhooks(webhookEvent, { content_type: req.params.slug, entry_id: req.params.id })
 }
 
 export const deleteEntry: SlugIdParam = async (req, res) => {
@@ -230,4 +236,5 @@ export const deleteEntry: SlugIdParam = async (req, res) => {
 
   if (!rowCount) { res.status(404).json({ error: 'Entry not found' }); return }
   res.status(204).end()
+  triggerWebhooks('entry.deleted', { content_type: req.params.slug, entry_id: req.params.id })
 }
