@@ -8,12 +8,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable'
+import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useSettings } from '@/context/settings.tsx'
 import { getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
@@ -27,10 +22,37 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { RichTextEditor } from '@/components/ui/custom/RichTextEditor.tsx'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command.tsx'
-import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon, GripVerticalIcon, CheckIcon, ChevronsUpDownIcon } from 'lucide-react'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command.tsx'
+import {
+  UploadIcon,
+  XIcon,
+  ImageIcon,
+  FolderOpenIcon,
+  FileIcon,
+  ChevronDownIcon,
+  GripVerticalIcon,
+  CheckIcon,
+  ChevronsUpDownIcon,
+} from 'lucide-react'
 
-type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'media-gallery' | 'relation' | 'uid'
+type FieldType =
+  | 'string'
+  | 'text'
+  | 'richtext'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'media'
+  | 'media-gallery'
+  | 'relation'
+  | 'uid'
 type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
 
 export type FieldDef = {
@@ -66,7 +88,13 @@ function buildAccept(allowedTypes?: FieldDef['allowedTypes']): string {
   return allowedTypes.map((t) => ACCEPT_MAP[t]).join(',')
 }
 
-type MediaItem = { id: string; filename: string; url: string; mime_type: string | null; size: number | null }
+type MediaItem = {
+  id: string
+  filename: string
+  url: string
+  mime_type: string | null
+  size: number | null
+}
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return '—'
@@ -83,7 +111,10 @@ function xhrPut(url: string, file: File): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`)))
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed: ${xhr.status}`))
     xhr.onerror = () => reject(new Error('Upload failed.'))
     xhr.send(file)
   })
@@ -100,14 +131,24 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   })
 
   if (presignRes.ok) {
-    const { id, upload_url, key, stored_url } = await presignRes.json() as {
-      id: string; upload_url: string; key: string; stored_url: string
+    const { id, upload_url, key, stored_url } = (await presignRes.json()) as {
+      id: string
+      upload_url: string
+      key: string
+      stored_url: string
     }
     await xhrPut(upload_url, file)
     const completeRes = await fetch('/cms/admin/media/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth },
-      body: JSON.stringify({ id, key, stored_url, filename: file.name, mime_type: file.type, size: file.size }),
+      body: JSON.stringify({
+        id,
+        key,
+        stored_url,
+        filename: file.name,
+        mime_type: file.type,
+        size: file.size,
+      }),
     })
     if (!completeRes.ok) throw new Error('Upload failed.')
     return completeRes.json() as Promise<{ id: string; url: string }>
@@ -124,7 +165,12 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   throw new Error('Upload failed.')
 }
 
-function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
+function MediaPickerDialog({
+  open,
+  onOpenChange,
+  allowedTypes,
+  onSelect,
+}: {
   open: boolean
   onOpenChange: (v: boolean) => void
   allowedTypes?: FieldDef['allowedTypes']
@@ -138,7 +184,7 @@ function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
     setLoading(true)
     const token = localStorage.getItem('plank_token')
     fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then((r) => r.ok ? r.json() as Promise<{ items: MediaItem[] }> : { items: [] })
+      .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
       .then((data) => setItems(data.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
@@ -174,12 +220,19 @@ function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => { onSelect(item); onOpenChange(false) }}
+                onClick={() => {
+                  onSelect(item)
+                  onOpenChange(false)
+                }}
                 className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
               >
                 <div className="aspect-square bg-muted">
                   {isImageMime(item.mime_type) ? (
-                    <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
+                    <img
+                      src={item.url}
+                      alt={item.filename}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full items-center justify-center">
                       <FileIcon className="size-6 text-muted-foreground" />
@@ -187,7 +240,12 @@ function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
                   )}
                 </div>
                 <div className="p-1.5">
-                  <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>{item.filename}</p>
+                  <p
+                    className="truncate text-[11px] font-medium leading-tight"
+                    title={item.filename}
+                  >
+                    {item.filename}
+                  </p>
                   <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
                 </div>
                 <div className="absolute inset-0 rounded-md ring-2 ring-primary ring-offset-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -200,7 +258,15 @@ function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
   )
 }
 
-function MediaInput({ value, onChange, allowedTypes }: { value: string | null; onChange: (v: unknown) => void; allowedTypes?: FieldDef['allowedTypes'] }) {
+function MediaInput({
+  value,
+  onChange,
+  allowedTypes,
+}: {
+  value: string | null
+  onChange: (v: unknown) => void
+  allowedTypes?: FieldDef['allowedTypes']
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -211,8 +277,14 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   const isLegacyUrl = typeof value === 'string' && value.startsWith('http')
 
   useEffect(() => {
-    if (!value) { setPreviewUrl(null); return }
-    if (isLegacyUrl) { setPreviewUrl(value); return }
+    if (!value) {
+      setPreviewUrl(null)
+      return
+    }
+    if (isLegacyUrl) {
+      setPreviewUrl(value)
+      return
+    }
     // It's a media ID — fetch a fresh URL
     const token = localStorage.getItem('plank_token')
     fetch(`/cms/admin/media/${value}/url`, {
@@ -263,7 +335,10 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
           size="icon"
           variant="secondary"
           className="absolute top-1.5 right-1.5 size-6"
-          onClick={() => { onChange(null); setPreviewUrl(null) }}
+          onClick={() => {
+            onChange(null)
+            setPreviewUrl(null)
+          }}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -273,10 +348,23 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
 
   return (
     <div>
-      <input ref={inputRef} type="file" accept={buildAccept(allowedTypes)} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+      <input
+        ref={inputRef}
+        type="file"
+        accept={buildAccept(allowedTypes)}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
+      />
       <div
         onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const f = e.dataTransfer.files[0]
+          if (f) handleFile(f)
+        }}
         className="flex w-full gap-2 rounded-md border border-dashed p-3"
       >
         <button
@@ -304,19 +392,29 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         allowedTypes={allowedTypes}
-        onSelect={(item) => { setPreviewUrl(item.url); onChange(item.id) }}
+        onSelect={(item) => {
+          setPreviewUrl(item.url)
+          onChange(item.id)
+        }}
       />
     </div>
   )
 }
 
-function SortableGalleryItem({ id, previewUrl, filename, onRemove }: {
+function SortableGalleryItem({
+  id,
+  previewUrl,
+  filename,
+  onRemove,
+}: {
   id: string
   previewUrl: string | null
   filename: string
   onRemove: () => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -360,7 +458,13 @@ function SortableGalleryItem({ id, previewUrl, filename, onRemove }: {
   )
 }
 
-function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChange: (v: unknown) => void }) {
+function MediaGalleryInput({
+  value,
+  onChange,
+}: {
+  value: string[] | null
+  onChange: (v: unknown) => void
+}) {
   const ids = Array.isArray(value) ? value : []
   const [urlCache, setUrlCache] = useState<Record<string, string>>({})
   const [nameCache, setNameCache] = useState<Record<string, string>>({})
@@ -521,7 +625,11 @@ function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChan
   )
 }
 
-function DateTimeInput({ value, onChange, timezone }: {
+function DateTimeInput({
+  value,
+  onChange,
+  timezone,
+}: {
   value: string | null | undefined
   onChange: (v: unknown) => void
   timezone: string
@@ -531,7 +639,11 @@ function DateTimeInput({ value, onChange, timezone }: {
   const [time, setTime] = useState('00:00')
 
   useEffect(() => {
-    if (!value) { setDate(undefined); setTime('00:00'); return }
+    if (!value) {
+      setDate(undefined)
+      setTime('00:00')
+      return
+    }
     const d = new Date(value)
     if (!isNaN(d.getTime())) {
       setDate(d)
@@ -581,7 +693,11 @@ function DateTimeInput({ value, onChange, timezone }: {
           variant="ghost"
           size="icon"
           className="size-8 text-muted-foreground hover:text-foreground"
-          onClick={() => { setDate(undefined); setTime('00:00'); onChange(null) }}
+          onClick={() => {
+            setDate(undefined)
+            setTime('00:00')
+            onChange(null)
+          }}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -615,8 +731,11 @@ function fetchCTList(headers: HeadersInit): Promise<CTSummary[]> {
   if (ctListCache.data) return Promise.resolve(ctListCache.data)
   if (ctListCache.promise) return ctListCache.promise
   ctListCache.promise = fetch('/cms/admin/content-types', { headers })
-    .then((r) => (r.ok ? r.json() as Promise<CTSummary[]> : []))
-    .then((list) => { ctListCache.data = list; return list })
+    .then((r) => (r.ok ? (r.json() as Promise<CTSummary[]>) : []))
+    .then((list) => {
+      ctListCache.data = list
+      return list
+    })
     .catch(() => [])
   return ctListCache.promise
 }
@@ -627,7 +746,7 @@ function resolveByTable(list: CTSummary[], tableName: string): CTSummary | null 
 
 function fetchEntries(slug: string, headers: HeadersInit) {
   return fetch(`/cms/admin/content-types/${slug}/entries?limit=200`, { headers })
-    .then((r) => (r.ok ? r.json() as Promise<{ data: Record<string, unknown>[] }> : { data: [] }))
+    .then((r) => (r.ok ? (r.json() as Promise<{ data: Record<string, unknown>[] }>) : { data: [] }))
     .catch(() => ({ data: [] }))
 }
 
@@ -643,11 +762,13 @@ function useRelationEntries(relatedTable: string) {
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
     fetchCTList(headers)
-      .then((list) => {
-        const ct = resolveByTable(list, relatedTable)
-        if (!ct) return { ctDef: null, res: { data: [] } }
-        return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
-      })
+      .then(
+        (list): Promise<{ ctDef: CTSummary | null; res: { data: Record<string, unknown>[] } }> => {
+          const ct = resolveByTable(list, relatedTable)
+          if (!ct) return Promise.resolve({ ctDef: null, res: { data: [] } })
+          return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+        },
+      )
       .then(({ ctDef, res }) => {
         const displayField = ctDef ? pickDisplayField(ctDef.fields ?? []) : null
         setEntries(
@@ -670,17 +791,22 @@ function useLinkedEntries(relatedTable: string, relatedField: string, currentId:
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!relatedTable || !currentId) { setEntries([]); return }
+    if (!relatedTable || !currentId) {
+      setEntries([])
+      return
+    }
     setLoading(true)
     const token = localStorage.getItem('plank_token')
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
     fetchCTList(headers)
-      .then((list) => {
-        const ct = resolveByTable(list, relatedTable)
-        if (!ct) return { ctDef: null, res: { data: [] } }
-        return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
-      })
+      .then(
+        (list): Promise<{ ctDef: CTSummary | null; res: { data: Record<string, unknown>[] } }> => {
+          const ct = resolveByTable(list, relatedTable)
+          if (!ct) return Promise.resolve({ ctDef: null, res: { data: [] } })
+          return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+        },
+      )
       .then(({ ctDef, res }) => {
         const displayField = ctDef ? pickDisplayField(ctDef.fields ?? []) : null
         const linked = res.data.filter((e) => String(e[relatedField] ?? '') === currentId)
@@ -698,7 +824,11 @@ function useLinkedEntries(relatedTable: string, relatedField: string, currentId:
   return { entries, loading }
 }
 
-function OneToManyDisplay({ relatedTable, relatedField, currentId }: {
+function OneToManyDisplay({
+  relatedTable,
+  relatedField,
+  currentId,
+}: {
   relatedTable: string
   relatedField: string
   currentId: string
@@ -768,8 +898,12 @@ function RelationInput({
   }
 
   const selectedIds: string[] = isMulti
-    ? Array.isArray(value) ? value : []
-    : value && !Array.isArray(value) ? [value] : []
+    ? Array.isArray(value)
+      ? value
+      : []
+    : value && !Array.isArray(value)
+      ? [value]
+      : []
 
   function getLabel(id: string) {
     return entries.find((e) => e.id === id)?.label ?? id
@@ -880,7 +1014,11 @@ function RelationInput({
 }
 
 function toSlug(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '')
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-+|-+$/g, '')
 }
 
 export function FieldInput({ field, value, onChange, allValues }: FieldInputProps) {
@@ -942,7 +1080,10 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
         placeholder="0"
         onChange={(e) => {
           const raw = e.target.value
-          if (raw === '') { onChange(null); return }
+          if (raw === '') {
+            onChange(null)
+            return
+          }
           onChange(field.subtype === 'float' ? parseFloat(raw) : parseInt(raw, 10))
         }}
       />
@@ -974,7 +1115,13 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   }
 
   if (field.type === 'media') {
-    return <MediaInput value={value as string | null} onChange={onChange} allowedTypes={field.allowedTypes} />
+    return (
+      <MediaInput
+        value={value as string | null}
+        onChange={onChange}
+        allowedTypes={field.allowedTypes}
+      />
+    )
   }
 
   if (field.type === 'media-gallery') {
