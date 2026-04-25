@@ -16,12 +16,17 @@ export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
 
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
 
+export type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
+
 export interface FieldDefinition {
   name: string
   type: FieldType
   required?: boolean
   subtype?: NumberSubtype
+  relationType?: RelationType
   relatedTable?: string
+  relatedSlug?: string
+  relatedField?: string
   targetField?: string
   allowedTypes?: MediaAllowedType[]
   width?: FieldWidth

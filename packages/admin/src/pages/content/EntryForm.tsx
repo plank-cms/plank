@@ -405,7 +405,7 @@ export function EntryForm() {
                 field={field}
                 value={values[field.name]}
                 onChange={(v) => handleChange(field.name, v)}
-                allValues={values}
+                allValues={{ ...values, id }}
               />
             </div>
           </div>

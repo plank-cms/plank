@@ -29,15 +29,18 @@ type FieldType =
   | 'uid'
 type NumberSubtype = 'integer' | 'float'
 export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
-
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
+export type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
 
 export type FieldCardData = {
   name: string
   type: FieldType
   required?: boolean
   subtype?: NumberSubtype
+  relationType?: RelationType
   relatedTable?: string
+  relatedSlug?: string
+  relatedField?: string
   targetField?: string
   allowedTypes?: MediaAllowedType[]
   width?: FieldWidth
@@ -193,11 +196,20 @@ export function FieldCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium leading-tight">
-          {field.name}
-          {field.required && <span className="ml-1 text-destructive">*</span>}
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-sm font-medium leading-tight">
+            {field.name}
+            {field.required && <span className="ml-1 text-destructive">*</span>}
+          </p>
+          {field.relationType === 'one-to-many' && (
+            <span className="shrink-0 rounded border border-indigo-200 bg-indigo-50 px-1 py-px text-[10px] font-medium text-indigo-600">
+              Auto
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {field.relationType === 'one-to-many' ? 'Inverse relation · read-only' : label}
         </p>
-        <p className="text-xs text-muted-foreground">{label}</p>
       </div>
 
       {onWidthChange && (

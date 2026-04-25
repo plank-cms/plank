@@ -27,17 +27,22 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { RichTextEditor } from '@/components/ui/custom/RichTextEditor.tsx'
-import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon, GripVerticalIcon } from 'lucide-react'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command.tsx'
+import { UploadIcon, XIcon, ImageIcon, FolderOpenIcon, FileIcon, ChevronDownIcon, GripVerticalIcon, CheckIcon, ChevronsUpDownIcon } from 'lucide-react'
 
 type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'media-gallery' | 'relation' | 'uid'
+type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
 
 export type FieldDef = {
   name: string
   type: FieldType
   required?: boolean
   subtype?: 'integer' | 'float'
-  targetField?: string
+  relationType?: RelationType
   relatedTable?: string
+  relatedSlug?: string
+  relatedField?: string
+  targetField?: string
   allowedTypes?: ('image' | 'video' | 'audio' | 'document')[]
   width?: string
 }
@@ -585,6 +590,295 @@ function DateTimeInput({ value, onChange, timezone }: {
   )
 }
 
+type RelationEntry = { id: string; label: string }
+
+type CTField = { name: string; type: string }
+
+function pickDisplayField(fields: CTField[]): string | null {
+  return (
+    fields.find((f) => f.type === 'uid')?.name ??
+    fields.find((f) => f.type === 'string')?.name ??
+    null
+  )
+}
+
+type CTSummary = { slug: string; tableName: string; fields: CTField[] }
+
+// Resolves a CT's slug and fields from its tableName — the stable identifier.
+// The result is module-level cached so all relation inputs on the same page share it.
+const ctListCache: { data: CTSummary[] | null; promise: Promise<CTSummary[]> | null } = {
+  data: null,
+  promise: null,
+}
+
+function fetchCTList(headers: HeadersInit): Promise<CTSummary[]> {
+  if (ctListCache.data) return Promise.resolve(ctListCache.data)
+  if (ctListCache.promise) return ctListCache.promise
+  ctListCache.promise = fetch('/cms/admin/content-types', { headers })
+    .then((r) => (r.ok ? r.json() as Promise<CTSummary[]> : []))
+    .then((list) => { ctListCache.data = list; return list })
+    .catch(() => [])
+  return ctListCache.promise
+}
+
+function resolveByTable(list: CTSummary[], tableName: string): CTSummary | null {
+  return list.find((ct) => ct.tableName === tableName) ?? null
+}
+
+function fetchEntries(slug: string, headers: HeadersInit) {
+  return fetch(`/cms/admin/content-types/${slug}/entries?limit=200`, { headers })
+    .then((r) => (r.ok ? r.json() as Promise<{ data: Record<string, unknown>[] }> : { data: [] }))
+    .catch(() => ({ data: [] }))
+}
+
+// For M:1, 1:1, M:M — fetch all entries from the related CT for selection
+function useRelationEntries(relatedTable: string) {
+  const [entries, setEntries] = useState<RelationEntry[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!relatedTable) return
+    setLoading(true)
+    const token = localStorage.getItem('plank_token')
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+    fetchCTList(headers)
+      .then((list) => {
+        const ct = resolveByTable(list, relatedTable)
+        if (!ct) return { ctDef: null, res: { data: [] } }
+        return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+      })
+      .then(({ ctDef, res }) => {
+        const displayField = ctDef ? pickDisplayField(ctDef.fields ?? []) : null
+        setEntries(
+          res.data.map((e) => ({
+            id: String(e.id),
+            label: displayField ? String(e[displayField] ?? e.id) : String(e.id),
+          })),
+        )
+      })
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false))
+  }, [relatedTable])
+
+  return { entries, loading }
+}
+
+// For 1:M — fetch entries from the related CT filtered by the FK field pointing back here
+function useLinkedEntries(relatedTable: string, relatedField: string, currentId: string) {
+  const [entries, setEntries] = useState<RelationEntry[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!relatedTable || !currentId) { setEntries([]); return }
+    setLoading(true)
+    const token = localStorage.getItem('plank_token')
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+
+    fetchCTList(headers)
+      .then((list) => {
+        const ct = resolveByTable(list, relatedTable)
+        if (!ct) return { ctDef: null, res: { data: [] } }
+        return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+      })
+      .then(({ ctDef, res }) => {
+        const displayField = ctDef ? pickDisplayField(ctDef.fields ?? []) : null
+        const linked = res.data.filter((e) => String(e[relatedField] ?? '') === currentId)
+        setEntries(
+          linked.map((e) => ({
+            id: String(e.id),
+            label: displayField ? String(e[displayField] ?? e.id) : String(e.id),
+          })),
+        )
+      })
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false))
+  }, [relatedTable, relatedField, currentId])
+
+  return { entries, loading }
+}
+
+function OneToManyDisplay({ relatedTable, relatedField, currentId }: {
+  relatedTable: string
+  relatedField: string
+  currentId: string
+}) {
+  const { entries, loading } = useLinkedEntries(relatedTable, relatedField, currentId)
+
+  if (!currentId) {
+    return (
+      <p className="text-xs text-muted-foreground">Save this entry first to see linked items.</p>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-1">
+        <Spinner className="size-3.5" />
+        <span className="text-xs text-muted-foreground">Loading…</span>
+      </div>
+    )
+  }
+
+  if (entries.length === 0) {
+    return <p className="text-xs text-muted-foreground">No linked entries.</p>
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entries.map((e) => (
+        <span
+          key={e.id}
+          className="inline-flex items-center rounded-md border bg-muted px-2 py-0.5 text-xs"
+        >
+          {e.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function RelationInput({
+  relationType,
+  relatedTable,
+  relatedField,
+  currentEntryId,
+  value,
+  onChange,
+}: {
+  relationType: RelationType
+  relatedTable: string
+  relatedField: string
+  currentEntryId: string
+  value: string | string[] | null
+  onChange: (v: unknown) => void
+}) {
+  const isMulti = relationType === 'many-to-many'
+  const [open, setOpen] = useState(false)
+  const { entries, loading } = useRelationEntries(relatedTable)
+
+  if (relationType === 'one-to-many') {
+    return (
+      <OneToManyDisplay
+        relatedTable={relatedTable}
+        relatedField={relatedField}
+        currentId={currentEntryId}
+      />
+    )
+  }
+
+  const selectedIds: string[] = isMulti
+    ? Array.isArray(value) ? value : []
+    : value && !Array.isArray(value) ? [value] : []
+
+  function getLabel(id: string) {
+    return entries.find((e) => e.id === id)?.label ?? id
+  }
+
+  function toggleEntry(id: string) {
+    if (isMulti) {
+      const next = selectedIds.includes(id)
+        ? selectedIds.filter((s) => s !== id)
+        : [...selectedIds, id]
+      onChange(next.length > 0 ? next : null)
+    } else {
+      onChange(selectedIds[0] === id ? null : id)
+      setOpen(false)
+    }
+  }
+
+  function removeId(id: string) {
+    if (isMulti) {
+      const next = selectedIds.filter((s) => s !== id)
+      onChange(next.length > 0 ? next : null)
+    } else {
+      onChange(null)
+    }
+  }
+
+  const triggerLabel = isMulti
+    ? selectedIds.length > 0
+      ? `${selectedIds.length} selected`
+      : 'Select entries…'
+    : selectedIds.length > 0
+      ? getLabel(selectedIds[0])
+      : 'Select entry…'
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate text-left">{triggerLabel}</span>
+            <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search…" />
+            <CommandList>
+              {loading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Spinner className="size-4" />
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>No entries found.</CommandEmpty>
+                  <CommandGroup>
+                    {entries.map((entry) => {
+                      const selected = selectedIds.includes(entry.id)
+                      return (
+                        <CommandItem
+                          key={entry.id}
+                          value={entry.label}
+                          onSelect={() => toggleEntry(entry.id)}
+                        >
+                          <CheckIcon
+                            className={`mr-2 size-4 ${selected ? 'opacity-100' : 'opacity-0'}`}
+                          />
+                          <span className="truncate">{entry.label}</span>
+                          <span className="ml-auto text-xs text-muted-foreground opacity-60 shrink-0">
+                            {entry.id.slice(0, 8)}
+                          </span>
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedIds.map((id) => (
+            <span
+              key={id}
+              className="inline-flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs"
+            >
+              {getLabel(id)}
+              <button
+                type="button"
+                onClick={() => removeId(id)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function toSlug(value: string): string {
   return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '')
 }
@@ -689,11 +983,13 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
 
   if (field.type === 'relation') {
     return (
-      <Input
-        className={sharedClass}
-        value={String(value ?? '')}
-        placeholder="Entry ID"
-        onChange={(e) => onChange(e.target.value)}
+      <RelationInput
+        relationType={field.relationType ?? 'many-to-one'}
+        relatedTable={field.relatedTable ?? ''}
+        relatedField={field.relatedField ?? ''}
+        currentEntryId={String(allValues.id ?? '')}
+        value={value as string | string[] | null}
+        onChange={onChange}
       />
     )
   }

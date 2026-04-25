@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import type { FieldCardData, MediaAllowedType } from './FieldCard.tsx'
+import type { FieldCardData, MediaAllowedType, RelationType } from './FieldCard.tsx'
 import { DEFAULT_FIELD_WIDTH } from './FieldCard.tsx'
 
 type FieldType = FieldCardData['type']
@@ -132,7 +132,6 @@ const TYPE_OPTIONS: TypeOption[] = [
     description: 'Link to another content type',
     color: 'text-indigo-600',
     bg: 'bg-indigo-50',
-    disabled: true,
   },
 ]
 
@@ -143,10 +142,18 @@ const MEDIA_TYPE_OPTIONS: { value: MediaAllowedType; label: string }[] = [
   { value: 'document', label: 'Documents' },
 ]
 
+const RELATION_TYPE_OPTIONS: { value: RelationType; label: string; description: string }[] = [
+  { value: 'many-to-one', label: 'Many-to-One', description: 'Many of these → one of the other' },
+  { value: 'one-to-one', label: 'One-to-One', description: 'One of these ↔ one of the other' },
+  { value: 'many-to-many', label: 'Many-to-Many', description: 'Many of these ↔ many of the other' },
+]
+
 type ConfigState = {
   name: string
   required: boolean
+  relationType: RelationType
   relatedTable: string
+  relatedSlug: string
   targetField: string
   allowedTypes: MediaAllowedType[]
 }
@@ -154,16 +161,20 @@ type ConfigState = {
 const EMPTY_CONFIG: ConfigState = {
   name: '',
   required: false,
+  relationType: 'many-to-one',
   relatedTable: '',
+  relatedSlug: '',
   targetField: '',
   allowedTypes: [],
 }
+
+type AvailableCT = { tableName: string; slug: string; name: string }
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   existingNames: string[]
-  availableTables: string[]
+  availableContentTypes: AvailableCT[]
   stringFields: StringField[]
   initialField?: FieldCardData
   onConfirm: (field: FieldCardData) => void
@@ -173,7 +184,7 @@ export function AddFieldDialog({
   open,
   onOpenChange,
   existingNames,
-  availableTables,
+  availableContentTypes,
   stringFields,
   initialField,
   onConfirm,
@@ -199,7 +210,9 @@ export function AddFieldDialog({
       setConfig({
         name: initialField.name,
         required: initialField.required ?? false,
+        relationType: initialField.relationType ?? 'many-to-one',
         relatedTable: initialField.relatedTable ?? '',
+        relatedSlug: initialField.relatedSlug ?? '',
         targetField: initialField.targetField ?? '',
         allowedTypes: initialField.allowedTypes ?? [],
       })
@@ -248,7 +261,9 @@ export function AddFieldDialog({
       type: selected.type,
       subtype: selected.subtype,
       required: config.required || undefined,
+      relationType: selected.type === 'relation' ? config.relationType : undefined,
       relatedTable: selected.type === 'relation' ? config.relatedTable : undefined,
+      relatedSlug: selected.type === 'relation' ? config.relatedSlug : undefined,
       targetField: selected.type === 'uid' ? config.targetField : undefined,
       allowedTypes:
         selected.type === 'media' && config.allowedTypes.length > 0
@@ -399,33 +414,65 @@ export function AddFieldDialog({
             )}
 
             {selected?.type === 'relation' && (
-              <div className="flex flex-col gap-1.5">
-                <Label>Related content type</Label>
-                {availableTables.length > 0 ? (
-                  <Select
-                    value={config.relatedTable}
-                    onValueChange={(v) => setConfig((prev) => ({ ...prev, relatedTable: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTables.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    placeholder="table_name"
-                    value={config.relatedTable}
-                    onChange={(e) =>
-                      setConfig((prev) => ({ ...prev, relatedTable: e.target.value }))
-                    }
-                  />
-                )}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label>Relation type</Label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {RELATION_TYPE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setConfig((prev) => ({ ...prev, relationType: opt.value }))}
+                        className={`flex items-start gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:border-primary ${
+                          config.relationType === opt.value
+                            ? 'border-primary bg-accent'
+                            : 'border-border'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium leading-none">{opt.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label>Related content type</Label>
+                  {availableContentTypes.length > 0 ? (
+                    <Select
+                      value={config.relatedTable}
+                      onValueChange={(v) => {
+                        const ct = availableContentTypes.find((c) => c.tableName === v)
+                        setConfig((prev) => ({
+                          ...prev,
+                          relatedTable: v,
+                          relatedSlug: ct?.slug ?? '',
+                        }))
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a content type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableContentTypes.map((ct) => (
+                          <SelectItem key={ct.tableName} value={ct.tableName}>
+                            {ct.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="table_name"
+                      value={config.relatedTable}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, relatedTable: e.target.value }))
+                      }
+                    />
+                  )}
+                </div>
               </div>
             )}
 

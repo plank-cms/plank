@@ -92,7 +92,7 @@ export function ContentTypeForm() {
   const { data: existing, loading: loadingExisting } = useFetch<ContentType>(
     isNew ? '' : `/cms/admin/content-types/${routeSlug}`
   )
-  const { data: allCTs } = useFetch<ContentType[]>('/cms/admin/content-types')
+  const { data: allCTs, refetch: refetchAllCTs } = useFetch<ContentType[]>('/cms/admin/content-types')
   const { loading: saving, request } = useApi<ContentType>()
   const { loading: deleting, request: requestDelete } = useApi()
 
@@ -109,6 +109,11 @@ export function ContentTypeForm() {
 
   // Track original state for isDirty
   const original = useRef<{ name: string; slug: string; fields: string }>({ name: '', slug: '', fields: '[]' })
+
+  useEffect(() => {
+    window.addEventListener('plank:content-types-changed', refetchAllCTs)
+    return () => window.removeEventListener('plank:content-types-changed', refetchAllCTs)
+  }, [refetchAllCTs])
 
   useEffect(() => {
     if (isNew) {
@@ -214,9 +219,9 @@ export function ContentTypeForm() {
     }
   }
 
-  const availableTables = (allCTs ?? [])
+  const availableContentTypes = (allCTs ?? [])
     .filter((ct) => ct.slug !== routeSlug)
-    .map((ct) => ct.tableName)
+    .map((ct) => ({ tableName: ct.tableName, slug: ct.slug, name: ct.name }))
 
   const stringFields = fields.filter((f) => f.type === 'string')
 
@@ -295,23 +300,40 @@ export function ContentTypeForm() {
       </div>
 
       {/* Fields grid */}
-      {fields.length > 0 ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={fields.map((f) => f.name)} strategy={verticalListSortingStrategy}>
-            <div className="grid grid-cols-6 gap-3">
-              {fields.map((field) => (
-                <SortableFieldCard
-                  key={field.name}
-                  field={field}
-                  onWidthChange={(w) => handleWidthChange(field.name, w)}
-                  onEdit={() => setEditingField(field)}
-                  onDelete={() => handleDeleteField(field.name)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      ) : (
+      {fields.length > 0 ? (() => {
+        const editableFields = fields.filter((f) => f.relationType !== 'one-to-many')
+        const inverseFields = fields.filter((f) => f.relationType === 'one-to-many')
+        return (
+          <div className="flex flex-col gap-3">
+            {editableFields.length > 0 && (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={editableFields.map((f) => f.name)} strategy={verticalListSortingStrategy}>
+                  <div className="grid grid-cols-6 gap-3">
+                    {editableFields.map((field) => (
+                      <SortableFieldCard
+                        key={field.name}
+                        field={field}
+                        onWidthChange={(w) => handleWidthChange(field.name, w)}
+                        onEdit={() => setEditingField(field)}
+                        onDelete={() => handleDeleteField(field.name)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+            {inverseFields.length > 0 && (
+              <div className="grid grid-cols-6 gap-3">
+                {inverseFields.map((field) => (
+                  <div key={field.name} className={`col-span-6`}>
+                    <FieldCard field={field} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })() : (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -336,7 +358,7 @@ export function ContentTypeForm() {
         open={addOpen}
         onOpenChange={setAddOpen}
         existingNames={existingFieldNames}
-        availableTables={availableTables}
+        availableContentTypes={availableContentTypes}
         stringFields={stringFields}
         onConfirm={handleAddField}
       />
@@ -346,7 +368,7 @@ export function ContentTypeForm() {
         open={Boolean(editingField)}
         onOpenChange={(val) => { if (!val) setEditingField(null) }}
         existingNames={existingFieldNames}
-        availableTables={availableTables}
+        availableContentTypes={availableContentTypes}
         stringFields={stringFields}
         initialField={editingField ?? undefined}
         onConfirm={handleEditField}
