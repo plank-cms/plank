@@ -16,9 +16,18 @@ import {
 import type { ContentType, FieldDefinition, RelationType } from '@plank/schema'
 import { z, flattenError } from 'zod'
 
+const ArraySubFieldSchema = z.object({
+  name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'Sub-field name must be lowercase with underscores'),
+  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media']),
+  required: z.boolean().optional(),
+  subtype: z.enum(['integer', 'float']).optional(),
+  allowedTypes: z.array(z.enum(['image', 'video', 'audio', 'document'])).optional(),
+  width: z.enum(['full', 'two-thirds', 'half', 'third']).optional(),
+})
+
 const FieldSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'Field name must be lowercase with underscores'),
-  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media', 'media-gallery', 'relation', 'uid']),
+  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media', 'media-gallery', 'relation', 'uid', 'array']),
   required: z.boolean().optional(),
   subtype: z.enum(['integer', 'float']).optional(),
   relationType: z.enum(['many-to-one', 'one-to-one', 'one-to-many', 'many-to-many']).optional(),
@@ -28,6 +37,7 @@ const FieldSchema = z.object({
   targetField: z.string().optional(),
   allowedTypes: z.array(z.enum(['image', 'video', 'audio', 'document'])).optional(),
   width: z.enum(['full', 'two-thirds', 'half', 'third']).optional(),
+  arrayFields: z.array(ArraySubFieldSchema).optional(),
 })
 
 const ContentTypeSchema = z.object({

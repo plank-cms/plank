@@ -11,6 +11,9 @@ import {
   LinkIcon,
   FingerprintIcon,
   ArrowLeftIcon,
+  ListIcon,
+  PlusIcon,
+  Trash2Icon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
@@ -25,11 +28,59 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import type { FieldCardData, MediaAllowedType, RelationType } from './FieldCard.tsx'
-import { DEFAULT_FIELD_WIDTH } from './FieldCard.tsx'
+import type { FieldCardData, MediaAllowedType, RelationType, ArraySubField, ArraySubFieldType, FieldWidth } from './FieldCard.tsx'
+import { DEFAULT_FIELD_WIDTH, FIELD_WIDTH_SPAN } from './FieldCard.tsx'
 
 type FieldType = FieldCardData['type']
 type StringField = { name: string }
+
+type ArraySubFieldDraft = {
+  type: ArraySubFieldType
+  subtype?: 'integer' | 'float'
+  name: string
+  required: boolean
+  allowedTypes: MediaAllowedType[]
+  width: FieldWidth
+}
+
+type ArraySubTypeOption = {
+  type: ArraySubFieldType
+  subtype?: 'integer' | 'float'
+  icon: LucideIcon
+  label: string
+  color: string
+  bg: string
+}
+
+const ARRAY_SUBFIELD_OPTIONS: ArraySubTypeOption[] = [
+  { type: 'string', icon: TypeIcon, label: 'Text', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { type: 'text', icon: AlignLeftIcon, label: 'Long Text', color: 'text-sky-600', bg: 'bg-sky-50' },
+  { type: 'richtext', icon: FileTextIcon, label: 'Rich Text', color: 'text-violet-600', bg: 'bg-violet-50' },
+  { type: 'number', subtype: 'integer', icon: HashIcon, label: 'Integer', color: 'text-orange-600', bg: 'bg-orange-50' },
+  { type: 'number', subtype: 'float', icon: HashIcon, label: 'Decimal', color: 'text-orange-600', bg: 'bg-orange-50' },
+  { type: 'boolean', icon: ToggleLeftIcon, label: 'Boolean', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { type: 'datetime', icon: CalendarIcon, label: 'Date & Time', color: 'text-amber-600', bg: 'bg-amber-50' },
+  { type: 'media', icon: ImageIcon, label: 'Media', color: 'text-rose-600', bg: 'bg-rose-50' },
+]
+
+const SUBFIELD_DEFAULT_WIDTH: Record<ArraySubFieldType, FieldWidth> = {
+  string: 'half',
+  text: 'full',
+  richtext: 'full',
+  number: 'third',
+  boolean: 'third',
+  datetime: 'half',
+  media: 'half',
+}
+
+const EMPTY_SUBFIELD_DRAFT: ArraySubFieldDraft = {
+  type: 'string',
+  subtype: undefined,
+  name: '',
+  required: false,
+  allowedTypes: [],
+  width: 'half',
+}
 
 type TypeOption = {
   type: FieldType
@@ -68,22 +119,12 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-violet-50',
   },
   {
-    type: 'number',
-    subtype: 'integer',
-    icon: HashIcon,
-    label: 'Integer (number)',
-    description: 'Whole numbers',
-    color: 'text-orange-600',
-    bg: 'bg-orange-50',
-  },
-  {
-    type: 'number',
-    subtype: 'float',
-    icon: HashIcon,
-    label: 'Decimal (number)',
-    description: 'Numbers with decimals',
-    color: 'text-orange-600',
-    bg: 'bg-orange-50',
+    type: 'uid',
+    icon: FingerprintIcon,
+    label: 'UID',
+    description: 'Unique slug from a field',
+    color: 'text-teal-600',
+    bg: 'bg-teal-50',
   },
   {
     type: 'boolean',
@@ -118,12 +159,30 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-pink-50',
   },
   {
-    type: 'uid',
-    icon: FingerprintIcon,
-    label: 'UID',
-    description: 'Unique slug from a field',
-    color: 'text-teal-600',
-    bg: 'bg-teal-50',
+    type: 'array',
+    icon: ListIcon,
+    label: 'Array',
+    description: 'Repeatable list of structured items',
+    color: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+  },
+  {
+    type: 'number',
+    subtype: 'integer',
+    icon: HashIcon,
+    label: 'Integer (number)',
+    description: 'Whole numbers',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'number',
+    subtype: 'float',
+    icon: HashIcon,
+    label: 'Decimal (number)',
+    description: 'Numbers with decimals',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
   },
   {
     type: 'relation',
@@ -156,6 +215,7 @@ type ConfigState = {
   relatedSlug: string
   targetField: string
   allowedTypes: MediaAllowedType[]
+  arrayFields: ArraySubField[]
 }
 
 const EMPTY_CONFIG: ConfigState = {
@@ -166,6 +226,7 @@ const EMPTY_CONFIG: ConfigState = {
   relatedSlug: '',
   targetField: '',
   allowedTypes: [],
+  arrayFields: [],
 }
 
 type AvailableCT = { tableName: string; slug: string; name: string }
@@ -192,6 +253,8 @@ export function AddFieldDialog({
   const [selected, setSelected] = useState<TypeOption | null>(null)
   const [config, setConfig] = useState<ConfigState>(EMPTY_CONFIG)
   const [nameError, setNameError] = useState('')
+  const [subFieldDraft, setSubFieldDraft] = useState<ArraySubFieldDraft | null>(null)
+  const [subFieldNameError, setSubFieldNameError] = useState('')
 
   const isEditing = Boolean(initialField)
 
@@ -200,6 +263,8 @@ export function AddFieldDialog({
       setSelected(null)
       setConfig(EMPTY_CONFIG)
       setNameError('')
+      setSubFieldDraft(null)
+      setSubFieldNameError('')
     } else if (initialField) {
       const match = TYPE_OPTIONS.find(
         (o) =>
@@ -215,6 +280,7 @@ export function AddFieldDialog({
         relatedSlug: initialField.relatedSlug ?? '',
         targetField: initialField.targetField ?? '',
         allowedTypes: initialField.allowedTypes ?? [],
+        arrayFields: initialField.arrayFields ?? [],
       })
     }
   }, [open, initialField])
@@ -227,6 +293,8 @@ export function AddFieldDialog({
     setSelected(option)
     setConfig(EMPTY_CONFIG)
     setNameError('')
+    setSubFieldDraft(null)
+    setSubFieldNameError('')
   }
 
   function handleBack() {
@@ -234,7 +302,46 @@ export function AddFieldDialog({
       setSelected(null)
       setConfig(EMPTY_CONFIG)
       setNameError('')
+      setSubFieldDraft(null)
+      setSubFieldNameError('')
     }
+  }
+
+  function handleStartAddSubField() {
+    setSubFieldDraft({ ...EMPTY_SUBFIELD_DRAFT })
+    setSubFieldNameError('')
+  }
+
+  function handleSubFieldPickType(option: ArraySubTypeOption) {
+    setSubFieldDraft((prev) => prev ? {
+      ...prev,
+      type: option.type,
+      subtype: option.subtype,
+      width: SUBFIELD_DEFAULT_WIDTH[option.type],
+    } : { ...EMPTY_SUBFIELD_DRAFT, type: option.type, subtype: option.subtype, width: SUBFIELD_DEFAULT_WIDTH[option.type] })
+  }
+
+  function handleConfirmSubField() {
+    if (!subFieldDraft) return
+    const trimmed = subFieldDraft.name.trim()
+    if (!trimmed) { setSubFieldNameError('Name is required'); return }
+    if (!/^[a-z][a-z0-9_]*$/.test(trimmed)) { setSubFieldNameError('Lowercase letters, digits and underscores only'); return }
+    if (config.arrayFields.some((f) => f.name === trimmed)) { setSubFieldNameError('A sub-field with this name already exists'); return }
+    const newSubField: ArraySubField = {
+      name: trimmed,
+      type: subFieldDraft.type,
+      subtype: subFieldDraft.subtype,
+      required: subFieldDraft.required || undefined,
+      allowedTypes: subFieldDraft.type === 'media' && subFieldDraft.allowedTypes.length > 0 ? subFieldDraft.allowedTypes : undefined,
+      width: subFieldDraft.width,
+    }
+    setConfig((prev) => ({ ...prev, arrayFields: [...prev.arrayFields, newSubField] }))
+    setSubFieldDraft(null)
+    setSubFieldNameError('')
+  }
+
+  function handleRemoveSubField(name: string) {
+    setConfig((prev) => ({ ...prev, arrayFields: prev.arrayFields.filter((f) => f.name !== name) }))
   }
 
   function validate() {
@@ -271,6 +378,7 @@ export function AddFieldDialog({
           : selected.type === 'media-gallery'
             ? ['image']
             : undefined,
+      arrayFields: selected.type === 'array' ? config.arrayFields : undefined,
       width: initialField?.width ?? DEFAULT_FIELD_WIDTH[selected.type],
     })
     handleOpenChange(false)
@@ -279,10 +387,11 @@ export function AddFieldDialog({
   const showStep2 = Boolean(selected)
   const baseLabel = selected?.label.replace(/\s*\(.*?\)/, '') ?? ''
   const title = isEditing ? 'Edit field' : showStep2 ? `${baseLabel} field` : 'Add a field'
+  const dialogWidth = !showStep2 ? 'max-w-3xl' : selected?.type === 'array' ? 'max-w-lg' : 'max-w-md'
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={showStep2 ? 'max-w-md' : 'max-w-2xl'}>
+      <DialogContent className={dialogWidth}>
         <DialogHeader>
           <div className="flex items-center gap-2">
             {showStep2 && !isEditing && (
@@ -380,6 +489,151 @@ export function AddFieldDialog({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {selected?.type === 'array' && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Sub-fields</Label>
+                  {!subFieldDraft && (
+                    <button
+                      type="button"
+                      onClick={handleStartAddSubField}
+                      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <PlusIcon className="size-3" />
+                      Add sub-field
+                    </button>
+                  )}
+                </div>
+
+                {config.arrayFields.length === 0 && !subFieldDraft && (
+                  <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    No sub-fields yet. Add at least one to make this field useful.
+                  </p>
+                )}
+
+                {config.arrayFields.length > 0 && (
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {config.arrayFields.map((sf) => {
+                      const opt = ARRAY_SUBFIELD_OPTIONS.find(
+                        (o) => o.type === sf.type && (o.subtype ?? undefined) === (sf.subtype ?? undefined),
+                      )
+                      const SfIcon = opt?.icon ?? TypeIcon
+                      return (
+                        <div
+                          key={sf.name}
+                          className={`${FIELD_WIDTH_SPAN[sf.width ?? 'full']} flex items-center gap-1.5 rounded-md border border-dashed border-border p-2`}
+                        >
+                          <div className={`flex size-5 shrink-0 items-center justify-center rounded ${opt?.bg ?? 'bg-muted'}`}>
+                            <SfIcon className={`size-3 ${opt?.color ?? 'text-muted-foreground'}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium">
+                              {sf.name}
+                              {sf.required && <span className="ml-0.5 text-destructive">*</span>}
+                            </p>
+                            <p className="truncate text-[10px] text-muted-foreground">{opt?.label}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSubField(sf.name)}
+                            className="flex shrink-0 size-5 items-center justify-center rounded text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2Icon className="size-3" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {subFieldDraft && (
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {ARRAY_SUBFIELD_OPTIONS.map((opt) => {
+                        const SfIcon = opt.icon
+                        const key = `${opt.type}${opt.subtype ?? ''}`
+                        const isSelected = subFieldDraft.type === opt.type && (subFieldDraft.subtype ?? undefined) === (opt.subtype ?? undefined)
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleSubFieldPickType(opt)}
+                            className={[
+                              'flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-left transition-colors',
+                              isSelected ? 'border-primary bg-accent' : 'border-border hover:border-primary hover:bg-accent',
+                            ].join(' ')}
+                          >
+                            <div className={`flex size-5 shrink-0 items-center justify-center rounded ${opt.bg}`}>
+                              <SfIcon className={`size-3 ${opt.color}`} />
+                            </div>
+                            <span className="truncate text-xs font-medium">{opt.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        placeholder="sub_field_name"
+                        autoFocus
+                        value={subFieldDraft.name}
+                        onChange={(e) => {
+                          setSubFieldDraft((prev) => prev ? { ...prev, name: e.target.value } : prev)
+                          setSubFieldNameError('')
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmSubField() }}
+                      />
+                      {subFieldNameError && <p className="text-xs text-destructive">{subFieldNameError}</p>}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox
+                          id="subfield-required"
+                          checked={subFieldDraft.required}
+                          onCheckedChange={(v) => setSubFieldDraft((prev) => prev ? { ...prev, required: Boolean(v) } : prev)}
+                        />
+                        <Label htmlFor="subfield-required" className="cursor-pointer font-normal text-sm">Required</Label>
+                      </div>
+                      <div className="flex items-center gap-px rounded-md border border-border p-0.5">
+                        {([
+                          { value: 'full' as FieldWidth, label: 'Full' },
+                          { value: 'two-thirds' as FieldWidth, label: '2/3' },
+                          { value: 'half' as FieldWidth, label: '1/2' },
+                          { value: 'third' as FieldWidth, label: '1/3' },
+                        ]).map(({ value, label: tooltip }) => {
+                          const bar = 'rounded-sm bg-current'
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              title={tooltip}
+                              onClick={() => setSubFieldDraft((prev) => prev ? { ...prev, width: value } : prev)}
+                              className={[
+                                'flex items-center justify-center rounded px-1.5 py-1 transition-colors',
+                                subFieldDraft.width === value ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
+                              ].join(' ')}
+                            >
+                              <div className="flex w-4 gap-px">
+                                {value === 'full' && <div className={`${bar} h-2 w-full`} />}
+                                {value === 'two-thirds' && (<><div className={`${bar} h-2 flex-1`} /><div className={`${bar} h-2 flex-1`} /><div className="h-2 flex-1 rounded-sm bg-current opacity-25" /></>)}
+                                {value === 'half' && (<><div className={`${bar} h-2 flex-1`} /><div className={`${bar} h-2 flex-1`} /></>)}
+                                {value === 'third' && (<><div className={`${bar} h-2 flex-1`} /><div className={`${bar} h-2 flex-1`} /><div className={`${bar} h-2 flex-1`} /></>)}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="sm" onClick={() => { setSubFieldDraft(null); setSubFieldNameError('') }}>Cancel</Button>
+                        <Button size="sm" onClick={handleConfirmSubField}>Add</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -73,11 +73,11 @@ export const createEntry: SlugParam = async (req, res) => {
     const { rows: existing } = await pool.query(`SELECT id FROM ${ct.tableName} LIMIT 1`)
     if (existing[0]) {
       const setClauses = fields.map((f, i) =>
-        f.type === 'media-gallery' ? `${f.name} = $${i + 1}::jsonb` : `${f.name} = $${i + 1}`,
+        f.type === 'media-gallery' || f.type === 'array' ? `${f.name} = $${i + 1}::jsonb` : `${f.name} = $${i + 1}`,
       ).join(', ')
       const values = [...fields.map((f) => {
         const v = req.body[f.name]
-        return f.type === 'media-gallery' ? JSON.stringify(v) : v
+        return f.type === 'media-gallery' || f.type === 'array' ? JSON.stringify(v) : v
       }), existing[0].id]
       const updateSql = fields.length > 0
         ? `UPDATE ${ct.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`
@@ -93,11 +93,11 @@ export const createEntry: SlugParam = async (req, res) => {
   const userId = req.user?.id ?? null
   const cols = ['id', 'created_by', ...fields.map((f) => f.name)].join(', ')
   const placeholders = ['$1', '$2', ...fields.map((f, i) =>
-    f.type === 'media-gallery' ? `$${i + 3}::jsonb` : `$${i + 3}`,
+    f.type === 'media-gallery' || f.type === 'array' ? `$${i + 3}::jsonb` : `$${i + 3}`,
   )].join(', ')
   const values = [id, userId, ...fields.map((f) => {
     const v = req.body[f.name]
-    return f.type === 'media-gallery' ? JSON.stringify(v) : v
+    return f.type === 'media-gallery' || f.type === 'array' ? JSON.stringify(v) : v
   })]
 
   const { rows } = await pool.query(
@@ -131,11 +131,11 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   const setClauses = fields.map((f, i) =>
-    f.type === 'media-gallery' ? `${f.name} = $${i + 1}::jsonb` : `${f.name} = $${i + 1}`,
+    f.type === 'media-gallery' || f.type === 'array' ? `${f.name} = $${i + 1}::jsonb` : `${f.name} = $${i + 1}`,
   ).join(', ')
   const values = [...fields.map((f) => {
     const v = req.body[f.name]
-    return f.type === 'media-gallery' ? JSON.stringify(v) : v
+    return f.type === 'media-gallery' || f.type === 'array' ? JSON.stringify(v) : v
   }), req.params.id]
 
   const { rows } = await pool.query(

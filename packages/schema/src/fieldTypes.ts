@@ -29,6 +29,8 @@ export function toPostgresType(field: FieldDefinition): string {
     }
     case 'uid':
       return 'VARCHAR(255) UNIQUE'
+    case 'array':
+      return 'JSONB'
     default:
       throw new SchemaError(`Unknown field type: "${(field as FieldDefinition).type}"`)
   }

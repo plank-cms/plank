@@ -9,6 +9,16 @@ export type FieldType =
   | 'media-gallery'
   | 'relation'
   | 'uid'
+  | 'array'
+
+export type ArraySubFieldType =
+  | 'string'
+  | 'text'
+  | 'richtext'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'media'
 
 export type NumberSubtype = 'integer' | 'float'
 
@@ -17,6 +27,15 @@ export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
 
 export type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
+
+export interface ArraySubField {
+  name: string
+  type: ArraySubFieldType
+  required?: boolean
+  subtype?: NumberSubtype
+  allowedTypes?: MediaAllowedType[]
+  width?: FieldWidth
+}
 
 export interface FieldDefinition {
   name: string
@@ -30,6 +49,7 @@ export interface FieldDefinition {
   targetField?: string
   allowedTypes?: MediaAllowedType[]
   width?: FieldWidth
+  arrayFields?: ArraySubField[]
 }
 
 export type ContentTypeKind = 'collection' | 'single'

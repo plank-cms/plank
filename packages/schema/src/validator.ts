@@ -59,6 +59,28 @@ export function validate(
           errors.push(`Field "${field.name}" must be a non-empty string ID`)
         }
         break
+      case 'array':
+        if (!Array.isArray(value)) {
+          errors.push(`Field "${field.name}" must be an array`)
+        } else if (field.required && value.length === 0) {
+          errors.push(`Field "${field.name}" is required`)
+        } else if (field.arrayFields && field.arrayFields.length > 0) {
+          for (let i = 0; i < value.length; i++) {
+            const item = value[i] as Record<string, unknown>
+            if (typeof item !== 'object' || item === null) {
+              errors.push(`Field "${field.name}[${i}]" must be an object`)
+              continue
+            }
+            for (const subField of field.arrayFields) {
+              const subValue = item[subField.name]
+              const subEmpty = subValue === undefined || subValue === null || subValue === ''
+              if (subField.required && subEmpty) {
+                errors.push(`Field "${field.name}[${i}].${subField.name}" is required`)
+              }
+            }
+          }
+        }
+        break
     }
   }
 

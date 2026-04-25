@@ -41,6 +41,8 @@ import {
   GripVerticalIcon,
   CheckIcon,
   ChevronsUpDownIcon,
+  PlusIcon,
+  Trash2Icon,
 } from 'lucide-react'
 
 type FieldType =
@@ -54,7 +56,17 @@ type FieldType =
   | 'media-gallery'
   | 'relation'
   | 'uid'
+  | 'array'
 type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
+type ArraySubFieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media'
+type ArraySubField = {
+  name: string
+  type: ArraySubFieldType
+  required?: boolean
+  subtype?: 'integer' | 'float'
+  allowedTypes?: ('image' | 'video' | 'audio' | 'document')[]
+  width?: string
+}
 
 export type FieldDef = {
   name: string
@@ -68,6 +80,7 @@ export type FieldDef = {
   targetField?: string
   allowedTypes?: ('image' | 'video' | 'audio' | 'document')[]
   width?: string
+  arrayFields?: ArraySubField[]
 }
 
 type FieldInputProps = {
@@ -1051,6 +1064,95 @@ function RelationInput({
   )
 }
 
+const ARRAY_ITEM_WIDTH: Record<string, string> = {
+  full: 'col-span-6',
+  'two-thirds': 'col-span-4',
+  half: 'col-span-3',
+  third: 'col-span-2',
+}
+
+function ArrayInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldDef
+  value: unknown
+  onChange: (v: unknown) => void
+}) {
+  const items = Array.isArray(value) ? (value as Record<string, unknown>[]) : []
+  const subFields = field.arrayFields ?? []
+
+  function buildEmptyItem(): Record<string, unknown> {
+    return Object.fromEntries(subFields.map((sf) => [sf.name, sf.type === 'boolean' ? false : null]))
+  }
+
+  function handleAddItem() {
+    onChange([...items, buildEmptyItem()])
+  }
+
+  function handleRemoveItem(index: number) {
+    onChange(items.filter((_, i) => i !== index))
+  }
+
+  function handleItemChange(index: number, subFieldName: string, subValue: unknown) {
+    onChange(items.map((item, i) => i === index ? { ...item, [subFieldName]: subValue } : item))
+  }
+
+  if (subFields.length === 0) {
+    return (
+      <div className="flex w-full items-center justify-center rounded-md border border-dashed p-4 text-xs text-muted-foreground">
+        No sub-fields defined for this array.
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, index) => (
+        <div key={index} className="rounded-md border border-dashed p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Item {index + 1}</span>
+            <button
+              type="button"
+              onClick={() => handleRemoveItem(index)}
+              className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2Icon className="size-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-6 gap-3">
+            {subFields.map((sf) => (
+              <div key={sf.name} className={ARRAY_ITEM_WIDTH[sf.width ?? 'full'] ?? 'col-span-6'}>
+                <div className="mb-1 flex items-center gap-1">
+                  <Label className="text-xs font-medium">
+                    {sf.name}
+                    {sf.required && <span className="ml-0.5 text-destructive">*</span>}
+                  </Label>
+                </div>
+                <FieldInput
+                  field={{ ...sf, type: sf.type as FieldType }}
+                  value={item[sf.name] ?? null}
+                  onChange={(v) => handleItemChange(index, sf.name, v)}
+                  allValues={item}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={handleAddItem}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+      >
+        <PlusIcon className="size-3.5" />
+        Add item
+      </button>
+    </div>
+  )
+}
+
 function toSlug(value: string): string {
   return value
     .toLowerCase()
@@ -1180,6 +1282,10 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
         onChange={onChange}
       />
     )
+  }
+
+  if (field.type === 'array') {
+    return <ArrayInput field={field} value={value} onChange={onChange} />
   }
 
   // string fallback
