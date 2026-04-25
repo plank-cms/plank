@@ -61,7 +61,14 @@ function buildAccept(allowedTypes?: FieldDef['allowedTypes']): string {
   return allowedTypes.map((t) => ACCEPT_MAP[t]).join(',')
 }
 
-type MediaItem = { id: string; filename: string; url: string; mime_type: string | null }
+type MediaItem = { id: string; filename: string; url: string; mime_type: string | null; size: number | null }
+
+function formatBytes(bytes: number | null): string {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
@@ -163,16 +170,21 @@ function MediaPickerDialog({ open, onOpenChange, allowedTypes, onSelect }: {
                 key={item.id}
                 type="button"
                 onClick={() => { onSelect(item); onOpenChange(false) }}
-                className="group relative aspect-square overflow-hidden rounded-md border bg-muted transition-colors hover:border-primary"
+                className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
               >
-                {isImageMime(item.mime_type) ? (
-                  <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-1 p-2">
-                    <FileIcon className="size-6 text-muted-foreground" />
-                    <span className="w-full truncate text-center text-[10px] text-muted-foreground">{item.filename}</span>
-                  </div>
-                )}
+                <div className="aspect-square bg-muted">
+                  {isImageMime(item.mime_type) ? (
+                    <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <FileIcon className="size-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-1.5">
+                  <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>{item.filename}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
+                </div>
                 <div className="absolute inset-0 rounded-md ring-2 ring-primary ring-offset-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               </button>
             ))}
@@ -293,9 +305,10 @@ function MediaInput({ value, onChange, allowedTypes }: { value: string | null; o
   )
 }
 
-function SortableGalleryItem({ id, previewUrl, onRemove }: {
+function SortableGalleryItem({ id, previewUrl, filename, onRemove }: {
   id: string
   previewUrl: string | null
+  filename: string
   onRemove: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -312,10 +325,15 @@ function SortableGalleryItem({ id, previewUrl, onRemove }: {
       className="relative aspect-square overflow-hidden rounded-md border bg-muted"
     >
       {previewUrl ? (
-        <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+        <img src={previewUrl} alt={filename} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full items-center justify-center">
           <ImageIcon className="size-5 text-muted-foreground" />
+        </div>
+      )}
+      {filename && (
+        <div className="absolute bottom-0 left-0 right-0 bg-background/75 backdrop-blur-sm px-1.5 py-1 pointer-events-none">
+          <p className="truncate text-[10px] leading-none text-foreground">{filename}</p>
         </div>
       )}
       <button
@@ -327,7 +345,7 @@ function SortableGalleryItem({ id, previewUrl, onRemove }: {
       </button>
       <button
         type="button"
-        className="absolute bottom-1 left-1 flex size-5 cursor-grab items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm active:cursor-grabbing"
+        className="absolute bottom-6 left-1 flex size-5 cursor-grab items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm active:cursor-grabbing"
         {...listeners}
         {...attributes}
       >
@@ -340,6 +358,7 @@ function SortableGalleryItem({ id, previewUrl, onRemove }: {
 function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChange: (v: unknown) => void }) {
   const ids = Array.isArray(value) ? value : []
   const [urlCache, setUrlCache] = useState<Record<string, string>>({})
+  const [nameCache, setNameCache] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -370,9 +389,30 @@ function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChan
     })
   }, [ids.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch filenames for IDs not yet in name cache
+  useEffect(() => {
+    const missing = ids.filter((id) => !id.startsWith('http') && !(id in nameCache))
+    if (missing.length === 0) return
+    const token = localStorage.getItem('plank_token')
+    fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
+      .then((data) => {
+        const updates: Record<string, string> = {}
+        for (const item of data.items) {
+          if (missing.includes(item.id)) updates[item.id] = item.filename
+        }
+        if (Object.keys(updates).length > 0) setNameCache((prev) => ({ ...prev, ...updates }))
+      })
+      .catch(() => {})
+  }, [ids.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function getPreviewUrl(id: string): string | null {
     if (id.startsWith('http')) return id
     return urlCache[id] ?? null
+  }
+
+  function getFilename(id: string): string {
+    return nameCache[id] ?? ''
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -392,6 +432,7 @@ function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChan
       for (const file of files) {
         const data = await uploadFile(file)
         setUrlCache((prev) => ({ ...prev, [data.id]: data.url }))
+        setNameCache((prev) => ({ ...prev, [data.id]: file.name }))
         currentIds = [...currentIds, data.id]
         onChange(currentIds)
       }
@@ -426,6 +467,7 @@ function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChan
                   key={id}
                   id={id}
                   previewUrl={getPreviewUrl(id)}
+                  filename={getFilename(id)}
                   onRemove={() => onChange(ids.filter((i) => i !== id))}
                 />
               ))}
@@ -465,6 +507,7 @@ function MediaGalleryInput({ value, onChange }: { value: string[] | null; onChan
         onSelect={(item) => {
           if (!ids.includes(item.id)) {
             setUrlCache((prev) => ({ ...prev, [item.id]: item.url }))
+            setNameCache((prev) => ({ ...prev, [item.id]: item.filename }))
             onChange([...ids, item.id])
           }
         }}
