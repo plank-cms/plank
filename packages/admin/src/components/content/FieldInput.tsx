@@ -626,6 +626,43 @@ function MediaGalleryInput({
   )
 }
 
+function FloatInput({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const [raw, setRaw] = useState(() =>
+    value !== null && value !== undefined && value !== '' ? String(value) : '',
+  )
+
+  useEffect(() => {
+    if (value === null || value === undefined || value === '') {
+      setRaw('')
+      return
+    }
+    const n = typeof value === 'number' ? value : parseFloat(String(value))
+    if (!isNaN(n) && n !== parseFloat(raw)) setRaw(String(n))
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const s = e.target.value.replace(',', '.')
+    setRaw(s)
+    if (s === '' || s === '-') {
+      onChange(null)
+      return
+    }
+    const n = parseFloat(s)
+    if (!isNaN(n)) onChange(n)
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      className={cn('w-full', 'text-base!')}
+      value={raw}
+      placeholder="0.00"
+      onChange={handleChange}
+    />
+  )
+}
+
 function DateTimeInput({
   value,
   onChange,
@@ -1072,12 +1109,15 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   }
 
   if (field.type === 'number') {
+    if (field.subtype === 'float') {
+      return <FloatInput value={value} onChange={onChange} />
+    }
     return (
       <Input
         type="number"
         className={cn(sharedClass, 'text-base!')}
         value={value === undefined || value === null ? '' : String(value)}
-        step={field.subtype === 'float' ? 'any' : '1'}
+        step="1"
         placeholder="0"
         onChange={(e) => {
           const raw = e.target.value
@@ -1085,7 +1125,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
             onChange(null)
             return
           }
-          onChange(field.subtype === 'float' ? parseFloat(raw) : parseInt(raw, 10))
+          onChange(parseInt(raw, 10))
         }}
       />
     )

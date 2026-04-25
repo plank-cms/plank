@@ -5,6 +5,11 @@ import pg from 'pg'
 // through combineDateAndTime which produces a UTC ISO string), so force UTC parsing.
 pg.types.setTypeParser(1114, (val: string) => (val ? new Date(val.replace(' ', 'T') + 'Z') : null))
 
+// NUMERIC (OID 1700): pg returns strings by default to preserve arbitrary precision.
+// All numeric fields in this app use standard float precision, so parse as JS number
+// to match the JSON number type that to_jsonb() produces in published_data snapshots.
+pg.types.setTypeParser(1700, (val: string) => (val !== null ? parseFloat(val) : null))
+
 const pool = new pg.Pool({
   connectionString: process.env.PLANK_DATABASE_URL,
   max: 10,
