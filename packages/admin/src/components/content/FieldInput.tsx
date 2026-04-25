@@ -86,11 +86,11 @@ function xhrPut(url: string, file: File): Promise<void> {
 
 async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   const token = localStorage.getItem('plank_token')
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+  const auth = token && { Authorization: `Bearer ${token}` }
 
   const presignRes = await fetch('/cms/admin/media/presign', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ filename: file.name, mime_type: file.type, size: file.size }),
   })
 
@@ -101,7 +101,7 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
     await xhrPut(upload_url, file)
     const completeRes = await fetch('/cms/admin/media/complete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ id, key, stored_url, filename: file.name, mime_type: file.type, size: file.size }),
     })
     if (!completeRes.ok) throw new Error('Upload failed.')
@@ -111,7 +111,7 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   if (presignRes.status === 501) {
     const body = new FormData()
     body.append('file', file)
-    const res = await fetch('/cms/admin/media', { method: 'POST', headers: authHeaders, body })
+    const res = await fetch('/cms/admin/media', { method: 'POST', headers: { ...auth }, body })
     if (!res.ok) throw new Error('Upload failed.')
     return res.json() as Promise<{ id: string; url: string }>
   }
