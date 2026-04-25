@@ -27,10 +27,13 @@ export interface FieldDefinition {
   width?: FieldWidth
 }
 
+export type ContentTypeKind = 'collection' | 'single'
+
 export interface ContentType {
   id?: string
   name: string
   slug: string
+  kind: ContentTypeKind
   tableName: string
   fields: FieldDefinition[]
   isDefault?: boolean

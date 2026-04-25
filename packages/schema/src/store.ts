@@ -5,6 +5,7 @@ type ContentTypeRow = {
   id: string
   name: string
   slug: string
+  kind: ContentType['kind']
   table_name: string
   fields: ContentType['fields']
   is_default: boolean
@@ -17,6 +18,7 @@ function rowToContentType(row: ContentTypeRow): ContentType {
     id: row.id,
     name: row.name,
     slug: row.slug,
+    kind: row.kind,
     tableName: row.table_name,
     fields: row.fields,
     isDefault: row.is_default,
@@ -42,10 +44,10 @@ export async function findContentTypeBySlug(slug: string): Promise<ContentType |
 
 export async function saveContentType(contentType: ContentType): Promise<ContentType> {
   const { rows } = await pool.query<ContentTypeRow>(
-    `INSERT INTO plank_content_types (id, name, slug, table_name, fields)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO plank_content_types (id, name, slug, kind, table_name, fields)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [createId(), contentType.name, contentType.slug, contentType.tableName, JSON.stringify(contentType.fields)],
+    [createId(), contentType.name, contentType.slug, contentType.kind ?? 'collection', contentType.tableName, JSON.stringify(contentType.fields)],
   )
   return rowToContentType(rows[0])
 }

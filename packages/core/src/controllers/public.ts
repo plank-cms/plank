@@ -99,6 +99,33 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   if (!ct) { res.status(404).json({ error: 'Not found' }); return }
 
   assertSafeIdentifier(ct.tableName)
+
+  if (ct.kind === 'single') {
+    const statusParam = String(req.query.status ?? 'published')
+    const statusClause =
+      statusParam === 'published' || statusParam === 'draft'
+        ? `WHERE e.status = $1`
+        : ''
+    const values: unknown[] = statusClause ? [statusParam] : []
+    const { rows } = await pool.query(
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+       FROM ${ct.tableName} e
+       LEFT JOIN plank_users u ON u.id = e.created_by
+       ${statusClause} LIMIT 1`,
+      values,
+    )
+    if (!rows[0]) { res.status(404).json({ error: 'Not found' }); return }
+    const entry = serializeEntry(rows[0], ct, statusParam)
+    const [,, privateMode] = await Promise.all([
+      resolveMediaFields([entry], ct),
+      resolveAuthorAvatars([entry]),
+      isPrivateProvider(),
+    ])
+    if (privateMode) res.setHeader('Cache-Control', 'private, max-age=3300')
+    res.json(entry)
+    return
+  }
+
   const page = Math.max(1, parseInt(String(req.query.page ?? 1)))
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? 20))))
   const offset = (page - 1) * limit

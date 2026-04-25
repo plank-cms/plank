@@ -10,6 +10,7 @@ import { ContentTypesIndex } from './pages/content-types/Index.tsx'
 import { ContentTypeForm } from './pages/content-types/Form.tsx'
 import { ContentManager } from './pages/ContentManager.tsx'
 import { ContentIndex } from './pages/content/Index.tsx'
+import { ContentSlugIndex } from './pages/content/SlugIndex.tsx'
 import { EntriesList } from './pages/content/EntriesList.tsx'
 import { EntryForm } from './pages/content/EntryForm.tsx'
 import { MediaLibrary } from './pages/MediaLibrary.tsx'
@@ -35,7 +36,7 @@ const router = createBrowserRouter([
         element: <ContentManager />,
         children: [
           { index: true, element: <ContentIndex /> },
-          { path: ':slug', element: <EntriesList /> },
+          { path: ':slug', element: <ContentSlugIndex /> },
           { path: ':slug/new', element: <EntryForm /> },
           { path: ':slug/:id', element: <EntryForm /> },
         ],

@@ -33,6 +33,10 @@ const ContentTypeSchema = z.object({
   fields: z.array(FieldSchema),
 })
 
+const CreateContentTypeSchema = ContentTypeSchema.extend({
+  kind: z.enum(['collection', 'single']).default('collection'),
+})
+
 export const listContentTypes: RequestHandler = async (_req, res) => {
   const contentTypes = await findAllContentTypes()
   res.json(contentTypes)
@@ -48,7 +52,7 @@ export const getContentType: SlugParam = async (req, res) => {
 }
 
 export const createContentType: RequestHandler = async (req, res) => {
-  const parsed = ContentTypeSchema.safeParse(req.body)
+  const parsed = CreateContentTypeSchema.safeParse(req.body)
   if (!parsed.success) {
     res.status(400).json({ errors: flattenError(parsed.error, (i) => i.message) })
     return
@@ -72,7 +76,7 @@ export const updateContentType: SlugParam = async (req, res) => {
     return
   }
 
-  const next = await updateInStore(req.params.slug, parsed.data)
+  const next = await updateInStore(req.params.slug, { ...parsed.data, kind: prev.kind })
   await syncTable(next, prev)
   res.json(next)
 }

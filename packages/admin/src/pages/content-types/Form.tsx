@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useBlocker } from 'react-router-dom'
-import { PlusIcon, Trash2Icon, LayersIcon } from 'lucide-react'
+import { PlusIcon, Trash2Icon, LayersIcon, ListIcon, FileIcon } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -32,10 +32,13 @@ import { FieldCard, FIELD_WIDTH_SPAN } from '@/components/content-types/FieldCar
 import type { FieldCardData, FieldWidth } from '@/components/content-types/FieldCard.tsx'
 import { AddFieldDialog } from '@/components/content-types/AddFieldDialog.tsx'
 
+type ContentTypeKind = 'collection' | 'single'
+
 type ContentType = {
   id?: string
   name: string
   slug: string
+  kind: ContentTypeKind
   tableName: string
   fields: FieldCardData[]
 }
@@ -96,6 +99,7 @@ export function ContentTypeForm() {
   // Local form state
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [kind, setKind] = useState<ContentTypeKind>('collection')
   const [fields, setFields] = useState<FieldCardData[]>([])
 
   // Dialog state
@@ -110,6 +114,7 @@ export function ContentTypeForm() {
     if (isNew) {
       setName('')
       setSlug('')
+      setKind('collection')
       setFields([])
       original.current = { name: '', slug: '', fields: '[]' }
       return
@@ -117,6 +122,7 @@ export function ContentTypeForm() {
     if (!existing) return
     setName(existing.name)
     setSlug(existing.slug)
+    setKind(existing.kind ?? 'collection')
     setFields(existing.fields)
     original.current = {
       name: existing.name,
@@ -175,7 +181,9 @@ export function ContentTypeForm() {
 
   async function handleSave() {
     if (!name.trim() || !slug.trim()) return
-    const body = { name: name.trim(), slug, tableName: toTableName(slug), fields }
+    const body = isNew
+      ? { name: name.trim(), slug, kind, tableName: toTableName(slug), fields }
+      : { name: name.trim(), slug, tableName: toTableName(slug), fields }
     try {
       const saved = await request(
         isNew ? '/cms/admin/content-types' : `/cms/admin/content-types/${routeSlug}`,
@@ -234,9 +242,36 @@ export function ContentTypeForm() {
             placeholder="Content type name"
             className="bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/40"
           />
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm text-muted-foreground">API ID:</span>
-            <span className="text-sm text-muted-foreground">{slug || '—'}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-muted-foreground">API ID:</span>
+              <span className="text-sm text-muted-foreground">{slug || '—'}</span>
+            </div>
+            {isNew ? (
+              <div className="flex items-center gap-1 rounded-md border p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setKind('collection')}
+                  className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors ${kind === 'collection' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <ListIcon className="size-3" />
+                  Collection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKind('single')}
+                  className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors ${kind === 'single' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <FileIcon className="size-3" />
+                  Single
+                </button>
+              </div>
+            ) : (
+              <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground ${kind === 'single' ? 'border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400' : ''}`}>
+                {kind === 'single' ? <FileIcon className="size-3" /> : <ListIcon className="size-3" />}
+                {kind === 'single' ? 'Single' : 'Collection'}
+              </span>
+            )}
           </div>
         </div>
 

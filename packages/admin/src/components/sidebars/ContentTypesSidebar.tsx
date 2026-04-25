@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { PlusIcon } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { PlusIcon, FileIcon } from 'lucide-react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useFetch } from '@/hooks/useFetch.ts'
-import { SidebarNav } from './SidebarNav.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 
@@ -10,10 +9,12 @@ type ContentType = {
   id: string
   name: string
   slug: string
+  kind: 'collection' | 'single'
 }
 
 export function ContentTypesSidebar() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { data, loading, error, refetch } = useFetch<ContentType[]>('/cms/admin/content-types')
 
   useEffect(() => {
@@ -21,10 +22,10 @@ export function ContentTypesSidebar() {
     return () => window.removeEventListener('plank:content-types-changed', refetch)
   }, [refetch])
 
-  const items = (data ?? []).map((ct) => ({
-    label: ct.name,
-    to: `/content-types/${ct.slug}`,
-  }))
+  function isActive(slug: string) {
+    const to = `/content-types/${slug}`
+    return pathname === to || pathname.startsWith(to + '/')
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -43,11 +44,29 @@ export function ContentTypesSidebar() {
         {error && (
           <p className="px-4 py-3 text-xs text-destructive">{error}</p>
         )}
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && (data ?? []).length === 0 && (
           <p className="px-4 py-3 text-xs text-muted-foreground">No content types yet.</p>
         )}
-        {!loading && !error && items.length > 0 && (
-          <SidebarNav items={items} />
+        {!loading && !error && (data ?? []).length > 0 && (
+          <nav className="flex flex-col gap-0.5 p-2">
+            {(data ?? []).map((ct) => (
+              <NavLink
+                key={ct.slug}
+                to={`/content-types/${ct.slug}`}
+                className={[
+                  'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors',
+                  isActive(ct.slug)
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                ].join(' ')}
+              >
+                <span className="min-w-0 flex-1 truncate">{ct.name}</span>
+                {ct.kind === 'single' && (
+                  <FileIcon className="size-3.5 shrink-0 text-violet-500 dark:text-violet-400" />
+                )}
+              </NavLink>
+            ))}
+          </nav>
         )}
       </div>
 

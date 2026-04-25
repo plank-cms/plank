@@ -12,6 +12,7 @@ import {
 import {
   listEntries,
   getEntry,
+  getSingleEntry,
   createEntry,
   updateEntry,
   deleteEntry,
@@ -38,6 +39,7 @@ router.delete('/content-types/:slug', authorize('content-types:write'), deleteCo
 
 // Entries
 router.get('/content-types/:slug/entries', authorize('entries:read'), listEntries)
+router.get('/content-types/:slug/single', authorize('entries:read'), getSingleEntry)
 router.post('/content-types/:slug/entries', authorize('entries:write'), createEntry)
 router.get('/entries/:slug/:id', authorize('entries:read'), getEntry)
 router.put('/entries/:slug/:id', authorize('entries:write'), updateEntry)
