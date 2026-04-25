@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS plank_webhooks (
-  id         VARCHAR(21)  NOT NULL PRIMARY KEY,
+  id         TEXT         NOT NULL PRIMARY KEY,
   name       VARCHAR(255) NOT NULL,
   url        TEXT         NOT NULL,
   events     TEXT[]       NOT NULL DEFAULT '{}',

@@ -40,11 +40,12 @@ export async function createWebhook(req: Request, res: Response): Promise<void> 
 
   try {
     const { rows } = await pool.query<WebhookRow>(
-      'INSERT INTO plank_webhooks (id, name, url, events) VALUES ($1, $2, $3, $4) RETURNING *',
+      'INSERT INTO plank_webhooks (id, name, url, events) VALUES ($1, $2, $3, $4::text[]) RETURNING *',
       [id, name, url, events],
     )
     res.status(201).json(rows[0])
-  } catch {
+  } catch (err) {
+    console.error('[webhooks] create error:', err)
     res.status(500).json({ error: 'Failed to create webhook' })
   }
 }
