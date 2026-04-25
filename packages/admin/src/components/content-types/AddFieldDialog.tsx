@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select.tsx'
 import type { FieldCardData, MediaAllowedType } from './FieldCard.tsx'
+import { DEFAULT_FIELD_WIDTH } from './FieldCard.tsx'
 
 type FieldType = FieldCardData['type']
 type StringField = { name: string }
@@ -255,7 +256,7 @@ export function AddFieldDialog({
           : selected.type === 'media-gallery'
             ? ['image']
             : undefined,
-      width: initialField?.width ?? 'full',
+      width: initialField?.width ?? DEFAULT_FIELD_WIDTH[selected.type],
     })
     handleOpenChange(false)
   }

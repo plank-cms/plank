@@ -12,7 +12,7 @@ export type FieldType =
 
 export type NumberSubtype = 'integer' | 'float'
 
-export type FieldWidth = 'full' | 'half' | 'third'
+export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
 
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
 

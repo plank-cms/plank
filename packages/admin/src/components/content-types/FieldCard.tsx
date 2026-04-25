@@ -28,7 +28,7 @@ type FieldType =
   | 'relation'
   | 'uid'
 type NumberSubtype = 'integer' | 'float'
-export type FieldWidth = 'full' | 'half' | 'third'
+export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
 
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
 
@@ -97,8 +97,22 @@ function getFieldMeta(type: FieldType, subtype?: NumberSubtype): FieldMeta {
 
 export const FIELD_WIDTH_SPAN: Record<FieldWidth, string> = {
   full: 'col-span-6',
+  'two-thirds': 'col-span-4',
   half: 'col-span-3',
   third: 'col-span-2',
+}
+
+export const DEFAULT_FIELD_WIDTH: Record<FieldType, FieldWidth> = {
+  string: 'half',
+  text: 'full',
+  richtext: 'full',
+  number: 'third',
+  boolean: 'third',
+  datetime: 'half',
+  media: 'half',
+  'media-gallery': 'full',
+  relation: 'half',
+  uid: 'half',
 }
 
 function WidthIcon({ width }: { width: FieldWidth }) {
@@ -107,6 +121,14 @@ function WidthIcon({ width }: { width: FieldWidth }) {
     return (
       <div className="flex w-4 gap-px">
         <div className={`${bar} h-2 w-full`} />
+      </div>
+    )
+  if (width === 'two-thirds')
+    return (
+      <div className="flex w-4 gap-px">
+        <div className={`${bar} h-2 flex-1`} />
+        <div className={`${bar} h-2 flex-1`} />
+        <div className="h-2 flex-1 rounded-sm bg-current opacity-25" />
       </div>
     )
   if (width === 'half')
@@ -127,6 +149,7 @@ function WidthIcon({ width }: { width: FieldWidth }) {
 
 const WIDTH_OPTIONS: { value: FieldWidth; label: string }[] = [
   { value: 'full', label: 'Full width' },
+  { value: 'two-thirds', label: '2/3' },
   { value: 'half', label: 'Half' },
   { value: 'third', label: '1/3' },
 ]

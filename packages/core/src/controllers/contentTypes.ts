@@ -23,7 +23,7 @@ const FieldSchema = z.object({
   relatedTable: z.string().optional(),
   targetField: z.string().optional(),
   allowedTypes: z.array(z.enum(['image', 'video', 'audio', 'document'])).optional(),
-  width: z.enum(['full', 'half', 'third']).optional(),
+  width: z.enum(['full', 'two-thirds', 'half', 'third']).optional(),
 })
 
 const ContentTypeSchema = z.object({
