@@ -5,7 +5,6 @@ import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
-import { Switch } from '@/components/ui/switch.tsx'
 import {
   Select,
   SelectContent,
@@ -119,8 +118,6 @@ function S3Fields({
   values: Settings
   onChange: (k: string, v: string) => void
 }) {
-  const isPrivate = values['s3.access_mode'] === 'private'
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -174,33 +171,18 @@ function S3Fields({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border p-4">
-        <div className="space-y-0.5">
-          <p className="text-sm font-medium">Private bucket</p>
-          <p className="text-xs text-muted-foreground">
-            Files will be served via pre-signed URLs that expire after 1 hour.
-          </p>
-        </div>
-        <Switch
-          checked={isPrivate}
-          onCheckedChange={(checked) => onChange('s3.access_mode', checked ? 'private' : 'public')}
+      <div className="space-y-1.5">
+        <Label htmlFor="s3-public-url">Public URL</Label>
+        <Input
+          id="s3-public-url"
+          placeholder="https://cdn.example.com"
+          value={values['s3.public_url'] ?? ''}
+          onChange={(e) => onChange('s3.public_url', e.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Optional. Leave blank to use the default S3 URL.
+        </p>
       </div>
-
-      {!isPrivate && (
-        <div className="space-y-1.5">
-          <Label htmlFor="s3-public-url">Public URL</Label>
-          <Input
-            id="s3-public-url"
-            placeholder="https://cdn.example.com"
-            value={values['s3.public_url'] ?? ''}
-            onChange={(e) => onChange('s3.public_url', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Optional. Leave blank to use the default S3 URL.
-          </p>
-        </div>
-      )}
     </div>
   )
 }
@@ -214,8 +196,6 @@ function R2Fields({
   values: Settings
   onChange: (k: string, v: string) => void
 }) {
-  const isPrivate = values['r2.access_mode'] === 'private'
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -259,35 +239,20 @@ function R2Fields({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border p-4">
-        <div className="space-y-0.5">
-          <p className="text-sm font-medium">Private bucket</p>
-          <p className="text-xs text-muted-foreground">
-            Files will be served via pre-signed URLs that expire after 1 hour.
-          </p>
-        </div>
-        <Switch
-          checked={isPrivate}
-          onCheckedChange={(checked) => onChange('r2.access_mode', checked ? 'private' : 'public')}
+      <div className="space-y-1.5">
+        <Label htmlFor="r2-public-url">
+          Public URL <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="r2-public-url"
+          placeholder="https://assets.example.com"
+          value={values['r2.public_url'] ?? ''}
+          onChange={(e) => onChange('r2.public_url', e.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Required. R2 does not generate public URLs automatically.
+        </p>
       </div>
-
-      {!isPrivate && (
-        <div className="space-y-1.5">
-          <Label htmlFor="r2-public-url">
-            Public URL <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="r2-public-url"
-            placeholder="https://assets.example.com"
-            value={values['r2.public_url'] ?? ''}
-            onChange={(e) => onChange('r2.public_url', e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Required for public buckets. R2 does not generate public URLs automatically.
-          </p>
-        </div>
-      )}
     </div>
   )
 }

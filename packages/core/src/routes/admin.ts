@@ -21,7 +21,7 @@ import {
 import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar, deleteAvatar } from '../controllers/users.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
 import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
-import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, completeMedia } from '../controllers/media.js'
+import { uploadMedia, listMedia, deleteMedia, getMediaUrl } from '../controllers/media.js'
 import { upload } from '../media/index.js'
 import { getNamespaceSettings, updateNamespaceSettings } from '../controllers/settings.js'
 import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
@@ -72,8 +72,6 @@ router.delete('/api-tokens/:id', authorize('api-tokens:write'), deleteApiToken)
 
 // Media
 router.get('/media', authorize('media:read'), listMedia)
-router.post('/media/presign', authorize('media:write'), presignMedia)
-router.post('/media/complete', authorize('media:write'), completeMedia)
 router.post('/media', authorize('media:write'), upload.single('file'), uploadMedia)
 router.get('/media/:id/url', authorize('media:read'), getMediaUrl)
 router.delete('/media/:id', authorize('media:write'), deleteMedia)

@@ -1,25 +1,21 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { getSetting } from '../../lib/settings.js'
 import type { MediaProvider, UploadOptions } from '../index.js'
 
-const SIGNED_URL_TTL = 3600 // 1 hour
-
 async function getConfig() {
-  const [accessKeyId, secretAccessKey, region, bucket, pathPrefix, accessMode, publicUrl] =
+  const [accessKeyId, secretAccessKey, region, bucket, pathPrefix, publicUrl] =
     await Promise.all([
       getSetting('media', 's3.access_key_id'),
       getSetting('media', 's3.secret_access_key'),
       getSetting('media', 's3.region'),
       getSetting('media', 's3.bucket'),
       getSetting('media', 's3.path_prefix'),
-      getSetting('media', 's3.access_mode'),
       getSetting('media', 's3.public_url'),
     ])
 
-  return { accessKeyId, secretAccessKey, region, bucket, pathPrefix, accessMode, publicUrl }
+  return { accessKeyId, secretAccessKey, region, bucket, pathPrefix, publicUrl }
 }
 
 function buildClient(cfg: Awaited<ReturnType<typeof getConfig>>) {
@@ -40,11 +36,9 @@ function buildKey(cfg: Awaited<ReturnType<typeof getConfig>>, filename: string, 
 }
 
 function buildStoredUrl(cfg: Awaited<ReturnType<typeof getConfig>>, key: string): string {
-  return cfg.accessMode === 'private'
-    ? key
-    : cfg.publicUrl
-      ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-      : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
+  return cfg.publicUrl
+    ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
+    : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
 }
 
 export const s3Provider: MediaProvider = {
@@ -72,28 +66,6 @@ export const s3Provider: MediaProvider = {
 
   async getUrl(key) {
     const cfg = await getConfig()
-
-    if (cfg.accessMode === 'private') {
-      const client = buildClient(cfg)
-      return getSignedUrl(client, new GetObjectCommand({ Bucket: cfg.bucket!, Key: key }), {
-        expiresIn: SIGNED_URL_TTL,
-      })
-    }
-
-    return cfg.publicUrl
-      ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-      : `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${key}`
-  },
-
-  async presignUpload(filename, mimeType) {
-    const cfg = await getConfig()
-    const client = buildClient(cfg)
-    const key = buildKey(cfg, filename)
-    const upload_url = await getSignedUrl(
-      client,
-      new PutObjectCommand({ Bucket: cfg.bucket!, Key: key }),
-      { expiresIn: 300 },
-    )
-    return { upload_url, key, stored_url: buildStoredUrl(cfg, key) }
+    return buildStoredUrl(cfg, key)
   },
 }

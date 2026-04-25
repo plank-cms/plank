@@ -121,62 +121,14 @@ function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
 }
 
-function xhrPut(url: string, file: File): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('PUT', url)
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`Upload failed: ${xhr.status}`))
-    xhr.onerror = () => reject(new Error('Upload failed.'))
-    xhr.send(file)
-  })
-}
-
 async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   const token = localStorage.getItem('plank_token')
-  const auth = token && { Authorization: `Bearer ${token}` }
-
-  const presignRes = await fetch('/cms/admin/media/presign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ filename: file.name, mime_type: file.type, size: file.size }),
-  })
-
-  if (presignRes.ok) {
-    const { id, upload_url, key, stored_url } = (await presignRes.json()) as {
-      id: string
-      upload_url: string
-      key: string
-      stored_url: string
-    }
-    await xhrPut(upload_url, file)
-    const completeRes = await fetch('/cms/admin/media/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...auth },
-      body: JSON.stringify({
-        id,
-        key,
-        stored_url,
-        filename: file.name,
-        mime_type: file.type,
-        size: file.size,
-      }),
-    })
-    if (!completeRes.ok) throw new Error('Upload failed.')
-    return completeRes.json() as Promise<{ id: string; url: string }>
-  }
-
-  if (presignRes.status === 501) {
-    const body = new FormData()
-    body.append('file', file)
-    const res = await fetch('/cms/admin/media', { method: 'POST', headers: { ...auth }, body })
-    if (!res.ok) throw new Error('Upload failed.')
-    return res.json() as Promise<{ id: string; url: string }>
-  }
-
-  throw new Error('Upload failed.')
+  const auth = token ? { Authorization: `Bearer ${token}` } : {}
+  const body = new FormData()
+  body.append('file', file)
+  const res = await fetch('/cms/admin/media', { method: 'POST', headers: auth, body })
+  if (!res.ok) throw new Error('Upload failed.')
+  return res.json() as Promise<{ id: string; url: string }>
 }
 
 function MediaPickerDialog({

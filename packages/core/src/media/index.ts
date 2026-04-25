@@ -12,8 +12,6 @@ export interface MediaProvider {
   upload(file: Express.Multer.File, options?: UploadOptions): Promise<{ url: string; key: string }>
   delete(key: string): Promise<void>
   getUrl(key: string): Promise<string>
-  // Returns presigned PUT URL + the key to store in DB — only for remote providers
-  presignUpload?(filename: string, mimeType: string): Promise<{ upload_url: string; key: string; stored_url: string }>
 }
 
 const providers: Record<string, MediaProvider> = {
@@ -29,14 +27,6 @@ export async function getProvider(): Promise<MediaProvider> {
   const provider = providers[name]
   if (!provider) throw new Error(`Unknown media provider: "${name}". Use local, s3, or r2.`)
   return provider
-}
-
-export async function isPrivateProvider(): Promise<boolean> {
-  const fromSettings = await getSetting('media', 'provider')
-  const name = fromSettings ?? process.env.PLANK_MEDIA_PROVIDER ?? 'local'
-  if (name === 'local') return false
-  const mode = await getSetting('media', `${name}.access_mode`)
-  return mode === 'private'
 }
 
 export const upload = multer({ storage: multer.memoryStorage() })

@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express'
 import { pool } from '@plank/db'
 import { findContentTypeBySlug, assertSafeIdentifier } from '@plank/schema'
 import type { ContentType } from '@plank/schema'
-import { getProvider, isPrivateProvider } from '../media/index.js'
+import { getProvider } from '../media/index.js'
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
@@ -116,12 +116,10 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     )
     if (!rows[0]) { res.status(404).json({ error: 'Not found' }); return }
     const entry = serializeEntry(rows[0], ct, statusParam)
-    const [,, privateMode] = await Promise.all([
+    await Promise.all([
       resolveMediaFields([entry], ct),
       resolveAuthorAvatars([entry]),
-      isPrivateProvider(),
     ])
-    if (privateMode) res.setHeader('Cache-Control', 'private, max-age=3300')
     res.json(entry)
     return
   }
@@ -167,12 +165,10 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   ])
 
   const data = rows.map((row) => serializeEntry(row, ct, statusParam))
-  const [,, privateMode] = await Promise.all([
+  await Promise.all([
     resolveMediaFields(data, ct),
     resolveAuthorAvatars(data),
-    isPrivateProvider(),
   ])
-  if (privateMode) res.setHeader('Cache-Control', 'private, max-age=3300')
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
 
@@ -198,11 +194,9 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
 
   if (!rows[0]) { res.status(404).json({ error: 'Not found' }); return }
   const entry = serializeEntry(rows[0], ct, statusParam)
-  const [,, privateMode] = await Promise.all([
+  await Promise.all([
     resolveMediaFields([entry], ct),
     resolveAuthorAvatars([entry]),
-    isPrivateProvider(),
   ])
-  if (privateMode) res.setHeader('Cache-Control', 'private, max-age=3300')
   res.json(entry)
 }

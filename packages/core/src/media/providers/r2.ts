@@ -1,25 +1,21 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { getSetting } from '../../lib/settings.js'
 import type { MediaProvider, UploadOptions } from '../index.js'
 
-const SIGNED_URL_TTL = 3600 // 1 hour
-
 async function getConfig() {
-  const [accessKeyId, secretAccessKey, accountId, bucket, pathPrefix, accessMode, publicUrl] =
+  const [accessKeyId, secretAccessKey, accountId, bucket, pathPrefix, publicUrl] =
     await Promise.all([
       getSetting('media', 'r2.access_key_id'),
       getSetting('media', 'r2.secret_access_key'),
       getSetting('media', 'r2.account_id'),
       getSetting('media', 'r2.bucket'),
       getSetting('media', 'r2.path_prefix'),
-      getSetting('media', 'r2.access_mode'),
       getSetting('media', 'r2.public_url'),
     ])
 
-  return { accessKeyId, secretAccessKey, accountId, bucket, pathPrefix, accessMode, publicUrl }
+  return { accessKeyId, secretAccessKey, accountId, bucket, pathPrefix, publicUrl }
 }
 
 function buildClient(cfg: Awaited<ReturnType<typeof getConfig>>) {
@@ -43,11 +39,10 @@ function buildKey(cfg: Awaited<ReturnType<typeof getConfig>>, filename: string, 
 }
 
 function buildStoredUrl(cfg: Awaited<ReturnType<typeof getConfig>>, key: string): string {
-  return cfg.accessMode === 'private'
-    ? key
-    : cfg.publicUrl
-      ? `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-      : key
+  if (!cfg.publicUrl) {
+    throw new Error('R2 provider requires a public_url configured in Settings > Media.')
+  }
+  return `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
 }
 
 export const r2Provider: MediaProvider = {
@@ -75,29 +70,6 @@ export const r2Provider: MediaProvider = {
 
   async getUrl(key) {
     const cfg = await getConfig()
-
-    if (cfg.accessMode === 'private') {
-      const client = buildClient(cfg)
-      return getSignedUrl(client, new GetObjectCommand({ Bucket: cfg.bucket!, Key: key }), {
-        expiresIn: SIGNED_URL_TTL,
-      })
-    }
-
-    if (!cfg.publicUrl) {
-      throw new Error('R2 public bucket requires a public_url configured in Settings > Media.')
-    }
-    return `${cfg.publicUrl.replace(/\/$/, '')}/${key}`
-  },
-
-  async presignUpload(filename, mimeType) {
-    const cfg = await getConfig()
-    const client = buildClient(cfg)
-    const key = buildKey(cfg, filename)
-    const upload_url = await getSignedUrl(
-      client,
-      new PutObjectCommand({ Bucket: cfg.bucket!, Key: key }),
-      { expiresIn: 300 },
-    )
-    return { upload_url, key, stored_url: buildStoredUrl(cfg, key) }
+    return buildStoredUrl(cfg, key)
   },
 }
