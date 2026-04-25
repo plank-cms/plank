@@ -30,6 +30,7 @@ const RESOURCES = [
   { key: 'media',         label: 'Media' },
   { key: 'users',         label: 'Users' },
   { key: 'api-tokens',    label: 'API Tokens' },
+  { key: 'webhooks',      label: 'Webhooks' },
 ] as const
 
 const ACTIONS = [

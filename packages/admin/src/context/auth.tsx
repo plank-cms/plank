@@ -4,6 +4,7 @@ interface User {
   id: string
   email: string
   role: string
+  permissions: string[]
   firstName: string | null
   lastName: string | null
   avatarUrl: string | null

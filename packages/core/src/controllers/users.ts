@@ -43,12 +43,17 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
 }
 
 export async function getMe(req: Request, res: Response): Promise<void> {
-  const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, role_id, first_name, last_name, avatar_url, created_at FROM plank_users WHERE id = $1',
+  const { rows } = await pool.query<UserRow & { permissions: string[] }>(
+    `SELECT u.id, u.email, u.role_id, u.first_name, u.last_name, u.avatar_url, u.created_at,
+            r.permissions
+     FROM plank_users u
+     JOIN plank_roles r ON r.id = u.role_id
+     WHERE u.id = $1`,
     [req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
-  res.json(await resolveAvatarUrl(rows[0]))
+  const resolved = await resolveAvatarUrl(rows[0])
+  res.json({ ...resolved, permissions: rows[0].permissions })
 }
 
 export async function updateMe(req: Request, res: Response): Promise<void> {

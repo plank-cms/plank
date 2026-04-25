@@ -27,14 +27,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip.tsx'
 
-const BASE_ITEMS = [
-  { to: '/', icon: LayoutDashboardIcon, label: 'Dashboard' },
-  { to: '/content', icon: FileTextIcon, label: 'Content' },
-  { to: '/media', icon: ImageIcon, label: 'Media' },
-]
-const ADMIN_ITEMS = [
-  { to: '/content-types', icon: LayersIcon, label: 'Content Types' },
-  { to: '/settings', icon: Settings2Icon, label: 'Settings' },
+const NAV_ITEMS = [
+  { to: '/', icon: LayoutDashboardIcon, label: 'Dashboard', permission: null },
+  { to: '/content', icon: FileTextIcon, label: 'Content', permission: null },
+  { to: '/media', icon: ImageIcon, label: 'Media', permission: null },
+  { to: '/content-types', icon: LayersIcon, label: 'Content Types', permission: 'content-types:read' },
+  { to: '/settings', icon: Settings2Icon, label: 'Settings', permission: 'settings:read' },
 ]
 
 
@@ -48,9 +46,10 @@ function LayoutShell() {
     return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(to + '/')
   }
 
-  const role = user?.role?.toLowerCase()
-  const isAdmin = role === 'super admin' || role === 'admin'
-  const NAV_ITEMS = isAdmin ? [...BASE_ITEMS, ...ADMIN_ITEMS] : BASE_ITEMS
+  const permissions = user?.permissions ?? []
+  const visibleNavItems = NAV_ITEMS.filter(({ permission }) =>
+    !permission || permissions.includes('*') || permissions.includes(permission),
+  )
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -62,7 +61,7 @@ function LayoutShell() {
 
           {/* Nav */}
           <nav className="flex flex-1 flex-col items-center gap-1 pt-2">
-            {NAV_ITEMS.map(({ to, icon: IconComponent, label }) => (
+            {visibleNavItems.map(({ to, icon: IconComponent, label }) => (
               <Tooltip key={to}>
                 <TooltipTrigger asChild>
                   <Button asChild size="icon" variant={isActive(to) ? 'secondary' : 'ghost'}>

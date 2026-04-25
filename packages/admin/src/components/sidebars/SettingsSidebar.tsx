@@ -2,20 +2,20 @@ import { Settings2Icon, UsersRoundIcon, ShieldIcon, KeyRoundIcon, WebhookIcon } 
 import { useAuth } from '@/context/auth.tsx'
 import { SidebarNav } from './SidebarNav.tsx'
 
-const BASE_ITEMS = [
-  { label: 'Overview', to: '/settings/overview', icon: Settings2Icon },
-  { label: 'Users', to: '/settings/users', icon: UsersRoundIcon },
-]
-const SUPER_ADMIN_ITEMS = [
-  { label: 'Roles', to: '/settings/roles', icon: ShieldIcon },
-  { label: 'API Tokens', to: '/settings/api-tokens', icon: KeyRoundIcon },
-  { label: 'Webhooks', to: '/settings/webhooks', icon: WebhookIcon },
-]
+function hasPermission(user: { permissions: string[] } | null, permission: string): boolean {
+  return user?.permissions.includes('*') || user?.permissions.includes(permission) || false
+}
 
 export function SettingsSidebar() {
   const { user } = useAuth()
-  const isSuperAdmin = user?.role.toLowerCase() === 'super admin'
-  const items = isSuperAdmin ? [...BASE_ITEMS, ...SUPER_ADMIN_ITEMS] : BASE_ITEMS
+
+  const items = [
+    { label: 'Overview',    to: '/settings/overview',   icon: Settings2Icon, permission: 'settings:read' },
+    { label: 'Users',       to: '/settings/users',      icon: UsersRoundIcon, permission: 'users:read' },
+    { label: 'Roles',       to: '/settings/roles',      icon: ShieldIcon,    permission: 'users:read' },
+    { label: 'API Tokens',  to: '/settings/api-tokens', icon: KeyRoundIcon,  permission: 'api-tokens:read' },
+    { label: 'Webhooks',    to: '/settings/webhooks',   icon: WebhookIcon,   permission: 'webhooks:read' },
+  ].filter(({ permission }) => hasPermission(user, permission))
 
   return (
     <div className="flex flex-col">

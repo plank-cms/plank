@@ -16,7 +16,7 @@ const RegisterSchema = z.object({
 
 type UserRow = { id: string; email: string; password: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null }
 type CountRow = { count: string }
-type RoleRow = { id: string; name: string }
+type RoleRow = { id: string; name: string; permissions: string[] }
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 
@@ -68,7 +68,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const { rows: roleRows } = await pool.query<RoleRow>(
-    'SELECT id, name FROM plank_roles WHERE id = $1',
+    'SELECT id, name, permissions FROM plank_roles WHERE id = $1',
     [user.role_id],
   )
 
@@ -86,6 +86,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       id: user.id,
       email: user.email,
       role: roleRows[0]?.name ?? 'unknown',
+      permissions: roleRows[0]?.permissions ?? [],
       firstName: user.first_name,
       lastName: user.last_name,
       avatarUrl: user.avatar_url,

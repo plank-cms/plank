@@ -83,8 +83,8 @@ router.get('/settings/:namespace', authorize('settings:read'), getNamespaceSetti
 router.put('/settings/:namespace', authorize('settings:write'), updateNamespaceSettings)
 
 // Webhooks
-router.get('/webhooks', authorize('settings:read'), listWebhooks)
-router.post('/webhooks', authorize('settings:write'), createWebhook)
-router.delete('/webhooks/:id', authorize('settings:write'), deleteWebhook)
+router.get('/webhooks', authorize('webhooks:read'), listWebhooks)
+router.post('/webhooks', authorize('webhooks:write'), createWebhook)
+router.delete('/webhooks/:id', authorize('webhooks:write'), deleteWebhook)
 
 export default router

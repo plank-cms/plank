@@ -46,7 +46,7 @@ const router = createBrowserRouter([
       {
         path: 'content-types',
         element: (
-          <ProtectedRoute roles={['super admin', 'admin']}>
+          <ProtectedRoute permission="content-types:read">
             <ContentTypeBuilder />
           </ProtectedRoute>
         ),
@@ -59,7 +59,7 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: (
-          <ProtectedRoute roles={['super admin', 'admin']}>
+          <ProtectedRoute permission="settings:read">
             <Settings />
           </ProtectedRoute>
         ),
@@ -67,30 +67,9 @@ const router = createBrowserRouter([
           { index: true, element: <Navigate to="overview" replace /> },
           { path: 'overview', element: <SettingsOverview /> },
           { path: 'users', element: <SettingsUsers /> },
-          {
-            path: 'roles',
-            element: (
-              <ProtectedRoute roles={['super admin']}>
-                <SettingsRoles />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'api-tokens',
-            element: (
-              <ProtectedRoute roles={['super admin']}>
-                <SettingsApiTokens />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: 'webhooks',
-            element: (
-              <ProtectedRoute roles={['super admin']}>
-                <SettingsWebhooks />
-              </ProtectedRoute>
-            ),
-          },
+          { path: 'roles', element: <SettingsRoles /> },
+          { path: 'api-tokens', element: <SettingsApiTokens /> },
+          { path: 'webhooks', element: <SettingsWebhooks /> },
         ],
       },
       { path: 'profile', element: <Profile /> },

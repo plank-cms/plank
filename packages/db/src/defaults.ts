@@ -6,6 +6,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'media:read', 'media:write', 'media:delete',
     'users:read', 'users:write', 'users:delete',
     'settings:read', 'settings:write',
+    'webhooks:read', 'webhooks:write',
   ],
   'User': [
     'entries:read', 'entries:write',
