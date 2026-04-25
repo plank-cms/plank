@@ -16,7 +16,7 @@
  *   Cron: */5 * * * *
  */
 
-const pg = require("pg");
+import pg from "pg";
 
 const pool = new pg.Pool({ connectionString: process.env.PLANK_DATABASE_URL });
 
