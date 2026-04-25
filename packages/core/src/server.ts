@@ -1,10 +1,12 @@
 import { migrate } from '@plank/db'
+import { syncAllTables } from '@plank/schema'
 import app from './app.js'
 
 export async function start(): Promise<void> {
   const PORT = process.env.PLANK_PORT ?? 5500
 
   await migrate()
+  await syncAllTables()
 
   app.listen(PORT, () => {
     const base = process.env.PLANK_PUBLIC_URL ?? `http://localhost:${PORT}`

@@ -1,6 +1,7 @@
 import { pool } from '@plank/db'
 import { assertSafeIdentifier, toPostgresType, isVirtualRelation, hasRelationColumn } from './fieldTypes.js'
 import type { ContentType, FieldDefinition } from './types.js'
+import { findAllContentTypes } from './store.js'
 
 function buildColumnDef(field: FieldDefinition): string | null {
   if (isVirtualRelation(field)) return null
@@ -146,7 +147,7 @@ export async function syncTable(
     }
   }
 
-  if (statements.length > 0 || junctionOps.length > 0) {
+  if (statements.length > 0) {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
@@ -163,6 +164,37 @@ export async function syncTable(
 
     for (const op of junctionOps) {
       await op()
+    }
+  }
+}
+
+export async function syncAllTables(): Promise<void> {
+  const contentTypes = await findAllContentTypes()
+
+  for (const ct of contentTypes) {
+    assertSafeIdentifier(ct.tableName)
+
+    const { rows } = await pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'`,
+      [ct.tableName],
+    )
+    const existingColumns = new Set(rows.map((r) => r.column_name))
+
+    for (const field of ct.fields) {
+      if (isVirtualRelation(field)) continue
+      if (existingColumns.has(field.name)) continue
+
+      assertSafeIdentifier(field.name)
+      const colDef = buildColumnDef(field)
+      if (colDef) {
+        await pool.query(`ALTER TABLE ${ct.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
+        console.log(`[plank] Added missing column "${field.name}" to table "${ct.tableName}"`)
+      }
+
+      if (field.type === 'relation' && (field.relationType ?? 'many-to-one') === 'many-to-many' && field.relatedTable) {
+        await pool.query(buildJunctionTableSQL(ct.tableName, field.name, field.relatedTable))
+        console.log(`[plank] Created missing junction table for "${ct.tableName}.${field.name}"`)
+      }
     }
   }
 }
