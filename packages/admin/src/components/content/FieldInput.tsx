@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/context/settings.tsx'
 import { getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
 import { Input } from '@/components/ui/input.tsx'
@@ -666,7 +667,7 @@ function DateTimeInput({
     <div className="flex items-center gap-2">
       <Popover open={calOpen} onOpenChange={setCalOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="w-40 justify-between font-normal">
+          <Button variant="outline" className="w-40 justify-between font-normal text-base">
             {date ? format(date, 'MMM d, yyyy') : 'Select date'}
             <ChevronDownIcon className="size-4 opacity-50" />
           </Button>
@@ -683,7 +684,7 @@ function DateTimeInput({
       </Popover>
       <Input
         type="time"
-        className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none text-base!"
         value={time}
         onChange={(e) => handleTimeChange(e.target.value)}
       />
@@ -946,7 +947,7 @@ function RelationInput({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between font-normal"
+            className="w-full justify-between font-normal text-base"
           >
             <span className="truncate text-left">{triggerLabel}</span>
             <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
@@ -1042,7 +1043,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
           checked={Boolean(value)}
           onCheckedChange={(v) => onChange(Boolean(v))}
         />
-        <Label htmlFor={`field-${field.name}`} className="cursor-pointer font-normal text-sm">
+        <Label htmlFor={`field-${field.name}`} className="cursor-pointer font-normal text-base">
           {value ? 'Yes' : 'No'}
         </Label>
       </div>
@@ -1062,7 +1063,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   if (field.type === 'text') {
     return (
       <Textarea
-        className={sharedClass}
+        className={cn(sharedClass, 'text-base')}
         value={String(value ?? '')}
         placeholder={field.name}
         onChange={(e) => onChange(e.target.value)}
@@ -1074,7 +1075,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
     return (
       <Input
         type="number"
-        className={sharedClass}
+        className={cn(sharedClass, 'text-base!')}
         value={value === undefined || value === null ? '' : String(value)}
         step={field.subtype === 'float' ? 'any' : '1'}
         placeholder="0"
@@ -1103,7 +1104,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   if (field.type === 'uid') {
     return (
       <Input
-        className={sharedClass}
+        className={cn(sharedClass, 'text-base md:text-base')}
         value={String(value ?? '')}
         placeholder="auto-generated-slug"
         onChange={(e) => {
@@ -1144,7 +1145,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   // string fallback
   return (
     <Input
-      className={sharedClass}
+      className={cn(sharedClass, 'text-base md:text-base')}
       value={String(value ?? '')}
       placeholder={field.name}
       onChange={(e) => onChange(e.target.value)}
