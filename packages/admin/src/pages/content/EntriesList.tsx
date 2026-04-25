@@ -269,14 +269,14 @@ function ConfigureViewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md h-[80vh] flex flex-col">
+        <DialogHeader className="flex-none">
           <DialogTitle>Configure the view</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 py-1">
+        <div className="flex flex-col flex-1 min-h-0 gap-5 py-1">
           {/* Displayed fields */}
-          <div>
+          <div className="flex-none">
             <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Displayed fields</p>
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">No fields selected.</p>
@@ -322,9 +322,9 @@ function ConfigureViewDialog({
 
           {/* Available fields */}
           {hidden.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Available fields</p>
-              <ul className="space-y-1">
+            <div className="flex flex-col flex-1 min-h-0">
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide flex-none">Available fields</p>
+              <ul className="space-y-1 overflow-y-auto flex-1 min-h-0">
                 {hidden.map((field) => (
                   <li key={field.name} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
                     <span className="flex-1">{humanize(field.name)}</span>
@@ -343,7 +343,7 @@ function ConfigureViewDialog({
           )}
 
           {/* Sort */}
-          <div>
+          <div className="flex-none">
             <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort entries</p>
             <div className="grid grid-cols-2 gap-2">
               <Select value={sort.field} onValueChange={(v) => setSort((s) => ({ ...s, field: v }))}>
@@ -369,7 +369,7 @@ function ConfigureViewDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-none">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={() => { onApply({ visibleFields: visible, sort }); onOpenChange(false) }}>
             Apply
