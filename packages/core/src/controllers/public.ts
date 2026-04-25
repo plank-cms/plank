@@ -129,6 +129,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   const offset = (page - 1) * limit
 
   const knownFields = new Set(ct.fields.map((f) => f.name))
+  const systemSortFields = new Set(['created_at', 'updated_at', 'published_at'])
   const filterClauses: string[] = []
   const filterValues: unknown[] = []
 
@@ -140,8 +141,13 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   }
   // statusParam === 'all' skips the filter entirely
 
+  const rawSort = String(req.query.sort ?? 'created_at')
+  const sortField = knownFields.has(rawSort) || systemSortFields.has(rawSort) ? rawSort : 'created_at'
+  assertSafeIdentifier(sortField)
+  const sortDir = String(req.query.order ?? 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+
   for (const [key, value] of Object.entries(req.query)) {
-    if (key === 'page' || key === 'limit' || key === 'status') continue
+    if (key === 'page' || key === 'limit' || key === 'status' || key === 'sort' || key === 'order') continue
     if (knownFields.has(key)) {
       assertSafeIdentifier(key)
       filterClauses.push(`e.${key} = $${filterValues.length + 1}`)
@@ -158,7 +164,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
       `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
        FROM ${ct.tableName} e
        LEFT JOIN plank_users u ON u.id = e.created_by
-       ${where} ORDER BY e.created_at DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
+       ${where} ORDER BY e.${sortField} ${sortDir} LIMIT $${limitParam} OFFSET $${offsetParam}`,
       [...filterValues, limit, offset],
     ),
     pool.query(`SELECT COUNT(*) as count FROM ${ct.tableName} e ${where}`, filterValues),
