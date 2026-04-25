@@ -14,8 +14,22 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 3000,
     proxy: {
-      '/cms': 'http://localhost:5500',
-      '/api': 'http://localhost:5500',
+      '/cms': {
+        target: 'http://localhost:5500',
+        configure: (proxy) => {
+          proxy.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code !== 'ECONNREFUSED') console.error('[proxy]', err.message)
+          })
+        },
+      },
+      '/api': {
+        target: 'http://localhost:5500',
+        configure: (proxy) => {
+          proxy.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code !== 'ECONNREFUSED') console.error('[proxy]', err.message)
+          })
+        },
+      },
     },
   },
   build: {
