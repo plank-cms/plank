@@ -185,42 +185,6 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
   res.json(rows[0])
 }
 
-export const runScheduledPublish: RequestHandler = async (_req, res) => {
-  const { rows: cts } = await pool.query<{ slug: string; table_name: string }>(
-    'SELECT slug, table_name FROM plank_content_types',
-  )
-
-  const published: Array<{ slug: string; id: string }> = []
-
-  for (const ct of cts) {
-    assertSafeIdentifier(ct.table_name)
-
-    const { rows: due } = await pool.query<{ id: string }>(
-      `SELECT id FROM ${ct.table_name} WHERE status = 'scheduled' AND scheduled_for <= NOW()`,
-    )
-
-    if (due.length === 0) continue
-
-    const snapshotExpr = buildSnapshotExpr(ct.table_name)
-
-    for (const { id } of due) {
-      await pool.query(
-        `UPDATE ${ct.table_name} SET
-          status = 'published',
-          published_data = ${snapshotExpr},
-          published_at = NOW(),
-          scheduled_for = NULL,
-          updated_at = NOW()
-        WHERE id = $1`,
-        [id],
-      )
-      published.push({ slug: ct.slug, id })
-    }
-  }
-
-  res.json({ published })
-}
-
 export const deleteEntry: SlugIdParam = async (req, res) => {
   const ct = await findContentTypeBySlug(req.params.slug)
   if (!ct) { res.status(404).json({ error: 'Content type not found' }); return }

@@ -5,7 +5,6 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import authRouter from './routes/auth.js'
 import adminRouter from './routes/admin.js'
-import cronRouter from './routes/cron.js'
 import publicRouter from './routes/public.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 
@@ -28,9 +27,6 @@ const cmsCorOptions = cors({ origin: adminOrigin, credentials: true })
 
 app.use('/cms/auth', cmsCorOptions, authRouter)
 app.use('/cms/admin', cmsCorOptions, adminRouter)
-
-// /cms/cron is open to any origin (called by server-side cron jobs, not the browser)
-app.use('/cms/cron', cors(), cronRouter)
 
 // /api/* is public — any origin can consume it (headless CMS)
 app.use('/api', cors(), publicRouter)

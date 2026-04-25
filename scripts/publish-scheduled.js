@@ -3,47 +3,58 @@
 /**
  * Scheduled entry publisher
  *
- * Calls POST /cms/cron/publish to publish any entries whose
+ * Connects directly to the database and publishes any entries whose
  * scheduled_for timestamp is in the past.
  *
  * Run from the project root: node scripts/publish-scheduled.js
  *
  * Required environment variables:
- *   PLANK_URL          Base URL of the running Plank server (e.g. http://localhost:5500)
- *   PLANK_CRON_SECRET  Secret generated during setup (set in the server's environment)
+ *   PLANK_DATABASE_URL  PostgreSQL connection string (already required by the server)
  *
  * Recommended cron in Dokploy: every 5 minutes
  *   node scripts/publish-scheduled.js
  *   Cron: */5 * * * *
  */
 
-const url = process.env.PLANK_URL;
-const secret = process.env.PLANK_CRON_SECRET;
+const pg = require("pg");
 
-if (!url || !secret) {
-  console.error("[publish-scheduled] Missing PLANK_URL or PLANK_CRON_SECRET env vars.");
-  process.exit(1);
-}
+const pool = new pg.Pool({ connectionString: process.env.PLANK_DATABASE_URL });
+
+const SNAPSHOT_EXCLUDED = ["'id'", "'status'", "'published_data'", "'published_at'", "'scheduled_for'", "'created_at'", "'updated_at'"];
+const snapshotExpr = (table) =>
+  `(SELECT ${SNAPSHOT_EXCLUDED.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)} FROM ${table} t WHERE t.id = $1)`;
 
 async function main() {
   const now = new Date().toISOString();
   console.log(`[publish-scheduled] Running at ${now}`);
 
-  const res = await fetch(`${url}/cms/cron/publish`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-  });
+  const { rows: cts } = await pool.query(
+    "SELECT slug, table_name FROM plank_content_types"
+  );
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`[publish-scheduled] Request failed (${res.status}): ${text}`);
-    process.exit(1);
+  const published = [];
+
+  for (const { slug, table_name } of cts) {
+    const { rows: due } = await pool.query(
+      `SELECT id FROM ${table_name} WHERE status = 'scheduled' AND scheduled_for <= NOW()`
+    );
+
+    if (due.length === 0) continue;
+
+    for (const { id } of due) {
+      await pool.query(
+        `UPDATE ${table_name} SET
+          status = 'published',
+          published_data = ${snapshotExpr(table_name)},
+          published_at = NOW(),
+          scheduled_for = NULL,
+          updated_at = NOW()
+        WHERE id = $1`,
+        [id]
+      );
+      published.push({ slug, id });
+    }
   }
-
-  const { published } = await res.json();
 
   if (published.length === 0) {
     console.log("[publish-scheduled] No entries ready to publish.");
@@ -56,7 +67,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("[publish-scheduled] Fatal error:", err.message ?? err);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error("[publish-scheduled] Fatal error:", err.message ?? err);
+    process.exit(1);
+  })
+  .finally(() => pool.end());
