@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 import {
@@ -62,6 +62,8 @@ function ToolbarDivider() {
 }
 
 export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+  const [isEmpty, setIsEmpty] = useState(!value)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -82,6 +84,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       },
     },
     onUpdate({ editor }) {
+      setIsEmpty(editor.isEmpty)
       onChange(JSON.stringify(editor.getJSON()))
     },
   })
@@ -99,6 +102,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       : ''
     const current = JSON.stringify(editor.getJSON())
     if (current !== value) editor.commands.setContent(incoming, { emitUpdate: false })
+    setIsEmpty(editor.isEmpty)
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSetLink() {
@@ -238,7 +242,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
       {/* Editor area */}
       <div className="relative overflow-y-auto">
-        {editor.isEmpty && placeholder && (
+        {isEmpty && placeholder && (
           <p className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground select-none">
             {placeholder}
           </p>
