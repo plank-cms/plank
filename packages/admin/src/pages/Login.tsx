@@ -60,11 +60,8 @@ export function Login() {
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Left panel — form */}
       <div className="flex flex-col gap-4 p-6 md:p-10">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <span className="text-xs font-bold">P</span>
-          </div>
-          <span className="font-semibold">Plank CMS</span>
+        <div className="flex items-center">
+          <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="h-10" />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
