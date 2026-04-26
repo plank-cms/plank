@@ -29,6 +29,15 @@ export const localProvider: MediaProvider = {
     return { url: `${base}/uploads/${key}`, key }
   },
 
+  async uploadRaw(buffer, exactKey, mimeType) {
+    const base_dir = await uploadsDir()
+    const dir = join(base_dir, exactKey.split('/').slice(0, -1).join('/'))
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(base_dir, exactKey), buffer)
+    const base = await publicUrl()
+    return { url: `${base}/uploads/${exactKey}`, key: exactKey }
+  },
+
   async delete(key) {
     const { unlink } = await import('node:fs/promises')
     const dir = await uploadsDir()

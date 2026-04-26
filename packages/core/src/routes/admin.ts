@@ -23,6 +23,7 @@ import { getUserPref, setUserPref } from '../controllers/userPrefs.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
 import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
 import { uploadMedia, listMedia, deleteMedia, getMediaUrl } from '../controllers/media.js'
+import { listFolders, createFolder, renameFolder, deleteFolder } from '../controllers/folders.js'
 import { upload } from '../media/index.js'
 import { getNamespaceSettings, updateNamespaceSettings } from '../controllers/settings.js'
 import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
@@ -73,9 +74,15 @@ router.get('/api-tokens', authorize('api-tokens:read'), listApiTokens)
 router.post('/api-tokens', authorize('api-tokens:write'), createApiToken)
 router.delete('/api-tokens/:id', authorize('api-tokens:write'), deleteApiToken)
 
+// Folders
+router.get('/folders', authorize('media:read'), listFolders)
+router.post('/folders', authorize('media:write'), createFolder)
+router.patch('/folders/:id', authorize('media:write'), renameFolder)
+router.delete('/folders/:id', authorize('media:write'), deleteFolder)
+
 // Media
 router.get('/media', authorize('media:read'), listMedia)
-router.post('/media', authorize('media:write'), upload.single('file'), uploadMedia)
+router.post('/media', authorize('media:write'), upload.array('files', 500), uploadMedia)
 router.get('/media/:id/url', authorize('media:read'), getMediaUrl)
 router.delete('/media/:id', authorize('media:write'), deleteMedia)
 

@@ -10,6 +10,7 @@ export interface UploadOptions {
 
 export interface MediaProvider {
   upload(file: Express.Multer.File, options?: UploadOptions): Promise<{ url: string; key: string }>
+  uploadRaw(buffer: Buffer, exactKey: string, mimeType: string): Promise<{ url: string; key: string }>
   delete(key: string): Promise<void>
   getUrl(key: string): Promise<string>
 }

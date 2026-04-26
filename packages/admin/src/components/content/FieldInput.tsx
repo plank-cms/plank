@@ -36,6 +36,7 @@ import {
   XIcon,
   ImageIcon,
   FolderOpenIcon,
+  HomeIcon,
   FileIcon,
   ChevronDownIcon,
   GripVerticalIcon,
@@ -125,10 +126,25 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   const token = localStorage.getItem('plank_token')
   const auth = token ? { Authorization: `Bearer ${token}` } : {}
   const body = new FormData()
-  body.append('file', file)
+  body.append('files', file, file.name)
   const res = await fetch('/cms/admin/media', { method: 'POST', headers: auth, body })
   if (!res.ok) throw new Error('Upload failed.')
   return res.json() as Promise<{ id: string; url: string }>
+}
+
+type PickerFolder = { id: string; name: string; parent_id: string | null }
+type PickerBreadcrumb = { id: string | null; name: string }
+
+function matchesAllowedTypes(mime: string | null, allowedTypes?: FieldDef['allowedTypes']): boolean {
+  if (!allowedTypes || allowedTypes.length === 0) return true
+  const m = mime ?? ''
+  return allowedTypes.some((t) => {
+    if (t === 'image') return m.startsWith('image/')
+    if (t === 'video') return m.startsWith('video/')
+    if (t === 'audio') return m.startsWith('audio/')
+    if (t === 'document') return m.startsWith('application/') || m.startsWith('text/')
+    return false
+  })
 }
 
 function MediaPickerDialog({
@@ -142,6 +158,10 @@ function MediaPickerDialog({
   allowedTypes?: FieldDef['allowedTypes']
   onSelect: (item: MediaItem) => void
 }) {
+  const [breadcrumb, setBreadcrumb] = useState<PickerBreadcrumb[]>([{ id: null, name: 'Media' }])
+  const currentFolderId = breadcrumb[breadcrumb.length - 1].id
+
+  const [folders, setFolders] = useState<PickerFolder[]>([])
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -149,24 +169,36 @@ function MediaPickerDialog({
     if (!open) return
     setLoading(true)
     const token = localStorage.getItem('plank_token')
-    fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
-      .then((data) => setItems(data.items))
-      .catch(() => setItems([]))
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+    const folderParam = currentFolderId ?? ''
+    Promise.all([
+      fetch(`/cms/admin/folders?parent_id=${folderParam}`, { headers })
+        .then((r) => (r.ok ? (r.json() as Promise<{ folders: PickerFolder[] }>) : { folders: [] }))
+        .then((d) => d.folders),
+      fetch(`/cms/admin/media?folder_id=${folderParam}`, { headers })
+        .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
+        .then((d) => d.items),
+    ])
+      .then(([f, m]) => { setFolders(f); setItems(m) })
+      .catch(() => { setFolders([]); setItems([]) })
       .finally(() => setLoading(false))
+  }, [open, currentFolderId])
+
+  // Reset to root when dialog closes
+  useEffect(() => {
+    if (!open) setBreadcrumb([{ id: null, name: 'Media' }])
   }, [open])
 
-  const filtered = items.filter((item) => {
-    if (!allowedTypes || allowedTypes.length === 0) return true
-    const mime = item.mime_type ?? ''
-    return allowedTypes.some((t) => {
-      if (t === 'image') return mime.startsWith('image/')
-      if (t === 'video') return mime.startsWith('video/')
-      if (t === 'audio') return mime.startsWith('audio/')
-      if (t === 'document') return mime.startsWith('application/') || mime.startsWith('text/')
-      return false
-    })
-  })
+  function openFolder(folder: PickerFolder) {
+    setBreadcrumb((prev) => [...prev, { id: folder.id, name: folder.name }])
+  }
+
+  function navigateTo(index: number) {
+    setBreadcrumb((prev) => prev.slice(0, index + 1))
+  }
+
+  const filtered = items.filter((item) => matchesAllowedTypes(item.mime_type, allowedTypes))
+  const empty = folders.length === 0 && filtered.length === 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,31 +206,65 @@ function MediaPickerDialog({
         <DialogHeader>
           <DialogTitle>Media Library</DialogTitle>
         </DialogHeader>
+
+        {/* Breadcrumb */}
+        {breadcrumb.length > 1 && (
+          <div className="flex items-center gap-1 text-sm -mt-1">
+            {breadcrumb.map((entry, i) => (
+              <span key={i} className="flex items-center gap-1 text-muted-foreground">
+                {i > 0 && <span>/</span>}
+                {i === breadcrumb.length - 1 ? (
+                  <span className="font-medium text-foreground">
+                    {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
+                  </span>
+                ) : (
+                  <button onClick={() => navigateTo(i)} className="hover:text-foreground transition-colors">
+                    {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner className="size-5" />
           </div>
-        ) : filtered.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">No media found.</p>
+        ) : empty ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">
+            {items.length === 0 && folders.length === 0 ? 'No media found.' : 'No matching files in this folder.'}
+          </p>
         ) : (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 max-h-[60vh] overflow-y-auto pr-1">
+            {folders.map((folder) => (
+              <button
+                key={folder.id}
+                type="button"
+                onClick={() => openFolder(folder)}
+                className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
+              >
+                <div className="aspect-square bg-muted/30 flex items-center justify-center">
+                  <FolderOpenIcon className="size-7 text-muted-foreground" />
+                </div>
+                <div className="p-1.5">
+                  <p className="truncate text-[11px] font-medium leading-tight" title={folder.name}>
+                    {folder.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Folder</p>
+                </div>
+              </button>
+            ))}
             {filtered.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => {
-                  onSelect(item)
-                  onOpenChange(false)
-                }}
+                onClick={() => { onSelect(item); onOpenChange(false) }}
                 className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
               >
                 <div className="aspect-square bg-muted">
                   {isImageMime(item.mime_type) ? (
-                    <img
-                      src={item.url}
-                      alt={item.filename}
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center">
                       <FileIcon className="size-6 text-muted-foreground" />
@@ -206,10 +272,7 @@ function MediaPickerDialog({
                   )}
                 </div>
                 <div className="p-1.5">
-                  <p
-                    className="truncate text-[11px] font-medium leading-tight"
-                    title={item.filename}
-                  >
+                  <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>
                     {item.filename}
                   </p>
                   <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>

@@ -62,6 +62,18 @@ export const r2Provider: MediaProvider = {
     return { url: buildStoredUrl(cfg, key), key }
   },
 
+  async uploadRaw(buffer, exactKey, mimeType) {
+    const cfg = await getConfig()
+    const client = buildClient(cfg)
+    await client.send(new PutObjectCommand({
+      Bucket: cfg.bucket!,
+      Key: exactKey,
+      Body: buffer,
+      ContentType: mimeType,
+    }))
+    return { url: buildStoredUrl(cfg, exactKey), key: exactKey }
+  },
+
   async delete(key) {
     const cfg = await getConfig()
     const client = buildClient(cfg)
