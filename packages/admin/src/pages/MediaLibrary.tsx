@@ -4,6 +4,7 @@ import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { Checkbox } from '@/components/ui/checkbox.tsx'
 import {
   Dialog,
   DialogContent,
@@ -37,9 +38,14 @@ function isImage(mimeType: string | null): boolean {
   return !!mimeType?.startsWith('image/')
 }
 
-function MediaCard({ item, onDelete }: { item: MediaItem; onDelete: (item: MediaItem) => void }) {
+function MediaCard({ item, onDelete, selected, onToggle }: {
+  item: MediaItem
+  onDelete: (item: MediaItem) => void
+  selected: boolean
+  onToggle: (id: string) => void
+}) {
   return (
-    <div className="group relative rounded-lg border bg-card overflow-hidden">
+    <div className={`group relative rounded-lg border bg-card overflow-hidden transition-colors ${selected ? 'ring-2 ring-primary' : ''}`}>
       <div className="aspect-square bg-muted flex items-center justify-center">
         {isImage(item.mime_type) ? (
           <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
@@ -47,12 +53,22 @@ function MediaCard({ item, onDelete }: { item: MediaItem; onDelete: (item: Media
           <FileIcon className="size-10 text-muted-foreground" />
         )}
       </div>
-      <button
-        onClick={() => onDelete(item)}
-        className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:text-destructive group-hover:opacity-100"
-      >
-        <Trash2Icon className="size-3.5" />
-      </button>
+      <div className={`absolute top-1.5 left-1.5 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={() => onToggle(item.id)}
+          aria-label="Select file"
+          className="bg-background/80 backdrop-blur-sm"
+        />
+      </div>
+      {!selected && (
+        <button
+          onClick={() => onDelete(item)}
+          className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:text-destructive group-hover:opacity-100"
+        >
+          <Trash2Icon className="size-3.5" />
+        </button>
+      )}
       <div className="p-2">
         <p className="text-xs font-medium truncate" title={item.filename}>
           {item.filename}
@@ -69,6 +85,9 @@ export function MediaLibrary() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<MediaItem | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false)
+  const [bulkLoading, setBulkLoading] = useState(false)
   const { loading: deleting, error: deleteError, request } = useApi()
 
   async function handleFiles(files: FileList | null) {
@@ -125,7 +144,35 @@ export function MediaLibrary() {
     }
   }
 
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    if (bulkLoading) return
+    setBulkLoading(true)
+    try {
+      const token = localStorage.getItem('plank_token')
+      const headers: HeadersInit = { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      await Promise.all([...selected].map((id) =>
+        fetch(`/cms/admin/media/${id}`, { method: 'DELETE', headers })
+      ))
+      setBulkConfirmDelete(false)
+      setSelected(new Set())
+      refetch()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   const items = data?.items ?? []
+  const allSelected = items.length > 0 && items.every((i) => selected.has(i.id))
+  const someSelected = !allSelected && items.some((i) => selected.has(i.id))
 
   return (
     <div>
@@ -141,6 +188,29 @@ export function MediaLibrary() {
           {uploading ? 'Uploading…' : 'Upload'}
         </Button>
       </div>
+
+      {selected.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+          <Checkbox
+            checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+            onCheckedChange={() => {
+              if (allSelected) setSelected(new Set())
+              else setSelected(new Set(items.map((i) => i.id)))
+            }}
+            aria-label="Select all"
+          />
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button variant="destructive" size="sm" disabled={bulkLoading} onClick={() => setBulkConfirmDelete(true)}>
+              <Trash2Icon className="size-3.5" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
 
       <input
         ref={inputRef}
@@ -174,17 +244,18 @@ export function MediaLibrary() {
           onDrop={handleDrop}
         >
           {items.map((item) => (
-            <MediaCard key={item.id} item={item} onDelete={setToDelete} />
+            <MediaCard
+              key={item.id}
+              item={item}
+              onDelete={setToDelete}
+              selected={selected.has(item.id)}
+              onToggle={toggleOne}
+            />
           ))}
         </div>
       )}
 
-      <Dialog
-        open={!!toDelete}
-        onOpenChange={(o) => {
-          if (!o) setToDelete(null)
-        }}
-      >
+      <Dialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null) }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete file</DialogTitle>
@@ -196,11 +267,25 @@ export function MediaLibrary() {
           </p>
           {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setToDelete(null)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setToDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkConfirmDelete} onOpenChange={(o) => { if (!o) setBulkConfirmDelete(false) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {selected.size} {selected.size === 1 ? 'file' : 'files'}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+              {bulkLoading ? <Spinner className="size-4" /> : null}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
