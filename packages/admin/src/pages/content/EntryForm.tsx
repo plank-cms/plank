@@ -143,7 +143,11 @@ export function EntryForm() {
     const body: Record<string, unknown> = {}
     ct.fields.forEach((f) => {
       const v = values[f.name]
-      if (v !== '' && v !== null && v !== undefined) body[f.name] = v
+      if (f.type === 'media' && v === null) {
+        body[f.name] = null
+      } else if (v !== '' && v !== null && v !== undefined) {
+        body[f.name] = v
+      }
     })
 
     try {
