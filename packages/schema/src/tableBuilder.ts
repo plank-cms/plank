@@ -181,14 +181,13 @@ export async function syncAllTables(): Promise<void> {
     const existingColumns = new Set(rows.map((r) => r.column_name))
 
     for (const field of ct.fields) {
-      if (isVirtualRelation(field)) continue
-      if (existingColumns.has(field.name)) continue
-
-      assertSafeIdentifier(field.name)
-      const colDef = buildColumnDef(field)
-      if (colDef) {
-        await pool.query(`ALTER TABLE ${ct.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
-        console.log(`[plank] Added missing column "${field.name}" to table "${ct.tableName}"`)
+      if (!isVirtualRelation(field) && !existingColumns.has(field.name)) {
+        assertSafeIdentifier(field.name)
+        const colDef = buildColumnDef(field)
+        if (colDef) {
+          await pool.query(`ALTER TABLE ${ct.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
+          console.log(`[plank] Added missing column "${field.name}" to table "${ct.tableName}"`)
+        }
       }
 
       if (field.type === 'relation' && (field.relationType ?? 'many-to-one') === 'many-to-many' && field.relatedTable) {
