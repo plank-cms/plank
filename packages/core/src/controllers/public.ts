@@ -64,6 +64,35 @@ async function resolveMediaFields(entries: Record<string, unknown>[], ct: Conten
   }
 }
 
+async function resolveManyToManyFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
+  const mmFields = ct.fields.filter(
+    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many',
+  )
+  if (mmFields.length === 0) return
+
+  const entryIds = entries.map((e) => e.id as string)
+  if (entryIds.length === 0) return
+
+  await Promise.all(
+    mmFields.map(async (field) => {
+      const jt = `_rel_${ct.tableName}_${field.name}`
+      const { rows } = await pool.query<{ source_id: string; target_id: string }>(
+        `SELECT source_id, target_id FROM ${jt} WHERE source_id = ANY($1)`,
+        [entryIds],
+      )
+      const map = new Map<string, string[]>()
+      for (const row of rows) {
+        const list = map.get(row.source_id)
+        if (list) list.push(row.target_id)
+        else map.set(row.source_id, [row.target_id])
+      }
+      for (const entry of entries) {
+        entry[field.name] = map.get(entry.id as string) ?? []
+      }
+    }),
+  )
+}
+
 async function resolveAuthorAvatars(entries: Record<string, unknown>[]): Promise<void> {
   const provider = await getProvider()
   await Promise.all(
@@ -119,6 +148,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     await Promise.all([
       resolveMediaFields([entry], ct),
       resolveAuthorAvatars([entry]),
+      resolveManyToManyFields([entry], ct),
     ])
     res.json(entry)
     return
@@ -174,6 +204,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields(data, ct),
     resolveAuthorAvatars(data),
+    resolveManyToManyFields(data, ct),
   ])
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
@@ -203,6 +234,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields([entry], ct),
     resolveAuthorAvatars([entry]),
+    resolveManyToManyFields([entry], ct),
   ])
   res.json(entry)
 }

@@ -1,8 +1,29 @@
 import type { RequestHandler } from 'express'
 import { pool, createId } from '@plank/db'
-import { findContentTypeBySlug, validate, assertSafeIdentifier } from '@plank/schema'
+import { findContentTypeBySlug, validate, assertSafeIdentifier, isVirtualRelation } from '@plank/schema'
+import type { FieldDefinition } from '@plank/schema'
 import { getProvider } from '../media/index.js'
 import { triggerWebhooks } from './webhooks.js'
+
+function junctionTableName(sourceTable: string, fieldName: string): string {
+  return `_rel_${sourceTable}_${fieldName}`
+}
+
+async function syncManyToMany(
+  entryId: string,
+  tableName: string,
+  field: FieldDefinition,
+  targetIds: string[],
+): Promise<void> {
+  const jt = junctionTableName(tableName, field.name)
+  await pool.query(`DELETE FROM ${jt} WHERE source_id = $1`, [entryId])
+  if (targetIds.length === 0) return
+  const placeholders = targetIds.map((_, i) => `($1, $${i + 2})`).join(', ')
+  await pool.query(
+    `INSERT INTO ${jt} (source_id, target_id) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    [entryId, ...targetIds],
+  )
+}
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
@@ -65,7 +86,12 @@ export const createEntry: SlugParam = async (req, res) => {
   validate(ct, req.body)
 
   assertSafeIdentifier(ct.tableName)
-  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined)
+
+  // M:M fields are virtual — managed via junction tables, not columns
+  const mmFields = ct.fields.filter(
+    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many' && req.body[f.name] !== undefined,
+  )
+  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualRelation(f))
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   // Single Types: upsert — update the existing entry if one already exists
@@ -84,6 +110,10 @@ export const createEntry: SlugParam = async (req, res) => {
         : `UPDATE ${ct.tableName} SET updated_at = NOW() WHERE id = $1 RETURNING *`
       const updateValues = fields.length > 0 ? values : [existing[0].id]
       const { rows } = await pool.query(updateSql, updateValues)
+      await Promise.all(mmFields.map((f) => {
+        const ids = Array.isArray(req.body[f.name]) ? (req.body[f.name] as string[]) : []
+        return syncManyToMany(existing[0].id, ct.tableName, f, ids)
+      }))
       res.json(rows[0])
       return
     }
@@ -104,6 +134,10 @@ export const createEntry: SlugParam = async (req, res) => {
     `INSERT INTO ${ct.tableName} (${cols}) VALUES (${placeholders}) RETURNING *`,
     values,
   )
+  await Promise.all(mmFields.map((f) => {
+    const ids = Array.isArray(req.body[f.name]) ? (req.body[f.name] as string[]) : []
+    return syncManyToMany(id, ct.tableName, f, ids)
+  }))
   res.status(201).json(rows[0])
   triggerWebhooks('entry.created', { content_type: req.params.slug, entry_id: rows[0].id })
 }
@@ -127,7 +161,12 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   validate(ct, req.body)
 
   assertSafeIdentifier(ct.tableName)
-  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined)
+
+  // M:M fields are virtual — managed via junction tables, not columns
+  const mmFields = ct.fields.filter(
+    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many' && req.body[f.name] !== undefined,
+  )
+  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualRelation(f))
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   const setClauses = fields.map((f, i) =>
@@ -138,12 +177,20 @@ export const updateEntry: SlugIdParam = async (req, res) => {
     return f.type === 'media-gallery' || f.type === 'array' ? JSON.stringify(v) : v
   }), req.params.id]
 
-  const { rows } = await pool.query(
-    `UPDATE ${ct.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
-    values,
-  )
+  const updateSql = fields.length > 0
+    ? `UPDATE ${ct.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`
+    : `UPDATE ${ct.tableName} SET updated_at = NOW() WHERE id = $1 RETURNING *`
+  const updateValues = fields.length > 0 ? values : [req.params.id]
+
+  const { rows } = await pool.query(updateSql, updateValues)
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
+
+  await Promise.all(mmFields.map((f) => {
+    const ids = Array.isArray(req.body[f.name]) ? (req.body[f.name] as string[]) : []
+    return syncManyToMany(req.params.id, ct.tableName, f, ids)
+  }))
+
   res.json(rows[0])
   triggerWebhooks('entry.updated', { content_type: req.params.slug, entry_id: req.params.id })
 }
