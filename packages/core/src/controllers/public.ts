@@ -64,33 +64,63 @@ async function resolveMediaFields(entries: Record<string, unknown>[], ct: Conten
   }
 }
 
-async function resolveManyToManyFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
-  const mmFields = ct.fields.filter(
-    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many',
+const SYSTEM_FIELDS = new Set(['status', 'published_data', 'published_at', 'scheduled_for', 'created_by', 'created_at', 'updated_at'])
+
+function stripSystemFields(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row).filter(([k]) => !SYSTEM_FIELDS.has(k)))
+}
+
+async function resolveRelationFields(entries: Record<string, unknown>[], ct: ContentType): Promise<void> {
+  const scalarFields = ct.fields.filter(
+    (f) => f.type === 'relation' &&
+      (f.relationType === 'many-to-one' || f.relationType === 'one-to-one' || !f.relationType) &&
+      f.relatedTable,
   )
-  if (mmFields.length === 0) return
+  const mmFields = ct.fields.filter(
+    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many' && f.relatedTable,
+  )
 
   const entryIds = entries.map((e) => e.id as string)
-  if (entryIds.length === 0) return
 
-  await Promise.all(
-    mmFields.map(async (field) => {
+  await Promise.all([
+    ...scalarFields.map(async (field) => {
+      const ids = entries.map((e) => e[field.name] as string).filter(Boolean)
+      if (ids.length === 0) return
+      assertSafeIdentifier(field.relatedTable!)
+      const { rows } = await pool.query(`SELECT * FROM ${field.relatedTable} WHERE id = ANY($1)`, [ids])
+      const map = new Map(rows.map((r) => [r.id as string, stripSystemFields(r)]))
+      for (const entry of entries) {
+        const id = entry[field.name] as string | null
+        entry[field.name] = id ? (map.get(id) ?? null) : null
+      }
+    }),
+    ...mmFields.map(async (field) => {
+      if (entryIds.length === 0) return
       const jt = `_rel_${ct.tableName}_${field.name}`
-      const { rows } = await pool.query<{ source_id: string; target_id: string }>(
+      const { rows: jRows } = await pool.query<{ source_id: string; target_id: string }>(
         `SELECT source_id, target_id FROM ${jt} WHERE source_id = ANY($1)`,
         [entryIds],
       )
-      const map = new Map<string, string[]>()
-      for (const row of rows) {
-        const list = map.get(row.source_id)
-        if (list) list.push(row.target_id)
-        else map.set(row.source_id, [row.target_id])
+      const allTargetIds = [...new Set(jRows.map((r) => r.target_id))]
+      const relatedMap = new Map<string, Record<string, unknown>>()
+      if (allTargetIds.length > 0) {
+        assertSafeIdentifier(field.relatedTable!)
+        const { rows: relRows } = await pool.query(`SELECT * FROM ${field.relatedTable} WHERE id = ANY($1)`, [allTargetIds])
+        for (const row of relRows) relatedMap.set(row.id as string, stripSystemFields(row))
+      }
+      const sourceMap = new Map<string, Record<string, unknown>[]>()
+      for (const row of jRows) {
+        const obj = relatedMap.get(row.target_id)
+        if (!obj) continue
+        const list = sourceMap.get(row.source_id)
+        if (list) list.push(obj)
+        else sourceMap.set(row.source_id, [obj])
       }
       for (const entry of entries) {
-        entry[field.name] = map.get(entry.id as string) ?? []
+        entry[field.name] = sourceMap.get(entry.id as string) ?? []
       }
     }),
-  )
+  ])
 }
 
 async function resolveAuthorAvatars(entries: Record<string, unknown>[]): Promise<void> {
@@ -148,7 +178,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     await Promise.all([
       resolveMediaFields([entry], ct),
       resolveAuthorAvatars([entry]),
-      resolveManyToManyFields([entry], ct),
+      resolveRelationFields([entry], ct),
     ])
     res.json(entry)
     return
@@ -204,7 +234,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields(data, ct),
     resolveAuthorAvatars(data),
-    resolveManyToManyFields(data, ct),
+    resolveRelationFields(data, ct),
   ])
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
@@ -234,7 +264,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields([entry], ct),
     resolveAuthorAvatars([entry]),
-    resolveManyToManyFields([entry], ct),
+    resolveRelationFields([entry], ct),
   ])
   res.json(entry)
 }

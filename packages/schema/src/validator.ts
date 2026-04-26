@@ -54,11 +54,22 @@ export function validate(
           errors.push(`Field "${field.name}" is required`)
         }
         break
-      case 'relation':
-        if (typeof value !== 'string' || !value.trim()) {
-          errors.push(`Field "${field.name}" must be a non-empty string ID`)
+      case 'relation': {
+        const rt = field.relationType ?? 'many-to-one'
+        if (rt === 'one-to-many') break // read-only, never sent by client
+        if (rt === 'many-to-many') {
+          if (!Array.isArray(value) || value.some((v) => typeof v !== 'string' || !v.trim())) {
+            errors.push(`Field "${field.name}" must be an array of IDs`)
+          } else if (field.required && value.length === 0) {
+            errors.push(`Field "${field.name}" is required`)
+          }
+        } else {
+          if (typeof value !== 'string' || !value.trim()) {
+            errors.push(`Field "${field.name}" must be a non-empty string ID`)
+          }
         }
         break
+      }
       case 'array':
         if (!Array.isArray(value)) {
           errors.push(`Field "${field.name}" must be an array`)
