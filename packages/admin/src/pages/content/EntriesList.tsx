@@ -59,23 +59,36 @@ function humanize(name: string) {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function loadViewConfig(slug: string, allFields: FieldDef[]): ViewConfig {
-  try {
-    const raw = localStorage.getItem(`plank_view_${slug}`)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<ViewConfig>
-      const visible = (parsed.visibleFields ?? []).filter((n) => allFields.some((f) => f.name === n))
-      return {
-        visibleFields: visible.length > 0 ? visible : allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
-        sort: parsed.sort ?? DEFAULT_SORT,
-      }
-    }
-  } catch {}
+function defaultViewConfig(allFields: FieldDef[]): ViewConfig {
   return { visibleFields: allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name), sort: DEFAULT_SORT }
 }
 
-function saveViewConfig(slug: string, config: ViewConfig) {
-  localStorage.setItem(`plank_view_${slug}`, JSON.stringify(config))
+function parseViewConfig(saved: Partial<ViewConfig> | null, allFields: FieldDef[]): ViewConfig {
+  if (!saved) return defaultViewConfig(allFields)
+  const visible = (saved.visibleFields ?? []).filter((n) => allFields.some((f) => f.name === n))
+  return {
+    visibleFields: visible.length > 0 ? visible : allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
+    sort: saved.sort ?? DEFAULT_SORT,
+  }
+}
+
+async function fetchViewConfig(slug: string): Promise<Partial<ViewConfig> | null> {
+  const token = localStorage.getItem('plank_token')
+  const res = await fetch(`/cms/admin/users/me/prefs/view_${slug}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) return null
+  const { value } = await res.json() as { value: Partial<ViewConfig> | null }
+  return value
+}
+
+async function persistViewConfig(slug: string, config: ViewConfig): Promise<void> {
+  const token = localStorage.getItem('plank_token')
+  await fetch(`/cms/admin/users/me/prefs/view_${slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ value: config }),
+  })
 }
 
 // ─── MediaThumbnail ───────────────────────────────────────────────────────────
@@ -398,7 +411,9 @@ export function EntriesList() {
 
   useEffect(() => {
     if (!ct || !slug) return
-    setViewConfig(loadViewConfig(slug, ct.fields))
+    fetchViewConfig(slug)
+      .then((saved) => setViewConfig(parseViewConfig(saved, ct.fields)))
+      .catch(() => setViewConfig(defaultViewConfig(ct.fields)))
   }, [ct?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const config = viewConfig ?? { visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [], sort: DEFAULT_SORT }
@@ -419,7 +434,7 @@ export function EntriesList() {
 
   function handleApplyConfig(cfg: ViewConfig) {
     setViewConfig(cfg)
-    if (slug) saveViewConfig(slug, cfg)
+    if (slug) persistViewConfig(slug, cfg).catch(() => {})
     setPage(1)
   }
 

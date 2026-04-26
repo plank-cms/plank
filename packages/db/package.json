@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && cp -r src/migrations dist/migrations",
-    "dev": "cp -r src/migrations dist/migrations && tsc --watch",
+    "build": "tsc && cp src/migrations/*.sql dist/migrations/",
+    "dev": "cp src/migrations/*.sql dist/migrations/ && tsc --watch",
     "lint": "eslint src/"
   },
   "dependencies": {
