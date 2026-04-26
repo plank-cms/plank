@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   PlusIcon, PencilIcon, Trash2Icon, FileTextIcon, ImageIcon,
   CheckIcon, Settings2Icon, ChevronUpIcon, ChevronDownIcon,
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
+import { PaginationWrap } from '@/components/ui/custom/PaginationWrap.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip.tsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -399,7 +400,16 @@ export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { timezone } = useSettings()
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const page = Math.max(1, Number(searchParams.get('page') ?? 1))
+  const limit = [10, 25, 50, 100].includes(Number(searchParams.get('limit'))) ? Number(searchParams.get('limit')) : 25
+
+  function setPage(p: number) {
+    setSearchParams((prev) => { prev.set('page', String(p)); return prev }, { replace: true })
+  }
+  function setLimit(l: number) {
+    setSearchParams((prev) => { prev.set('limit', String(l)); prev.set('page', '1'); return prev }, { replace: true })
+  }
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [viewConfig, setViewConfig] = useState<ViewConfig | null>(null)
@@ -421,7 +431,7 @@ export function EntriesList() {
 
   const { data: entries, loading: loadingEntries, refetch } = useFetch<EntriesResponse>(
     slug
-      ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=20&sort=${sort.field}&order=${sort.dir}`
+      ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}&sort=${sort.field}&order=${sort.dir}`
       : null
   )
 
@@ -561,20 +571,15 @@ export function EntriesList() {
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>{entries?.total} entries</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-                  Previous
-                </Button>
-                <span>Page {page} of {totalPages}</span>
-                <Button variant="outline" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+          <div className="mt-4">
+            <PaginationWrap
+              page={page}
+              totalPages={totalPages}
+              limit={limit}
+              onPageChange={setPage}
+              onLimitChange={(l) => { setLimit(l); setPage(1) }}
+            />
+          </div>
         </TooltipProvider>
       )}
 
