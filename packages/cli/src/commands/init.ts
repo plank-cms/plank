@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path'
 import fs from 'fs-extra'
 import { execa } from 'execa'
 
-const PACKAGE_VERSION = '0.5.0'
+const PACKAGE_VERSION = '0.5.1'
 
 function generateSecret(): string {
   return randomBytes(32).toString('hex')
