@@ -9,6 +9,7 @@ type SlugIdParam = RequestHandler<{ slug: string; id: string }>
 
 type Row = Record<string, unknown> & {
   published_data?: Record<string, unknown> | null
+  published_at?: unknown
   _author_first_name?: string | null
   _author_last_name?: string | null
   _author_avatar_url?: string | null
@@ -145,6 +146,7 @@ function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<
     if (field.name in source) out[field.name] = source[field.name]
   }
   out.status = row.status
+  out.published_at = row.published_at ?? null
   out.created_at = row.created_at
   out.updated_at = row.updated_at
   out.author = _author_first_name || _author_last_name
