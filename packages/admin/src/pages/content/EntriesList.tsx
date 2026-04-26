@@ -17,6 +17,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { PaginationWrap } from '@/components/ui/custom/PaginationWrap.tsx'
+import { Checkbox } from '@/components/ui/checkbox.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip.tsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -413,6 +414,9 @@ export function EntriesList() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
   const [viewConfig, setViewConfig] = useState<ViewConfig | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false)
   const { loading: deleting, request: requestDelete } = useApi()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
@@ -425,6 +429,8 @@ export function EntriesList() {
       .then((saved) => setViewConfig(parseViewConfig(saved, ct.fields)))
       .catch(() => setViewConfig(defaultViewConfig(ct.fields)))
   }, [ct?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { setSelected(new Set()) }, [page, limit])
 
   const config = viewConfig ?? { visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [], sort: DEFAULT_SORT }
   const { sort } = config
@@ -440,6 +446,61 @@ export function EntriesList() {
     await requestDelete(`/cms/admin/entries/${slug}/${deletingId}`, 'DELETE')
     setDeletingId(null)
     refetch()
+  }
+
+  const currentIds = (entries?.data ?? []).map((e) => e.id)
+  const allSelected = currentIds.length > 0 && currentIds.every((id) => selected.has(id))
+  const someSelected = !allSelected && currentIds.some((id) => selected.has(id))
+
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allSelected) currentIds.forEach((id) => next.delete(id))
+      else currentIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulkUnpublish() {
+    if (!slug || bulkLoading) return
+    setBulkLoading(true)
+    try {
+      const token = localStorage.getItem('plank_token')
+      const headers: HeadersInit = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      await Promise.all([...selected].map((id) =>
+        fetch(`/cms/admin/entries/${slug}/${id}/status`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'draft' }) })
+      ))
+      setSelected(new Set())
+      refetch()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!slug || bulkLoading) return
+    setBulkLoading(true)
+    try {
+      const token = localStorage.getItem('plank_token')
+      const headers: HeadersInit = { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      await Promise.all([...selected].map((id) =>
+        fetch(`/cms/admin/entries/${slug}/${id}`, { method: 'DELETE', headers })
+      ))
+      setBulkConfirmDelete(false)
+      setSelected(new Set())
+      refetch()
+    } finally {
+      setBulkLoading(false)
+    }
   }
 
   function handleApplyConfig(cfg: ViewConfig) {
@@ -503,10 +564,33 @@ export function EntriesList() {
 
       {!loadingEntries && (entries?.data ?? []).length > 0 && (
         <TooltipProvider>
+          {selected.size > 0 && (
+            <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+              <span className="text-sm font-medium">{selected.size} selected</span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button variant="outline" size="sm" disabled={bulkLoading} onClick={handleBulkUnpublish}>
+                  {bulkLoading ? <Spinner className="size-3.5" /> : null}
+                  Unpublish
+                </Button>
+                <Button variant="destructive" size="sm" disabled={bulkLoading} onClick={() => setBulkConfirmDelete(true)}>
+                  <Trash2Icon className="size-3.5" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-lg border border-border">
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/50">
                 <tr>
+                  <th className="w-10 px-4 py-3">
+                    <Checkbox
+                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all"
+                    />
+                  </th>
                   {visibleFields.map((field) => (
                     <th key={field.name} className="px-4 py-3 text-left font-medium text-muted-foreground">
                       {humanize(field.name)}
@@ -522,7 +606,14 @@ export function EntriesList() {
               </thead>
               <tbody className="divide-y divide-border">
                 {(entries?.data ?? []).map((entry) => (
-                  <tr key={entry.id} className="group hover:bg-muted/30 transition-colors">
+                  <tr key={entry.id} className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}>
+                    <td className="w-10 px-4 py-3">
+                      <Checkbox
+                        checked={selected.has(entry.id)}
+                        onCheckedChange={() => toggleOne(entry.id)}
+                        aria-label="Select row"
+                      />
+                    </td>
                     {visibleFields.map((field) => (
                       <td key={field.name} className="px-4 py-3">
                         <FieldCell field={field} value={entry[field.name]} />
@@ -605,6 +696,23 @@ export function EntriesList() {
             <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? <Spinner className="size-4" /> : null}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete dialog */}
+      <Dialog open={bulkConfirmDelete} onOpenChange={(v) => { if (!v) setBulkConfirmDelete(false) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {selected.size} {selected.size === 1 ? 'entry' : 'entries'}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+              {bulkLoading ? <Spinner className="size-4" /> : null}
               Delete
             </Button>
           </DialogFooter>
