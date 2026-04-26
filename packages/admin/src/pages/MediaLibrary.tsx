@@ -519,7 +519,7 @@ export function MediaLibrary() {
       )}
 
       {/* Bulk bar */}
-      {selected.size > 0 && (
+      {!empty && !loading && (
         <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
           <Checkbox
             checked={allSelected ? true : someSelected ? 'indeterminate' : false}
@@ -529,13 +529,19 @@ export function MediaLibrary() {
             }}
             aria-label="Select all"
           />
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button variant="destructive" size="sm" disabled={bulkLoading} onClick={() => setBulkConfirmDelete(true)}>
-              <Trash2Icon className="size-3.5" />Delete
-            </Button>
-          </div>
+          {selected.size > 0 ? (
+            <>
+              <span className="text-sm font-medium">{selected.size} selected</span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
+                <Button variant="destructive" size="sm" disabled={bulkLoading} onClick={() => setBulkConfirmDelete(true)}>
+                  <Trash2Icon className="size-3.5" />Delete
+                </Button>
+              </div>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">Select all</span>
+          )}
         </div>
       )}
 
