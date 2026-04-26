@@ -68,6 +68,29 @@ export const listEntries: SlugParam = async (req, res) => {
   res.json({ data, total: parseInt(countRows[0].count), page, limit })
 }
 
+async function loadManyToManyIds(
+  entryId: string,
+  tableName: string,
+  fields: import('@plank/schema').FieldDefinition[],
+): Promise<Record<string, string[]>> {
+  const mmFields = fields.filter(
+    (f) => f.type === 'relation' && (f.relationType ?? 'many-to-one') === 'many-to-many',
+  )
+  if (mmFields.length === 0) return {}
+  const result: Record<string, string[]> = {}
+  await Promise.all(
+    mmFields.map(async (f) => {
+      const jt = junctionTableName(tableName, f.name)
+      const { rows } = await pool.query<{ target_id: string }>(
+        `SELECT target_id FROM ${jt} WHERE source_id = $1`,
+        [entryId],
+      )
+      result[f.name] = rows.map((r) => r.target_id)
+    }),
+  )
+  return result
+}
+
 export const getEntry: SlugIdParam = async (req, res) => {
   const ct = await findContentTypeBySlug(req.params.slug)
   if (!ct) { res.status(404).json({ error: 'Content type not found' }); return }
@@ -76,7 +99,8 @@ export const getEntry: SlugIdParam = async (req, res) => {
   const { rows } = await pool.query(`SELECT * FROM ${ct.tableName} WHERE id = $1`, [req.params.id])
 
   if (!rows[0]) { res.status(404).json({ error: 'Entry not found' }); return }
-  res.json(rows[0])
+  const mmIds = await loadManyToManyIds(req.params.id, ct.tableName, ct.fields)
+  res.json({ ...rows[0], ...mmIds })
 }
 
 export const createEntry: SlugParam = async (req, res) => {
@@ -151,7 +175,8 @@ export const getSingleEntry: SlugParam = async (req, res) => {
   const { rows } = await pool.query(`SELECT * FROM ${ct.tableName} LIMIT 1`)
 
   if (!rows[0]) { res.status(404).json({ error: 'No entry found' }); return }
-  res.json(rows[0])
+  const mmIds = await loadManyToManyIds(rows[0].id, ct.tableName, ct.fields)
+  res.json({ ...rows[0], ...mmIds })
 }
 
 export const updateEntry: SlugIdParam = async (req, res) => {
