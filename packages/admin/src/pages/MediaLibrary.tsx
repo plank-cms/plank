@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react'
 import {
   UploadIcon, FileIcon, Trash2Icon, DownloadIcon,
   FileAudioIcon, FileVideoIcon, FileTextIcon,
-  FolderIcon, FolderPlusIcon, HomeIcon, PencilIcon,
+  FolderIcon, FolderPlusIcon, HomeIcon, PencilIcon, EllipsisIcon,
 } from 'lucide-react'
 import {
   Breadcrumb,
@@ -19,6 +19,12 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu.tsx'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -33,6 +39,7 @@ type Folder = {
   name: string
   parent_id: string | null
   created_at: string
+  item_count: number
 }
 
 type MediaItem = {
@@ -167,41 +174,48 @@ function FolderCard({ folder, onOpen, onDelete, onRename, selected, onToggle }: 
 }) {
   return (
     <div
-      className={`group relative rounded-lg border bg-card overflow-hidden transition-colors cursor-pointer hover:bg-muted/50 ${selected ? 'ring-2 ring-primary' : ''}`}
+      className={`group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors cursor-pointer hover:bg-muted/50 ${selected ? 'ring-2 ring-primary' : ''}`}
       onClick={() => { if (!selected) onOpen(folder) }}
     >
-      <div className="aspect-square bg-muted/30 flex items-center justify-center">
-        <FolderIcon className="size-10 text-muted-foreground" />
-      </div>
-      <div className={`absolute top-1.5 left-1.5 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-        <Checkbox
-          checked={selected}
-          onCheckedChange={() => onToggle(`folder:${folder.id}`)}
-          aria-label="Select folder"
-          className="bg-background/80 backdrop-blur-sm"
+      <div className="relative shrink-0 size-7 flex items-center justify-center">
+        <FolderIcon className={`size-7 text-muted-foreground transition-opacity ${selected ? 'opacity-0' : 'group-hover:opacity-0'}`} />
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
           onClick={(e) => e.stopPropagation()}
-        />
+        >
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => onToggle(`folder:${folder.id}`)}
+            aria-label="Select folder"
+          />
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold truncate" title={folder.name}>{folder.name}</p>
+        <p className="text-xs text-muted-foreground">{folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}</p>
       </div>
       {!selected && (
-        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => { e.stopPropagation(); onRename(folder) }}
-            className="flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground backdrop-blur-sm hover:text-foreground"
-          >
-            <PencilIcon className="size-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(folder) }}
-            className="flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground backdrop-blur-sm hover:text-destructive"
-          >
-            <Trash2Icon className="size-3.5" />
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <EllipsisIcon className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onSelect={() => onRename(folder)}>
+              <PencilIcon className="size-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onDelete(folder)} className="text-destructive focus:text-destructive">
+              <Trash2Icon className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
-      <div className="p-2">
-        <p className="text-xs font-medium truncate" title={folder.name}>{folder.name}</p>
-        <p className="text-xs text-muted-foreground">Folder</p>
-      </div>
     </div>
   )
 }

@@ -6,13 +6,21 @@ type FolderRow = {
   name: string
   parent_id: string | null
   created_at: Date
+  item_count: number
 }
 
 export async function listFolders(req: Request, res: Response): Promise<void> {
   const parentId = (req.query.parent_id as string) || null
 
   const { rows } = await pool.query<FolderRow>(
-    `SELECT * FROM plank_folders WHERE parent_id IS NOT DISTINCT FROM $1 ORDER BY name ASC`,
+    `SELECT f.*,
+      (
+        (SELECT COUNT(*) FROM plank_folders sub WHERE sub.parent_id = f.id) +
+        (SELECT COUNT(*) FROM plank_media m WHERE m.folder_id = f.id)
+      )::int AS item_count
+     FROM plank_folders f
+     WHERE f.parent_id IS NOT DISTINCT FROM $1
+     ORDER BY f.name ASC`,
     [parentId],
   )
 

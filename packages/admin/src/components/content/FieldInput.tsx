@@ -36,6 +36,7 @@ import {
   XIcon,
   ImageIcon,
   FolderOpenIcon,
+  FolderIcon,
   HomeIcon,
   FileIcon,
   ChevronDownIcon,
@@ -132,7 +133,7 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   return res.json() as Promise<{ id: string; url: string }>
 }
 
-type PickerFolder = { id: string; name: string; parent_id: string | null }
+type PickerFolder = { id: string; name: string; parent_id: string | null; item_count: number }
 type PickerBreadcrumb = { id: string | null; name: string }
 
 function matchesAllowedTypes(mime: string | null, allowedTypes?: FieldDef['allowedTypes']): boolean {
@@ -242,16 +243,16 @@ function MediaPickerDialog({
                 key={folder.id}
                 type="button"
                 onClick={() => openFolder(folder)}
-                className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
+                className="flex items-center gap-2.5 rounded-md border bg-card px-2.5 py-2 text-left transition-colors hover:bg-muted/50 hover:border-primary"
               >
-                <div className="aspect-square bg-muted/30 flex items-center justify-center">
-                  <FolderOpenIcon className="size-7 text-muted-foreground" />
-                </div>
-                <div className="p-1.5">
-                  <p className="truncate text-[11px] font-medium leading-tight" title={folder.name}>
+                <FolderIcon className="size-7 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold leading-tight" title={folder.name}>
                     {folder.name}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">Folder</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}
+                  </p>
                 </div>
               </button>
             ))}
