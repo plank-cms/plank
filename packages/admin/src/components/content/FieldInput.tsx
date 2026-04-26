@@ -237,50 +237,58 @@ function MediaPickerDialog({
             {items.length === 0 && folders.length === 0 ? 'No media found.' : 'No matching files in this folder.'}
           </p>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 max-h-[60vh] overflow-y-auto pr-1">
-            {folders.map((folder) => (
-              <button
-                key={folder.id}
-                type="button"
-                onClick={() => openFolder(folder)}
-                className="flex items-center gap-2.5 rounded-md border bg-card px-2.5 py-2 text-left transition-colors hover:bg-muted/50 hover:border-primary"
-              >
-                <FolderIcon className="size-7 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold leading-tight" title={folder.name}>
-                    {folder.name}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}
-                  </p>
-                </div>
-              </button>
-            ))}
-            {filtered.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => { onSelect(item); onOpenChange(false) }}
-                className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
-              >
-                <div className="aspect-square bg-muted">
-                  {isImageMime(item.mime_type) ? (
-                    <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <FileIcon className="size-6 text-muted-foreground" />
+          <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
+            {folders.length > 0 && (
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {folders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => openFolder(folder)}
+                    className="flex items-center gap-2.5 rounded-md border bg-card px-2.5 py-2 text-left transition-colors hover:bg-muted/50 hover:border-primary"
+                  >
+                    <FolderIcon className="size-7 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold leading-tight" title={folder.name}>
+                        {folder.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}
+                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="p-1.5">
-                  <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>
-                    {item.filename}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
-                </div>
-                <div className="absolute inset-0 rounded-md ring-2 ring-primary ring-offset-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-              </button>
-            ))}
+                  </button>
+                ))}
+              </div>
+            )}
+            {filtered.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                {filtered.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { onSelect(item); onOpenChange(false) }}
+                    className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
+                  >
+                    <div className="aspect-square bg-muted">
+                      {isImageMime(item.mime_type) ? (
+                        <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <FileIcon className="size-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-1.5">
+                      <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>
+                        {item.filename}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
+                    </div>
+                    <div className="absolute inset-0 rounded-md ring-2 ring-primary ring-offset-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

@@ -580,31 +580,39 @@ export function MediaLibrary() {
         </div>
       ) : (
         <div
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+          className="flex flex-col gap-6"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
         >
-          {folders.map((folder) => (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              onOpen={openFolder}
-              onDelete={setFolderToDelete}
-              onRename={(f) => { setFolderToRename(f); setRenameValue(f.name) }}
-              selected={selected.has(`folder:${folder.id}`)}
-              onToggle={toggleOne}
-            />
-          ))}
-          {items.map((item) => (
-            <MediaCard
-              key={item.id}
-              item={item}
-              onDelete={setToDelete}
-              onPreview={setPreview}
-              selected={selected.has(item.id)}
-              onToggle={toggleOne}
-            />
-          ))}
+          {folders.length > 0 && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {folders.map((folder) => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onOpen={openFolder}
+                  onDelete={setFolderToDelete}
+                  onRename={(f) => { setFolderToRename(f); setRenameValue(f.name) }}
+                  selected={selected.has(`folder:${folder.id}`)}
+                  onToggle={toggleOne}
+                />
+              ))}
+            </div>
+          )}
+          {items.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {items.map((item) => (
+                <MediaCard
+                  key={item.id}
+                  item={item}
+                  onDelete={setToDelete}
+                  onPreview={setPreview}
+                  selected={selected.has(item.id)}
+                  onToggle={toggleOne}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
