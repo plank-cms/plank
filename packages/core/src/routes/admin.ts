@@ -22,7 +22,7 @@ import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changeP
 import { getUserPref, setUserPref } from '../controllers/userPrefs.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
 import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
-import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, confirmMedia } from '../controllers/media.js'
+import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, confirmMedia, updateMedia } from '../controllers/media.js'
 import { listFolders, createFolder, renameFolder, deleteFolder } from '../controllers/folders.js'
 import { upload } from '../media/index.js'
 import { getNamespaceSettings, updateNamespaceSettings } from '../controllers/settings.js'
@@ -88,6 +88,7 @@ router.post('/media/presign', authorize('media:write'), presignMedia)
 router.post('/media/confirm', authorize('media:write'), confirmMedia)
 router.post('/media', authorize('media:write'), upload.array('files', 500), uploadMedia)
 router.get('/media/:id/url', authorize('media:read'), getMediaUrl)
+router.patch('/media/:id', authorize('media:write'), updateMedia)
 router.delete('/media/:id', authorize('media:write'), deleteMedia)
 
 // Settings

@@ -22,7 +22,7 @@ import { Calendar } from '@/components/ui/calendar.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { RichTextEditor } from '@/components/ui/custom/RichTextEditor.tsx'
+import { RichTextEditor, type ImageInsert } from '@/components/ui/custom/RichTextEditor.tsx'
 import { uploadMediaFile } from '@/lib/uploadMedia.ts'
 import {
   Command,
@@ -111,6 +111,9 @@ type MediaItem = {
   url: string
   mime_type: string | null
   size: number | null
+  alt: string | null
+  width: number | null
+  height: number | null
 }
 
 function formatBytes(bytes: number | null): string {
@@ -1182,21 +1185,21 @@ function toSlug(value: string): string {
 
 function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const resolveRef = useRef<((url: string | null) => void) | null>(null)
+  const resolveRef = useRef<((img: ImageInsert | null) => void) | null>(null)
   const [insertOpen, setInsertOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
-  function onInsertImage(): Promise<string | null> {
+  function onInsertImage(): Promise<ImageInsert | null> {
     setInsertOpen(true)
     return new Promise((resolve) => {
       resolveRef.current = resolve
     })
   }
 
-  function resolveWith(url: string | null) {
-    resolveRef.current?.(url)
+  function resolveWith(img: ImageInsert | null) {
+    resolveRef.current?.(img)
     resolveRef.current = null
   }
 
@@ -1209,8 +1212,8 @@ function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unkn
     setUploading(true)
     setUploadError(null)
     try {
-      const data = await uploadFile(file)
-      resolveWith(data.url)
+      const data = await uploadMediaFile(file)
+      resolveWith({ src: data.url, alt: data.alt, width: data.width, height: data.height })
       setInsertOpen(false)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed.')
@@ -1283,7 +1286,7 @@ function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unkn
         }}
         allowedTypes={['image']}
         onSelect={(item) => {
-          resolveWith(item.url)
+          resolveWith({ src: item.url, alt: item.alt, width: item.width, height: item.height })
           setPickerOpen(false)
           setInsertOpen(false)
         }}

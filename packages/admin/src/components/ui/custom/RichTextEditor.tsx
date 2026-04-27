@@ -22,11 +22,18 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 
+export type ImageInsert = {
+  src: string
+  alt?: string | null
+  width?: number | null
+  height?: number | null
+}
+
 type RichTextEditorProps = {
   value: string
   onChange: (json: string) => void
   placeholder?: string
-  onInsertImage?: () => Promise<string | null>
+  onInsertImage?: () => Promise<ImageInsert | null>
 }
 
 type ToolbarButtonProps = {
@@ -72,10 +79,15 @@ export function RichTextEditor({ value, onChange, placeholder, onInsertImage }: 
       StarterKit.configure({
         link: { openOnClick: false, HTMLAttributes: { class: 'text-primary underline' } },
       }),
-      Image.configure({
-        HTMLAttributes: { class: 'max-w-full rounded' },
-        allowedAttributes: ['src'],
-      }),
+      Image.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            width: { default: null },
+            height: { default: null },
+          }
+        },
+      }).configure({ HTMLAttributes: { class: 'max-w-full rounded' } }),
     ],
     content: (() => {
       if (!value) return ''
@@ -114,8 +126,10 @@ export function RichTextEditor({ value, onChange, placeholder, onInsertImage }: 
 
   async function handleInsertImage() {
     if (!editor || !onInsertImage) return
-    const url = await onInsertImage()
-    if (url) editor.chain().focus().setImage({ src: url }).run()
+    const img = await onInsertImage()
+    if (!img) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor.chain().focus().setImage({ src: img.src, alt: img.alt ?? undefined, width: img.width ?? undefined, height: img.height ?? undefined } as any).run()
   }
 
   function handleSetLink() {

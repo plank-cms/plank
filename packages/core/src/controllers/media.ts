@@ -12,6 +12,9 @@ type MediaRow = {
   provider_key: string
   mime_type: string | null
   size: number | null
+  alt: string | null
+  width: number | null
+  height: number | null
   folder_id: string | null
   uploaded_by: string | null
   created_at: Date
@@ -40,6 +43,9 @@ export async function listMedia(req: Request, res: Response): Promise<void> {
       url: await provider.getUrl(r.provider_key),
       mime_type: r.mime_type,
       size: r.size,
+      alt: r.alt,
+      width: r.width,
+      height: r.height,
       folder_id: r.folder_id,
       uploaded_by: r.uploaded_by,
       created_at: r.created_at,
@@ -107,6 +113,7 @@ export async function uploadMedia(req: Request, res: Response): Promise<void> {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [id, filename, m3u8Url, m3u8Key, m3u8File.mimetype, m3u8File.size, folderId, req.user!.id],
     )
+    // HLS bundles are video — no image dimensions to store
 
     res.status(201).json({ id, url: m3u8Url, filename })
     return
@@ -116,15 +123,17 @@ export async function uploadMedia(req: Request, res: Response): Promise<void> {
   const file = files[0]
   const { url, key } = await provider.upload(file, { prefix: folderId ? `${MEDIA_PREFIX}/${folderId}` : MEDIA_PREFIX })
   const id = createId()
+  const width = req.body.width ? parseInt(req.body.width as string) : null
+  const height = req.body.height ? parseInt(req.body.height as string) : null
 
   await pool.query(
-    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, folder_id, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [id, file.originalname, url, key, file.mimetype, file.size, folderId, req.user!.id],
+    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, alt, width, height, folder_id, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [id, file.originalname, url, key, file.mimetype, file.size, null, width, height, folderId, req.user!.id],
   )
 
   const resolvedUrl = await provider.getUrl(key)
-  res.status(201).json({ id, url: resolvedUrl, filename: file.originalname })
+  res.status(201).json({ id, url: resolvedUrl, filename: file.originalname, alt: null, width, height })
 }
 
 export async function deleteMedia(req: Request, res: Response): Promise<void> {
@@ -172,8 +181,9 @@ export async function presignMedia(req: Request, res: Response): Promise<void> {
 }
 
 export async function confirmMedia(req: Request, res: Response): Promise<void> {
-  const { key, filename, mimeType, size, folderId } = req.body as {
-    key: string; filename: string; mimeType: string; size?: number; folderId?: string | null
+  const { key, filename, mimeType, size, folderId, width, height } = req.body as {
+    key: string; filename: string; mimeType: string; size?: number
+    folderId?: string | null; width?: number | null; height?: number | null
   }
   if (!key || !filename || !mimeType) {
     res.status(400).json({ error: 'key, filename and mimeType are required' })
@@ -185,12 +195,32 @@ export async function confirmMedia(req: Request, res: Response): Promise<void> {
   const id = createId()
 
   await pool.query(
-    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, folder_id, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [id, filename, url, key, mimeType, size ?? null, folderId ?? null, req.user!.id],
+    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, alt, width, height, folder_id, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [id, filename, url, key, mimeType, size ?? null, null, width ?? null, height ?? null, folderId ?? null, req.user!.id],
   )
 
-  res.status(201).json({ id, url, filename })
+  res.status(201).json({ id, url, filename, alt: null, width: width ?? null, height: height ?? null })
+}
+
+export async function updateMedia(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const { filename, alt } = req.body as { filename?: string; alt?: string | null }
+
+  const { rows } = await pool.query<MediaRow>(
+    `UPDATE plank_media
+     SET filename = COALESCE($1, filename),
+         alt      = $2
+     WHERE id = $3
+     RETURNING *`,
+    [filename ?? null, alt ?? null, id],
+  )
+
+  if (!rows[0]) { res.status(404).json({ error: 'Media not found' }); return }
+
+  const provider = await getProvider()
+  const url = await provider.getUrl(rows[0].provider_key)
+  res.json({ ...rows[0], url })
 }
 
 export async function getMediaUrl(req: Request, res: Response): Promise<void> {

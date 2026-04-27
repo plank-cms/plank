@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
 import { Input } from '@/components/ui/input.tsx'
+import { Label } from '@/components/ui/label.tsx'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -58,6 +59,9 @@ type MediaItem = {
   url: string
   mime_type: string | null
   size: number | null
+  alt: string | null
+  width: number | null
+  height: number | null
   folder_id: string | null
   created_at: string
 }
@@ -375,6 +379,10 @@ export function MediaLibrary() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<MediaItem | null>(null)
+  const [editFilename, setEditFilename] = useState('')
+  const [editAlt, setEditAlt] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<MediaItem | null>(null)
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null)
   const [folderToRename, setFolderToRename] = useState<Folder | null>(null)
@@ -716,7 +724,12 @@ export function MediaLibrary() {
                   key={item.id}
                   item={item}
                   onDelete={setToDelete}
-                  onPreview={setPreview}
+                  onPreview={(item) => {
+                    setPreview(item)
+                    setEditFilename(item.filename)
+                    setEditAlt(item.alt ?? '')
+                    setEditError(null)
+                  }}
                   selected={selected.has(item.id)}
                   onToggle={toggleOne}
                 />
@@ -730,7 +743,7 @@ export function MediaLibrary() {
       <Dialog
         open={!!preview}
         onOpenChange={(o) => {
-          if (!o) setPreview(null)
+          if (!o) { setPreview(null); setEditError(null) }
         }}
       >
         <DialogContent className="sm:max-w-2xl">
@@ -740,9 +753,12 @@ export function MediaLibrary() {
             </DialogTitle>
           </DialogHeader>
           {preview && <MediaPreviewContent item={preview} />}
-          <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{preview?.mime_type ?? '—'}</span>
             <div className="flex items-center gap-3">
+              {preview?.width && preview?.height && (
+                <span>{preview.width} × {preview.height}</span>
+              )}
               <span>{formatBytes(preview?.size ?? null)}</span>
               <a href={preview?.url} target="_blank" rel="noreferrer" download={preview?.filename}>
                 <Button variant="ghost" size="sm" className="h-7 px-2">
@@ -751,6 +767,62 @@ export function MediaLibrary() {
               </a>
             </div>
           </div>
+          {preview && isImage(preview.mime_type) && (
+            <form
+              className="flex flex-col gap-3 border-t pt-3"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                setEditSaving(true)
+                setEditError(null)
+                const token = localStorage.getItem('plank_token')
+                try {
+                  const res = await fetch(`/cms/admin/media/${preview.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ filename: editFilename || preview.filename, alt: editAlt || null }),
+                  })
+                  if (!res.ok) throw new Error('Save failed.')
+                  const updated = await res.json() as MediaItem
+                  setPreview(updated)
+                  refetchMedia()
+                } catch (err) {
+                  setEditError(err instanceof Error ? err.message : 'Save failed.')
+                } finally {
+                  setEditSaving(false)
+                }
+              }}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Filename</Label>
+                  <Input
+                    value={editFilename}
+                    onChange={(e) => setEditFilename(e.target.value)}
+                    placeholder={preview.filename}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Alt text</Label>
+                  <Input
+                    value={editAlt}
+                    onChange={(e) => setEditAlt(e.target.value)}
+                    placeholder="Describe the image…"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+              {editError && <p className="text-xs text-destructive">{editError}</p>}
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" disabled={editSaving}>
+                  {editSaving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 

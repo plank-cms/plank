@@ -1,0 +1,4 @@
+ALTER TABLE plank_media
+  ADD COLUMN alt    TEXT,
+  ADD COLUMN width  INTEGER,
+  ADD COLUMN height INTEGER;
