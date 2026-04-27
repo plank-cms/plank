@@ -1,8 +1,8 @@
-@import "tailwindcss";
-@import "./app.css";
+@import 'tailwindcss';
+@import './app.css';
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Google Sans', ui-sans-serif, system-ui, sans-serif;
 
   --color-background: oklch(0.145 0 0);
   --color-foreground: oklch(0.985 0 0);
