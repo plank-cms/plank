@@ -114,14 +114,14 @@ export function EntryForm() {
         return v
       }
       const snap: Record<string, unknown> = {}
+      const normalizedInitial: Record<string, unknown> = {}
       ct.fields.forEach((f) => {
+        // Skip fields absent from published_data (e.g. M:M relations stored in junction tables)
+        if (!(f.name in existing.published_data!)) return
         snap[f.name] = normalize(
           existing.published_data![f.name] ?? (f.type === 'boolean' ? false : ''),
           f.type,
         )
-      })
-      const normalizedInitial: Record<string, unknown> = {}
-      ct.fields.forEach((f) => {
         normalizedInitial[f.name] = normalize(initial[f.name], f.type)
       })
       setIsPublishedStale(JSON.stringify(normalizedInitial) !== JSON.stringify(snap))
