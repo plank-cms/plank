@@ -550,7 +550,7 @@ export function EntriesList() {
     loading: loadingEntries,
     refetch,
   } = useFetch<EntriesResponse>(
-    slug
+    slug && viewConfig
       ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}&sort=${sort.field}&order=${sort.dir}`
       : null,
   )
@@ -634,7 +634,7 @@ export function EntriesList() {
     setPage(1)
   }
 
-  if (loadingCt) {
+  if (loadingCt || !viewConfig) {
     return (
       <div className="flex items-center gap-2 py-12 text-muted-foreground">
         <Spinner className="size-4" />
