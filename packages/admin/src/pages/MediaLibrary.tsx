@@ -170,7 +170,7 @@ function MediaPreviewContent({ item }: { item: MediaItem }) {
       <img
         src={item.url}
         alt={item.filename}
-        className="max-h-[70vh] w-full rounded-md object-contain"
+        className="max-h-full max-w-full rounded-md object-contain"
       />
     )
   if (isHLS(item.url, mime)) return <HLSVideoPlayer url={item.url} />
@@ -764,7 +764,9 @@ export function MediaLibrary() {
                 {preview?.filename}
               </DialogTitle>
             </DialogHeader>
-            {preview && <MediaPreviewContent item={preview} />}
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+              {preview && <MediaPreviewContent item={preview} />}
+            </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{preview?.mime_type ?? '—'}</span>
               <div className="flex items-center gap-3">
