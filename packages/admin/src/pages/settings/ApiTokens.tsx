@@ -153,7 +153,7 @@ export function SettingsApiTokens() {
 
   return (
     <>
-      <HeaderFixed sidebar>
+      <HeaderFixed>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold -mt-2">API Tokens</h1>

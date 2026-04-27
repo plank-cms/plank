@@ -274,7 +274,7 @@ export function ContentTypeForm() {
   return (
     <>
       {/* Header */}
-      <HeaderFixed sidebar>
+      <HeaderFixed>
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <input

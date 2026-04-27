@@ -1,18 +1,11 @@
-import clsx from 'clsx'
+import { useSecondaryPanelContext } from '@/context/secondaryPanel.tsx'
 
-export default function HeaderFixed({
-  children,
-  sidebar = false,
-}: {
-  children: React.ReactNode
-  sidebar?: boolean
-}) {
+export default function HeaderFixed({ children }: { children: React.ReactNode }) {
+  const { content: secondaryPanel } = useSecondaryPanelContext()
+
   return (
     <div
-      className={clsx(
-        'bg-background fixed top-0 w-full z-50 pt-4 h-18',
-        sidebar ? 'max-w-[52.1rem] xl:max-w-274 2xl:max-w-312' : 'max-w-312',
-      )}
+      className={`bg-background fixed top-0 z-50 px-4 pt-4 h-18 left-14 ${secondaryPanel ? 'right-64' : 'right-0'}`}
     >
       {children}
     </div>

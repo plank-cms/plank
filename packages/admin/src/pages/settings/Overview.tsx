@@ -130,7 +130,7 @@ function GeneralSettings() {
 export function SettingsOverview() {
   return (
     <>
-      <HeaderFixed sidebar>
+      <HeaderFixed>
         <h1 className="text-2xl font-bold -mt-2">Overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           General configuration for your CMS instance.

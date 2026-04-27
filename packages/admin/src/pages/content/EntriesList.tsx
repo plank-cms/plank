@@ -653,7 +653,7 @@ export function EntriesList() {
 
   return (
     <>
-      <HeaderFixed sidebar>
+      <HeaderFixed>
         <div className="mb-6 flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold -mt-6">{ct.name}</h1>
           <div className="flex items-center gap-2">
