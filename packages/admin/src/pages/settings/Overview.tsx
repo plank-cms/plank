@@ -56,7 +56,7 @@ const TIMEZONES = [
   { value: 'Pacific/Auckland', label: 'Pacific/Auckland — New Zealand (UTC+12/13)' },
 ]
 
-// ─── GeneralSettings ──────────────────────────────────────────────────────────
+// GeneralSettings ──────────────────────────────────────────────────────────
 
 function GeneralSettings() {
   const { data, loading } = useFetch<Record<string, string>>('/cms/admin/settings/general')
@@ -83,7 +83,11 @@ function GeneralSettings() {
     <div className="space-y-6">
       <Card>
         <CardContent className="flex items-center gap-4 py-2">
-          <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="h-10 w-auto" />
+          <img
+            src={`${import.meta.env.BASE_URL}plank-logo-w.svg`}
+            alt="Plank CMS"
+            className="h-10 w-auto"
+          />
           <div>
             <p className="font-bold">Plank CMS by AM25</p>
             <p className="text-sm text-muted-foreground">Version {pkg.version}</p>
@@ -120,7 +124,7 @@ function GeneralSettings() {
   )
 }
 
-// ─── SettingsOverview ─────────────────────────────────────────────────────────
+// SettingsOverview ─────────────────────────────────────────────────────────
 
 export function SettingsOverview() {
   return (

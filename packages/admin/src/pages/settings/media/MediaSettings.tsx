@@ -19,7 +19,7 @@ type Settings = Record<string, string>
 
 const MASKED = '••••••••'
 
-// ─── Local fields ─────────────────────────────────────────────────────────────
+// Local fields ──
 
 function LocalFields({
   values,
@@ -58,7 +58,7 @@ function LocalFields({
   )
 }
 
-// ─── Secret input with show/hide toggle ───────────────────────────────────────
+// Secret input with show/hide toggle ───────────────────────────────────────
 
 function SecretInput({
   id,
@@ -109,7 +109,7 @@ function SecretInput({
   )
 }
 
-// ─── S3 fields ────────────────────────────────────────────────────────────────
+// S3 fields ─────
 
 function S3Fields({
   values,
@@ -187,7 +187,7 @@ function S3Fields({
   )
 }
 
-// ─── R2 fields ────────────────────────────────────────────────────────────────
+// R2 fields ─────
 
 function R2Fields({
   values,
@@ -257,7 +257,7 @@ function R2Fields({
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// Main component
 
 export function MediaSettings() {
   const { data: saved, loading } = useFetch<Settings>('/cms/admin/settings/media')

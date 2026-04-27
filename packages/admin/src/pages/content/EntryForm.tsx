@@ -13,7 +13,13 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Calendar } from '@/components/ui/calendar.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog.tsx'
 import { FieldInput } from '@/components/content/FieldInput.tsx'
 import type { FieldDef } from '@/components/content/FieldInput.tsx'
 import { FIELD_WIDTH_SPAN } from '@/components/content-types/FieldCard.tsx'
@@ -39,10 +45,10 @@ export function EntryForm() {
   const { timezone } = useSettings()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
-    slug ? `/cms/admin/content-types/${slug}` : null
+    slug ? `/cms/admin/content-types/${slug}` : null,
   )
   const { data: existing, loading: loadingEntry } = useFetch<Entry>(
-    slug && id ? `/cms/admin/entries/${slug}/${id}` : null
+    slug && id ? `/cms/admin/entries/${slug}/${id}` : null,
   )
 
   const { loading: saving, request } = useApi<Entry>()
@@ -67,7 +73,9 @@ export function EntryForm() {
   useEffect(() => {
     if (isNew) {
       const empty: Record<string, unknown> = {}
-      ct?.fields.forEach((f) => { empty[f.name] = f.type === 'boolean' ? false : '' })
+      ct?.fields.forEach((f) => {
+        empty[f.name] = f.type === 'boolean' ? false : ''
+      })
       setValues(empty)
       setStatus('draft')
       setScheduledFor('')
@@ -78,7 +86,9 @@ export function EntryForm() {
     if (!existing || !ct) return
 
     const initial: Record<string, unknown> = {}
-    ct.fields.forEach((f) => { initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '') })
+    ct.fields.forEach((f) => {
+      initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '')
+    })
     setValues(initial)
     setStatus(existing.status ?? 'draft')
     original.current = JSON.stringify(initial)
@@ -104,10 +114,15 @@ export function EntryForm() {
       }
       const snap: Record<string, unknown> = {}
       ct.fields.forEach((f) => {
-        snap[f.name] = normalize(existing.published_data![f.name] ?? (f.type === 'boolean' ? false : ''), f.type)
+        snap[f.name] = normalize(
+          existing.published_data![f.name] ?? (f.type === 'boolean' ? false : ''),
+          f.type,
+        )
       })
       const normalizedInitial: Record<string, unknown> = {}
-      ct.fields.forEach((f) => { normalizedInitial[f.name] = normalize(initial[f.name], f.type) })
+      ct.fields.forEach((f) => {
+        normalizedInitial[f.name] = normalize(initial[f.name], f.type)
+      })
       setIsPublishedStale(JSON.stringify(normalizedInitial) !== JSON.stringify(snap))
     } else {
       setIsPublishedStale(false)
@@ -116,10 +131,12 @@ export function EntryForm() {
 
   const isDirty = JSON.stringify(values) !== original.current
 
-  const blocker = useBlocker(useCallback(() => {
-    if (skipBlocker.current) return false
-    return isDirty
-  }, [isDirty]))
+  const blocker = useBlocker(
+    useCallback(() => {
+      if (skipBlocker.current) return false
+      return isDirty
+    }, [isDirty]),
+  )
 
   function handleChange(name: string, value: unknown) {
     setValues((prev) => ({ ...prev, [name]: value }))
@@ -155,7 +172,7 @@ export function EntryForm() {
       const saved = await request(
         isNew ? `/cms/admin/content-types/${slug}/entries` : `/cms/admin/entries/${slug}/${id}`,
         isNew ? 'POST' : 'PUT',
-        body
+        body,
       )
       original.current = JSON.stringify(values)
       return saved
@@ -171,7 +188,9 @@ export function EntryForm() {
     if (status === 'scheduled') {
       const entryId = isNew ? (saved.id as string) : id!
       try {
-        await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'draft' })
+        await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', {
+          status: 'draft',
+        })
         setStatus('draft')
         setScheduledFor('')
         setShowScheduler(false)
@@ -200,7 +219,9 @@ export function EntryForm() {
     }
 
     try {
-      await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', { status: 'published' })
+      await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', {
+        status: 'published',
+      })
       setStatus('published')
       setScheduledFor('')
       setIsPublishedStale(false)
@@ -269,7 +290,10 @@ export function EntryForm() {
 
   const saveDraftEnabled = !busy && (status === 'scheduled' ? true : isDirty)
   useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })
-  useKeyboardShortcut('mod+shift+p', handlePublish, { enabled: canPublish && !busy, label: 'Publish' })
+  useKeyboardShortcut('mod+shift+p', handlePublish, {
+    enabled: canPublish && !busy,
+    label: 'Publish',
+  })
 
   if (loading) {
     return (
@@ -282,7 +306,7 @@ export function EntryForm() {
 
   if (!ct) return null
 
-  // ─── Status badge ──────────────────────────────────────────────────────────
+  // Status badge ──────────────────────────────────────────────────────────
 
   let statusBadge: React.ReactNode
   if (status === 'scheduled') {
@@ -340,7 +364,7 @@ export function EntryForm() {
           <Button
             variant="outline"
             onClick={handleSaveDraft}
-            disabled={status === 'scheduled' ? busy : (!isDirty || busy)}
+            disabled={status === 'scheduled' ? busy : !isDirty || busy}
           >
             {saving ? <Spinner className="size-4" /> : null}
             {status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft'}
@@ -353,7 +377,11 @@ export function EntryForm() {
           )}
           <Button onClick={handlePublish} disabled={!canPublish || busy}>
             {patching ? <Spinner className="size-4" /> : null}
-            {status === 'scheduled' ? 'Publish now' : status === 'published' && !isPublishedStale ? 'Republish' : 'Publish'}
+            {status === 'scheduled'
+              ? 'Publish now'
+              : status === 'published' && !isPublishedStale
+                ? 'Republish'
+                : 'Publish'}
           </Button>
         </div>
       </div>
@@ -386,7 +414,9 @@ export function EntryForm() {
             </Popover>
           </div>
           <div className="space-y-1.5">
-            <Label>Time <span className="text-muted-foreground font-normal">(24h)</span></Label>
+            <Label>
+              Time <span className="text-muted-foreground font-normal">(24h)</span>
+            </Label>
             <Input
               type="time"
               className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
@@ -432,7 +462,9 @@ export function EntryForm() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? <Spinner className="size-4" /> : null}
               Delete
@@ -449,8 +481,12 @@ export function EntryForm() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">Leave without saving?</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => blocker.reset?.()}>Stay</Button>
-            <Button variant="destructive" onClick={() => blocker.proceed?.()}>Leave</Button>
+            <Button variant="outline" onClick={() => blocker.reset?.()}>
+              Stay
+            </Button>
+            <Button variant="destructive" onClick={() => blocker.proceed?.()}>
+              Leave
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
