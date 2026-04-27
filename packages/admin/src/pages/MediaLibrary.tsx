@@ -42,6 +42,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog.tsx'
+import HeaderFixed from '@/components/Header'
 
 // Types
 
@@ -70,7 +71,7 @@ type MediaList = { items: MediaItem[]; total: number }
 type FolderList = { folders: Folder[] }
 type BreadcrumbEntry = { id: string | null; name: string }
 
-// Helpers ───────
+// Helpers
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return '—'
@@ -131,7 +132,7 @@ async function readFSEntry(
   return []
 }
 
-// HLS Video Player ─────────────────────────────────────────────────────────
+// HLS Video Player
 
 function HLSVideoPlayer({ url }: { url: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -159,7 +160,7 @@ function HLSVideoPlayer({ url }: { url: string }) {
   return <video ref={videoRef} controls className="max-h-[70vh] w-full rounded-md bg-black" />
 }
 
-// Media Preview ─
+// Media Preview
 
 function MediaPreviewContent({ item }: { item: MediaItem }) {
   const mime = item.mime_type?.toLowerCase() ?? null
@@ -208,7 +209,7 @@ function MediaPreviewContent({ item }: { item: MediaItem }) {
   )
 }
 
-// Folder Card ───
+// Folder Card
 
 function FolderCard({
   folder,
@@ -284,7 +285,7 @@ function FolderCard({
   )
 }
 
-// Media Card ────
+// Media Card
 
 function MediaCard({
   item,
@@ -351,7 +352,7 @@ function MediaCard({
   )
 }
 
-// Media Library ─
+// Media Library
 
 export function MediaLibrary() {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -395,7 +396,7 @@ export function MediaLibrary() {
   const { loading: deleting, error: deleteError, request } = useApi()
   const { loading: folderSaving, error: folderSaveError, request: folderRequest } = useApi<Folder>()
 
-  // ── Upload ───────
+  // Upload
 
   async function uploadFilesWithPaths(filesWithPaths: { file: File; relativePath: string }[]) {
     const hasM3U8 = filesWithPaths.some(({ relativePath }) => relativePath.endsWith('.m3u8'))
@@ -414,12 +415,16 @@ export function MediaLibrary() {
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Upload failed.'
-        try { msg = (JSON.parse(text) as { error?: string }).error ?? msg } catch { /* ignore */ }
+        try {
+          msg = (JSON.parse(text) as { error?: string }).error ?? msg
+        } catch {
+          /* ignore */
+        }
         throw new Error(msg)
       }
     } else {
       await Promise.all(
-        filesWithPaths.map(({ file }) => uploadMediaFile(file, { folderId: currentFolderId }))
+        filesWithPaths.map(({ file }) => uploadMediaFile(file, { folderId: currentFolderId })),
       )
     }
   }
@@ -469,7 +474,7 @@ export function MediaLibrary() {
     }
   }
 
-  // ── Navigation ───
+  // Navigation
 
   function openFolder(folder: Folder) {
     setBreadcrumb((prev) => [...prev, { id: folder.id, name: folder.name }])
@@ -481,7 +486,7 @@ export function MediaLibrary() {
     setSelected(new Set())
   }
 
-  // ── Folder CRUD ──
+  // Folder CRUD
 
   async function handleCreateFolder() {
     if (!newFolderName.trim()) return
@@ -522,7 +527,7 @@ export function MediaLibrary() {
     }
   }
 
-  // ── Media CRUD ───
+  // Media CRUD
 
   async function handleDeleteMedia() {
     if (!toDelete) return
@@ -535,7 +540,7 @@ export function MediaLibrary() {
     }
   }
 
-  // ── Selection ────
+  // Selection
 
   function toggleOne(key: string) {
     setSelected((prev) => {
@@ -580,397 +585,415 @@ export function MediaLibrary() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Media Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {mediaData ? `${mediaData.total} file${mediaData.total !== 1 ? 's' : ''}` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setNewFolderName('')
-              setNewFolderOpen(true)
-            }}
-          >
-            <FolderPlusIcon className="size-4" />
-            New folder
-          </Button>
-          <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {uploading ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
-            {uploading ? 'Uploading…' : 'Upload'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Breadcrumb */}
-      {breadcrumb.length > 1 && (
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            {breadcrumb.map((entry, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <BreadcrumbSeparator />}
-                <BreadcrumbItem>
-                  {i === breadcrumb.length - 1 ? (
-                    <BreadcrumbPage>
-                      {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
-                    </BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <button onClick={() => navigateTo(i)}>
-                        {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
-                      </button>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-              </React.Fragment>
-            ))}
-          </BreadcrumbList>
-        </Breadcrumb>
-      )}
-
-      {/* Bulk bar */}
-      {!empty && !loading && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
-          <Checkbox
-            checked={allSelected ? true : someSelected ? 'indeterminate' : false}
-            onCheckedChange={() => {
-              if (allSelected) setSelected(new Set())
-              else setSelected(new Set(allKeys))
-            }}
-            aria-label="Select all"
-          />
-          {selected.size > 0 ? (
-            <>
-              <span className="text-sm font-medium">{selected.size} selected</span>
-              <div className="ml-auto flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
-                  Clear
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={bulkLoading}
-                  onClick={() => setBulkConfirmDelete(true)}
-                >
-                  <Trash2Icon className="size-3.5" />
-                  Delete
-                </Button>
-              </div>
-            </>
-          ) : (
-            <span className="text-sm text-muted-foreground">Select all</span>
-          )}
-        </div>
-      )}
-
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
-      />
-      {uploadError && <p className="mb-4 text-sm text-destructive">{uploadError}</p>}
-
-      {/* Grid */}
-      {loading ? (
-        <div className="flex items-center gap-2 py-16 justify-center text-muted-foreground">
-          <Spinner className="size-5" />
-        </div>
-      ) : empty ? (
-        <div
-          className="flex flex-col items-center justify-center rounded-lg border border-dashed py-20 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-        >
-          <UploadIcon className="size-8 text-muted-foreground mb-3" />
-          <p className="text-sm font-medium">Drop files or folders here, or click to upload</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Images, videos, audio, documents and more
-          </p>
-        </div>
-      ) : (
-        <div
-          className="flex flex-col gap-6"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-        >
-          {folders.length > 0 && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {folders.map((folder) => (
-                <FolderCard
-                  key={folder.id}
-                  folder={folder}
-                  onOpen={openFolder}
-                  onDelete={setFolderToDelete}
-                  onRename={(f) => {
-                    setFolderToRename(f)
-                    setRenameValue(f.name)
-                  }}
-                  selected={selected.has(`folder:${folder.id}`)}
-                  onToggle={toggleOne}
-                />
-              ))}
-            </div>
-          )}
-          {items.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-              {items.map((item) => (
-                <MediaCard
-                  key={item.id}
-                  item={item}
-                  onDelete={setToDelete}
-                  onPreview={(item) => {
-                    setPreview(item)
-                    setEditFilename(item.filename)
-                    setEditAlt(item.alt ?? '')
-                    setEditError(null)
-                  }}
-                  selected={selected.has(item.id)}
-                  onToggle={toggleOne}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Preview */}
-      <Dialog
-        open={!!preview}
-        onOpenChange={(o) => {
-          if (!o) { setPreview(null); setEditError(null) }
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="truncate pr-6" title={preview?.filename}>
-              {preview?.filename}
-            </DialogTitle>
-          </DialogHeader>
-          {preview && <MediaPreviewContent item={preview} />}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{preview?.mime_type ?? '—'}</span>
-            <div className="flex items-center gap-3">
-              {preview?.width && preview?.height && (
-                <span>{preview.width} × {preview.height}</span>
-              )}
-              <span>{formatBytes(preview?.size ?? null)}</span>
-              <a href={preview?.url} target="_blank" rel="noreferrer" download={preview?.filename}>
-                <Button variant="ghost" size="sm" className="h-7 px-2">
-                  <DownloadIcon className="size-3.5" />
-                </Button>
-              </a>
-            </div>
+      <HeaderFixed>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold -mt-2">Media Library</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {mediaData ? `${mediaData.total} file${mediaData.total !== 1 ? 's' : ''}` : ''}
+            </p>
           </div>
-          {preview && isImage(preview.mime_type) && (
-            <form
-              className="flex flex-col gap-3 border-t pt-3"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                setEditSaving(true)
-                setEditError(null)
-                const token = localStorage.getItem('plank_token')
-                try {
-                  const res = await fetch(`/cms/admin/media/${preview.id}`, {
-                    method: 'PATCH',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({ filename: editFilename || preview.filename, alt: editAlt || null }),
-                  })
-                  if (!res.ok) throw new Error('Save failed.')
-                  const updated = await res.json() as MediaItem
-                  setPreview(updated)
-                  refetchMedia()
-                } catch (err) {
-                  setEditError(err instanceof Error ? err.message : 'Save failed.')
-                } finally {
-                  setEditSaving(false)
-                }
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewFolderName('')
+                setNewFolderOpen(true)
               }}
             >
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Filename</Label>
-                  <Input
-                    value={editFilename}
-                    onChange={(e) => setEditFilename(e.target.value)}
-                    placeholder={preview.filename}
-                    className="h-8 text-sm"
-                  />
+              <FolderPlusIcon className="size-4" />
+              New folder
+            </Button>
+            <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
+              {uploading ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
+              {uploading ? 'Uploading…' : 'Upload'}
+            </Button>
+          </div>
+        </div>
+      </HeaderFixed>
+
+      <section className="mt-24">
+        {/* Breadcrumb */}
+        {breadcrumb.length > 1 && (
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList>
+              {breadcrumb.map((entry, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <BreadcrumbSeparator />}
+                  <BreadcrumbItem>
+                    {i === breadcrumb.length - 1 ? (
+                      <BreadcrumbPage>
+                        {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
+                      </BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <button onClick={() => navigateTo(i)}>
+                          {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
+                        </button>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </React.Fragment>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
+        )}
+
+        {/* Bulk bar */}
+        {!empty && !loading && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+            <Checkbox
+              checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+              onCheckedChange={() => {
+                if (allSelected) setSelected(new Set())
+                else setSelected(new Set(allKeys))
+              }}
+              aria-label="Select all"
+            />
+            {selected.size > 0 ? (
+              <>
+                <span className="text-sm font-medium">{selected.size} selected</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
+                    Clear
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={bulkLoading}
+                    onClick={() => setBulkConfirmDelete(true)}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                    Delete
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Alt text</Label>
-                  <Input
-                    value={editAlt}
-                    onChange={(e) => setEditAlt(e.target.value)}
-                    placeholder="Describe the image…"
-                    className="h-8 text-sm"
+              </>
+            ) : (
+              <span className="text-sm text-muted-foreground">Select all</span>
+            )}
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        {uploadError && <p className="mb-4 text-sm text-destructive">{uploadError}</p>}
+
+        {/* Grid */}
+        {loading ? (
+          <div className="flex items-center gap-2 py-16 justify-center text-muted-foreground">
+            <Spinner className="size-5" />
+          </div>
+        ) : empty ? (
+          <div
+            className="flex flex-col items-center justify-center rounded-lg border border-dashed py-20 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            <UploadIcon className="size-8 text-muted-foreground mb-3" />
+            <p className="text-sm font-medium">Drop files or folders here, or click to upload</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Images, videos, audio, documents and more
+            </p>
+          </div>
+        ) : (
+          <div
+            className="flex flex-col gap-6"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            {folders.length > 0 && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {folders.map((folder) => (
+                  <FolderCard
+                    key={folder.id}
+                    folder={folder}
+                    onOpen={openFolder}
+                    onDelete={setFolderToDelete}
+                    onRename={(f) => {
+                      setFolderToRename(f)
+                      setRenameValue(f.name)
+                    }}
+                    selected={selected.has(`folder:${folder.id}`)}
+                    onToggle={toggleOne}
                   />
+                ))}
+              </div>
+            )}
+            {items.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                {items.map((item) => (
+                  <MediaCard
+                    key={item.id}
+                    item={item}
+                    onDelete={setToDelete}
+                    onPreview={(item) => {
+                      setPreview(item)
+                      setEditFilename(item.filename)
+                      setEditAlt(item.alt ?? '')
+                      setEditError(null)
+                    }}
+                    selected={selected.has(item.id)}
+                    onToggle={toggleOne}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Preview */}
+        <Dialog
+          open={!!preview}
+          onOpenChange={(o) => {
+            if (!o) {
+              setPreview(null)
+              setEditError(null)
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="truncate pr-6" title={preview?.filename}>
+                {preview?.filename}
+              </DialogTitle>
+            </DialogHeader>
+            {preview && <MediaPreviewContent item={preview} />}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{preview?.mime_type ?? '—'}</span>
+              <div className="flex items-center gap-3">
+                {preview?.width && preview?.height && (
+                  <span>
+                    {preview.width} × {preview.height}
+                  </span>
+                )}
+                <span>{formatBytes(preview?.size ?? null)}</span>
+                <a
+                  href={preview?.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={preview?.filename}
+                >
+                  <Button variant="ghost" size="sm" className="h-7 px-2">
+                    <DownloadIcon className="size-3.5" />
+                  </Button>
+                </a>
+              </div>
+            </div>
+            {preview && isImage(preview.mime_type) && (
+              <form
+                className="flex flex-col gap-3 border-t pt-3"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setEditSaving(true)
+                  setEditError(null)
+                  const token = localStorage.getItem('plank_token')
+                  try {
+                    const res = await fetch(`/cms/admin/media/${preview.id}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({
+                        filename: editFilename || preview.filename,
+                        alt: editAlt || null,
+                      }),
+                    })
+                    if (!res.ok) throw new Error('Save failed.')
+                    const updated = (await res.json()) as MediaItem
+                    setPreview(updated)
+                    refetchMedia()
+                  } catch (err) {
+                    setEditError(err instanceof Error ? err.message : 'Save failed.')
+                  } finally {
+                    setEditSaving(false)
+                  }
+                }}
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Filename</Label>
+                    <Input
+                      value={editFilename}
+                      onChange={(e) => setEditFilename(e.target.value)}
+                      placeholder={preview.filename}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-xs">Alt text</Label>
+                    <Input
+                      value={editAlt}
+                      onChange={(e) => setEditAlt(e.target.value)}
+                      placeholder="Describe the image…"
+                      className="h-8 text-sm"
+                    />
+                  </div>
                 </div>
-              </div>
-              {editError && <p className="text-xs text-destructive">{editError}</p>}
-              <div className="flex justify-end">
-                <Button type="submit" size="sm" disabled={editSaving}>
-                  {editSaving ? 'Saving…' : 'Save'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+                {editError && <p className="text-xs text-destructive">{editError}</p>}
+                <div className="flex justify-end">
+                  <Button type="submit" size="sm" disabled={editSaving}>
+                    {editSaving ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
-      {/* New folder */}
-      <Dialog
-        open={newFolderOpen}
-        onOpenChange={(o) => {
-          if (!o) setNewFolderOpen(false)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>New folder</DialogTitle>
-          </DialogHeader>
-          <Input
-            placeholder="Folder name"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCreateFolder()
-            }}
-            autoFocus
-          />
-          {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewFolderOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateFolder} disabled={folderSaving || !newFolderName.trim()}>
-              {folderSaving ? 'Creating…' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* New folder */}
+        <Dialog
+          open={newFolderOpen}
+          onOpenChange={(o) => {
+            if (!o) setNewFolderOpen(false)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>New folder</DialogTitle>
+            </DialogHeader>
+            <Input
+              placeholder="Folder name"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateFolder()
+              }}
+              autoFocus
+            />
+            {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNewFolderOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFolder} disabled={folderSaving || !newFolderName.trim()}>
+                {folderSaving ? 'Creating…' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Rename folder */}
-      <Dialog
-        open={!!folderToRename}
-        onOpenChange={(o) => {
-          if (!o) setFolderToRename(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rename folder</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleRenameFolder()
-            }}
-            autoFocus
-          />
-          {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderToRename(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRenameFolder} disabled={folderSaving || !renameValue.trim()}>
-              {folderSaving ? 'Saving…' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Rename folder */}
+        <Dialog
+          open={!!folderToRename}
+          onOpenChange={(o) => {
+            if (!o) setFolderToRename(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename folder</DialogTitle>
+            </DialogHeader>
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameFolder()
+              }}
+              autoFocus
+            />
+            {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFolderToRename(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleRenameFolder} disabled={folderSaving || !renameValue.trim()}>
+                {folderSaving ? 'Saving…' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete media */}
-      <Dialog
-        open={!!toDelete}
-        onOpenChange={(o) => {
-          if (!o) setToDelete(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete file</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{' '}
-            <span className="font-medium text-foreground">{toDelete?.filename}</span>? This action
-            cannot be undone.
-          </p>
-          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setToDelete(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteMedia} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Delete media */}
+        <Dialog
+          open={!!toDelete}
+          onOpenChange={(o) => {
+            if (!o) setToDelete(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete file</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete{' '}
+              <span className="font-medium text-foreground">{toDelete?.filename}</span>? This action
+              cannot be undone.
+            </p>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteMedia} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete folder */}
-      <Dialog
-        open={!!folderToDelete}
-        onOpenChange={(o) => {
-          if (!o) setFolderToDelete(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete folder</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{' '}
-            <span className="font-medium text-foreground">{folderToDelete?.name}</span>? The folder
-            must be empty.
-          </p>
-          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFolderToDelete(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteFolder} disabled={deleting}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Delete folder */}
+        <Dialog
+          open={!!folderToDelete}
+          onOpenChange={(o) => {
+            if (!o) setFolderToDelete(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete folder</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete{' '}
+              <span className="font-medium text-foreground">{folderToDelete?.name}</span>? The
+              folder must be empty.
+            </p>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFolderToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteFolder} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Bulk delete */}
-      <Dialog
-        open={bulkConfirmDelete}
-        onOpenChange={(o) => {
-          if (!o) setBulkConfirmDelete(false)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              Delete {selected.size} {selected.size === 1 ? 'item' : 'items'}?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This action cannot be undone. Non-empty folders will be skipped.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
-              {bulkLoading ? <Spinner className="size-4" /> : null}Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Bulk delete */}
+        <Dialog
+          open={bulkConfirmDelete}
+          onOpenChange={(o) => {
+            if (!o) setBulkConfirmDelete(false)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                Delete {selected.size} {selected.size === 1 ? 'item' : 'items'}?
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This action cannot be undone. Non-empty folders will be skipped.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+                {bulkLoading ? <Spinner className="size-4" /> : null}Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
     </div>
   )
 }

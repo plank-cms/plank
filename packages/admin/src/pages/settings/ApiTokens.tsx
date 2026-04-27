@@ -9,14 +9,28 @@ import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table.tsx'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog.tsx'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select.tsx'
+import HeaderFixed from '@/components/Header'
 
 type ApiToken = {
   id: string
@@ -84,7 +98,9 @@ export function SettingsApiTokens() {
       header: 'Created',
       cell: ({ getValue }) =>
         new Date(getValue<string>()).toLocaleDateString('en-US', {
-          year: 'numeric', month: 'short', day: 'numeric',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
         }),
     },
     {
@@ -114,7 +130,9 @@ export function SettingsApiTokens() {
       })
       setCreated(result)
       refetch()
-    } catch { /* shown via apiError */ }
+    } catch {
+      /* shown via apiError */
+    }
   }
 
   function handleCloseCreate() {
@@ -128,150 +146,185 @@ export function SettingsApiTokens() {
       await request(`/cms/admin/api-tokens/${deleteToken!.id}`, 'DELETE')
       setDeleteToken(null)
       refetch()
-    } catch { /* shown via apiError */ }
+    } catch {
+      /* shown via apiError */
+    }
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">API Tokens</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage tokens for consuming the public API.
-          </p>
+    <>
+      <HeaderFixed sidebar>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold -mt-2">API Tokens</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage tokens for consuming the public API.
+            </p>
+          </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="size-4" />
+            New token
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="size-4" />
-          New token
-        </Button>
-      </div>
+      </HeaderFixed>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24">
-                  <Spinner className="mx-auto size-5" />
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  No tokens yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+      <section className="mt-24">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((header) => (
+                    <TableHead key={header.id}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Create dialog — two states: form / token revealed */}
-      <Dialog open={createOpen} onOpenChange={(o) => { if (!o) handleCloseCreate() }}>
-        <DialogContent className="sm:max-w-md">
-          {!created ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>New API token</DialogTitle>
-              </DialogHeader>
-              <form id="create-token-form" onSubmit={handleCreate} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="token-name">Name</Label>
-                  <Input
-                    id="token-name"
-                    placeholder="e.g. Production frontend"
-                    value={form.name}
-                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="token-access">Access type</Label>
-                  <Select
-                    value={form.accessType}
-                    onValueChange={(v) => setForm((p) => ({ ...p, accessType: v as CreateForm['accessType'] }))}
+              ))}
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24">
+                    <Spinner className="mx-auto size-5" />
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-muted-foreground"
                   >
-                    <SelectTrigger id="token-access">
-                      <SelectValue placeholder="Select access type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="read-only">Read only</SelectItem>
-                      <SelectItem value="full-access">Full access</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {apiError && <p className="text-sm text-destructive">{apiError}</p>}
-              </form>
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={handleCloseCreate}>Cancel</Button>
-                <Button type="submit" form="create-token-form" disabled={submitting || !form.accessType}>
-                  {submitting ? 'Generating…' : 'Generate token'}
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>Token generated</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4">
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                  Make sure to copy your token now. You won't be able to see it again.
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Token</Label>
-                  <div className="flex gap-2">
-                    <Input readOnly value={created.token} className="font-mono text-xs" />
-                    <CopyButton value={created.token} />
+                    No tokens yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Create dialog — two states: form / token revealed */}
+        <Dialog
+          open={createOpen}
+          onOpenChange={(o) => {
+            if (!o) handleCloseCreate()
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            {!created ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>New API token</DialogTitle>
+                </DialogHeader>
+                <form
+                  id="create-token-form"
+                  onSubmit={handleCreate}
+                  className="flex flex-col gap-4"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="token-name">Name</Label>
+                    <Input
+                      id="token-name"
+                      placeholder="e.g. Production frontend"
+                      value={form.name}
+                      onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="token-access">Access type</Label>
+                    <Select
+                      value={form.accessType}
+                      onValueChange={(v) =>
+                        setForm((p) => ({ ...p, accessType: v as CreateForm['accessType'] }))
+                      }
+                    >
+                      <SelectTrigger id="token-access">
+                        <SelectValue placeholder="Select access type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read-only">Read only</SelectItem>
+                        <SelectItem value="full-access">Full access</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {apiError && <p className="text-sm text-destructive">{apiError}</p>}
+                </form>
+                <DialogFooter>
+                  <Button variant="outline" type="button" onClick={handleCloseCreate}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="create-token-form"
+                    disabled={submitting || !form.accessType}
+                  >
+                    {submitting ? 'Generating…' : 'Generate token'}
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Token generated</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    Make sure to copy your token now. You won't be able to see it again.
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Token</Label>
+                    <div className="flex gap-2">
+                      <Input readOnly value={created.token} className="font-mono text-xs" />
+                      <CopyButton value={created.token} />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleCloseCreate}>Done</Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+                <DialogFooter>
+                  <Button onClick={handleCloseCreate}>Done</Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
-      {/* Delete confirmation */}
-      <Dialog open={!!deleteToken} onOpenChange={(o) => { if (!o) setDeleteToken(null) }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Revoke token</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to revoke <span className="font-medium text-foreground">{deleteToken?.name}</span>? Any frontend using it will immediately lose access.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteToken(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              {submitting ? 'Revoking…' : 'Revoke'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        {/* Delete confirmation */}
+        <Dialog
+          open={!!deleteToken}
+          onOpenChange={(o) => {
+            if (!o) setDeleteToken(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Revoke token</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to revoke{' '}
+              <span className="font-medium text-foreground">{deleteToken?.name}</span>? Any frontend
+              using it will immediately lose access.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteToken(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
+                {submitting ? 'Revoking…' : 'Revoke'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
+    </>
   )
 }

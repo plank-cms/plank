@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
+import HeaderFixed from '@/components/Header'
 
 type User = {
   id: string
@@ -121,7 +122,9 @@ export function SettingsUsers() {
         cell: ({ row }) => {
           const { first_name, last_name } = row.original
           if (!first_name && !last_name) return <span className="text-muted-foreground">—</span>
-          return <span className="font-bold">{[first_name, last_name].filter(Boolean).join(' ')}</span>
+          return (
+            <span className="font-bold">{[first_name, last_name].filter(Boolean).join(' ')}</span>
+          )
         },
       },
       {
@@ -208,220 +211,224 @@ export function SettingsUsers() {
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Users</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage who has access to the admin panel.
-          </p>
+    <>
+      <HeaderFixed sidebar>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold -mt-2">Users</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage who has access to the admin panel.
+            </p>
+          </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="size-4" />
+            New user
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="size-4" />
-          New user
-        </Button>
-      </div>
+      </HeaderFixed>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24">
-                  <Spinner className="mx-auto size-5" />
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No users found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+      <section className="mt-24">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((header) => (
+                    <TableHead key={header.id}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24">
+                    <Spinner className="mx-auto size-5" />
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-      {/* Create dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New user</DialogTitle>
-          </DialogHeader>
-          <form id="create-user-form" onSubmit={handleCreate} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c-email">Email</Label>
-              <Input
-                id="c-email"
-                type="email"
-                placeholder="user@example.com"
-                value={createForm.email}
-                onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c-password">Password</Label>
-              <Input
-                id="c-password"
-                type="password"
-                placeholder="Min. 8 characters"
-                value={createForm.password}
-                onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c-role">Role</Label>
-              <Select
-                value={createForm.roleId}
-                onValueChange={(v) => setCreateForm((p) => ({ ...p, roleId: v }))}
-              >
-                <SelectTrigger id="c-role">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleList.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Create dialog */}
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>New user</DialogTitle>
+            </DialogHeader>
+            <form id="create-user-form" onSubmit={handleCreate} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="c-email">Email</Label>
+                <Input
+                  id="c-email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="c-password">Password</Label>
+                <Input
+                  id="c-password"
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="c-role">Role</Label>
+                <Select
+                  value={createForm.roleId}
+                  onValueChange={(v) => setCreateForm((p) => ({ ...p, roleId: v }))}
+                >
+                  <SelectTrigger id="c-role">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleList.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {apiError && <p className="text-sm text-destructive">{apiError}</p>}
+            </form>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" form="create-user-form" disabled={submitting}>
+                {submitting ? 'Creating…' : 'Create user'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit dialog */}
+        <Dialog
+          open={!!editUser}
+          onOpenChange={(o) => {
+            if (!o) setEditUser(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit user</DialogTitle>
+            </DialogHeader>
+            <form id="edit-user-form" onSubmit={handleEdit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="e-email">Email</Label>
+                <Input
+                  id="e-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="e-fname">First name</Label>
+                <Input
+                  id="e-fname"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((p) => ({ ...p, firstName: e.target.value }))}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="e-lname">Last name</Label>
+                <Input
+                  id="e-lname"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((p) => ({ ...p, lastName: e.target.value }))}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="e-role">Role</Label>
+                <Select
+                  value={editForm.roleId}
+                  onValueChange={(v) => setEditForm((p) => ({ ...p, roleId: v }))}
+                >
+                  <SelectTrigger id="e-role">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleList.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {apiError && <p className="text-sm text-destructive">{apiError}</p>}
+            </form>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setEditUser(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" form="edit-user-form" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete confirmation dialog */}
+        <Dialog
+          open={!!deleteUser}
+          onOpenChange={(o) => {
+            if (!o) setDeleteUser(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete user</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete{' '}
+              <span className="font-medium text-foreground">{deleteUser?.email}</span>? This action
+              cannot be undone.
+            </p>
             {apiError && <p className="text-sm text-destructive">{apiError}</p>}
-          </form>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" form="create-user-form" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create user'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit dialog */}
-      <Dialog
-        open={!!editUser}
-        onOpenChange={(o) => {
-          if (!o) setEditUser(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit user</DialogTitle>
-          </DialogHeader>
-          <form id="edit-user-form" onSubmit={handleEdit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="e-email">Email</Label>
-              <Input
-                id="e-email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="e-fname">First name</Label>
-              <Input
-                id="e-fname"
-                value={editForm.firstName}
-                onChange={(e) => setEditForm((p) => ({ ...p, firstName: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="e-lname">Last name</Label>
-              <Input
-                id="e-lname"
-                value={editForm.lastName}
-                onChange={(e) => setEditForm((p) => ({ ...p, lastName: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="e-role">Role</Label>
-              <Select
-                value={editForm.roleId}
-                onValueChange={(v) => setEditForm((p) => ({ ...p, roleId: v }))}
-              >
-                <SelectTrigger id="e-role">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleList.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {apiError && <p className="text-sm text-destructive">{apiError}</p>}
-          </form>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setEditUser(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" form="edit-user-form" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirmation dialog */}
-      <Dialog
-        open={!!deleteUser}
-        onOpenChange={(o) => {
-          if (!o) setDeleteUser(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete user</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{' '}
-            <span className="font-medium text-foreground">{deleteUser?.email}</span>? This action
-            cannot be undone.
-          </p>
-          {apiError && <p className="text-sm text-destructive">{apiError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteUser(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              {submitting ? 'Deleting…' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteUser(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
+                {submitting ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
+    </>
   )
 }

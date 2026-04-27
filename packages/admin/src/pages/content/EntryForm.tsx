@@ -25,6 +25,7 @@ import type { FieldDef } from '@/components/content/FieldInput.tsx'
 import { FIELD_WIDTH_SPAN } from '@/components/content-types/FieldCard.tsx'
 import type { FieldWidth } from '@/components/content-types/FieldCard.tsx'
 import { formatDatetime, getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
+import HeaderFixed from '@/components/Header'
 
 type ContentType = {
   name: string
@@ -306,7 +307,7 @@ export function EntryForm() {
 
   if (!ct) return null
 
-  // Status badge ──────────────────────────────────────────────────────────
+  // Status badge
 
   let statusBadge: React.ReactNode
   if (status === 'scheduled') {
@@ -329,167 +330,174 @@ export function EntryForm() {
   return (
     <>
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs text-muted-foreground mb-0.5">{ct.name}</p>
+      <HeaderFixed sidebar>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold -mt-2">{isNew ? 'New entry' : 'Edit entry'}</h1>
+              {statusBadge}
+            </div>
+            <p className="text-muted-foreground text-xs mt-1">{ct.name}</p>
+          </div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">{isNew ? 'New entry' : 'Edit entry'}</h1>
-            {statusBadge}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isNew && (
+            {!isNew && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleting}
+              >
+                <Trash2Icon className="size-4" />
+              </Button>
+            )}
+            {!isNew && status === 'published' && (
+              <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
+                {patching ? <Spinner className="size-4" /> : null}
+                Revert to draft
+              </Button>
+            )}
+            {!isNew && status === 'scheduled' && (
+              <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
+                {patching ? <Spinner className="size-4" /> : null}
+                Cancel schedule
+              </Button>
+            )}
             <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => setDeleteConfirmOpen(true)}
-              disabled={deleting}
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={status === 'scheduled' ? busy : !isDirty || busy}
             >
-              <Trash2Icon className="size-4" />
+              {saving ? <Spinner className="size-4" /> : null}
+              {status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft'}
             </Button>
-          )}
-          {!isNew && status === 'published' && (
-            <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
+            {status !== 'scheduled' && (
+              <Button variant="outline" onClick={openScheduler} disabled={busy}>
+                <CalendarClockIcon className="size-4" />
+                Schedule
+              </Button>
+            )}
+            <Button onClick={handlePublish} disabled={!canPublish || busy}>
               {patching ? <Spinner className="size-4" /> : null}
-              Revert to draft
+              {status === 'scheduled'
+                ? 'Publish now'
+                : status === 'published' && !isPublishedStale
+                  ? 'Republish'
+                  : 'Publish'}
             </Button>
-          )}
-          {!isNew && status === 'scheduled' && (
-            <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
-              {patching ? <Spinner className="size-4" /> : null}
-              Cancel schedule
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={handleSaveDraft}
-            disabled={status === 'scheduled' ? busy : !isDirty || busy}
-          >
-            {saving ? <Spinner className="size-4" /> : null}
-            {status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft'}
-          </Button>
-          {status !== 'scheduled' && (
-            <Button variant="outline" onClick={openScheduler} disabled={busy}>
-              <CalendarClockIcon className="size-4" />
-              Schedule
-            </Button>
-          )}
-          <Button onClick={handlePublish} disabled={!canPublish || busy}>
-            {patching ? <Spinner className="size-4" /> : null}
-            {status === 'scheduled'
-              ? 'Publish now'
-              : status === 'published' && !isPublishedStale
-                ? 'Republish'
-                : 'Publish'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Inline scheduler panel */}
-      {showScheduler && (
-        <div className="mb-6 flex items-end gap-2 rounded-lg border p-4 bg-muted/30">
-          <div className="flex flex-col gap-1.5">
-            <Label>Date</Label>
-            <Popover open={calOpen} onOpenChange={setCalOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-40 justify-between font-normal">
-                  {schedDate ? format(schedDate, 'MMM d, yyyy') : 'Select date'}
-                  <ChevronDownIcon className="size-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={schedDate}
-                  captionLayout="dropdown"
-                  defaultMonth={schedDate ?? new Date()}
-                  disabled={{ before: new Date() }}
-                  onSelect={(d) => {
-                    setSchedDate(d)
-                    setCalOpen(false)
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
           </div>
-          <div className="space-y-1.5">
-            <Label>
-              Time <span className="text-muted-foreground font-normal">(24h)</span>
-            </Label>
-            <Input
-              type="time"
-              className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-              value={schedTime}
-              onChange={(e) => setSchedTime(e.target.value)}
-            />
-          </div>
-          <Button onClick={handleSchedule} disabled={!canSchedule || busy}>
-            {patching ? <Spinner className="size-4" /> : null}
-            Confirm
-          </Button>
-          <Button variant="ghost" onClick={() => setShowScheduler(false)}>
-            Cancel
-          </Button>
         </div>
-      )}
+      </HeaderFixed>
 
-      {/* Fields grid */}
-      <div className="grid grid-cols-6 gap-4">
-        {ct.fields.map((field) => (
-          <div key={field.name} className={FIELD_WIDTH_SPAN[(field.width as FieldWidth) ?? 'full']}>
+      <section className="mt-24">
+        {/* Inline scheduler panel */}
+        {showScheduler && (
+          <div className="mb-6 flex items-end gap-2 rounded-lg border p-4 bg-muted/30">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`entry-${field.name}`} className="capitalize">
-                {field.name.replace(/_/g, ' ')}
-                {field.required && <span className="ml-1 text-destructive">*</span>}
+              <Label>Date</Label>
+              <Popover open={calOpen} onOpenChange={setCalOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-40 justify-between font-normal">
+                    {schedDate ? format(schedDate, 'MMM d, yyyy') : 'Select date'}
+                    <ChevronDownIcon className="size-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={schedDate}
+                    captionLayout="dropdown"
+                    defaultMonth={schedDate ?? new Date()}
+                    disabled={{ before: new Date() }}
+                    onSelect={(d) => {
+                      setSchedDate(d)
+                      setCalOpen(false)
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                Time <span className="text-muted-foreground font-normal">(24h)</span>
               </Label>
-              <FieldInput
-                field={field}
-                value={values[field.name]}
-                onChange={(v) => handleChange(field.name, v)}
-                allValues={{ ...values, id }}
+              <Input
+                type="time"
+                className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                value={schedTime}
+                onChange={(e) => setSchedTime(e.target.value)}
               />
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Delete confirmation */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete this entry?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+            <Button onClick={handleSchedule} disabled={!canSchedule || busy}>
+              {patching ? <Spinner className="size-4" /> : null}
+              Confirm
+            </Button>
+            <Button variant="ghost" onClick={() => setShowScheduler(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Spinner className="size-4" /> : null}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
 
-      {/* Unsaved changes blocker */}
-      <Dialog open={blocker.state === 'blocked'} onOpenChange={() => blocker.reset?.()}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Unsaved changes</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">Leave without saving?</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => blocker.reset?.()}>
-              Stay
-            </Button>
-            <Button variant="destructive" onClick={() => blocker.proceed?.()}>
-              Leave
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Fields grid */}
+        <div className="grid grid-cols-6 gap-4">
+          {ct.fields.map((field) => (
+            <div
+              key={field.name}
+              className={FIELD_WIDTH_SPAN[(field.width as FieldWidth) ?? 'full']}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={`entry-${field.name}`} className="capitalize">
+                  {field.name.replace(/_/g, ' ')}
+                  {field.required && <span className="ml-1 text-destructive">*</span>}
+                </Label>
+                <FieldInput
+                  field={field}
+                  value={values[field.name]}
+                  onChange={(v) => handleChange(field.name, v)}
+                  allValues={{ ...values, id }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Delete confirmation */}
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete this entry?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <Spinner className="size-4" /> : null}
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Unsaved changes blocker */}
+        <Dialog open={blocker.state === 'blocked'} onOpenChange={() => blocker.reset?.()}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Unsaved changes</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">Leave without saving?</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => blocker.reset?.()}>
+                Stay
+              </Button>
+              <Button variant="destructive" onClick={() => blocker.proceed?.()}>
+                Leave
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
     </>
   )
 }

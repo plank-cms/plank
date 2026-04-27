@@ -31,10 +31,14 @@ const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboardIcon, label: 'Dashboard', permission: null },
   { to: '/content', icon: FileTextIcon, label: 'Content', permission: null },
   { to: '/media', icon: ImageIcon, label: 'Media', permission: null },
-  { to: '/content-types', icon: LayersIcon, label: 'Content Types', permission: 'content-types:read' },
+  {
+    to: '/content-types',
+    icon: LayersIcon,
+    label: 'Content Types',
+    permission: 'content-types:read',
+  },
   { to: '/settings', icon: Settings2Icon, label: 'Settings', permission: 'settings:read' },
 ]
-
 
 function LayoutShell() {
   const { user, logout } = useAuth()
@@ -47,8 +51,9 @@ function LayoutShell() {
   }
 
   const permissions = user?.permissions ?? []
-  const visibleNavItems = NAV_ITEMS.filter(({ permission }) =>
-    !permission || permissions.includes('*') || permissions.includes(permission),
+  const visibleNavItems = NAV_ITEMS.filter(
+    ({ permission }) =>
+      !permission || permissions.includes('*') || permissions.includes(permission),
   )
 
   return (
@@ -56,7 +61,11 @@ function LayoutShell() {
       <div className="flex h-svh overflow-hidden bg-background">
         <aside className="flex h-full w-14 shrink-0 flex-col items-center gap-4 border-r border-sidebar-border bg-sidebar py-4">
           <NavLink to="/">
-            <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="px-3 pb-4" />
+            <img
+              src={`${import.meta.env.BASE_URL}plank-logo-w.svg`}
+              alt="Plank CMS"
+              className="px-3 pb-4"
+            />
           </NavLink>
 
           {/* Nav */}
@@ -110,7 +119,7 @@ function LayoutShell() {
         </aside>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl w-full mx-auto px-4 py-3 mb-16">
+          <div className="max-w-7xl w-full mx-auto px-4 mb-16">
             <Outlet />
           </div>
         </main>

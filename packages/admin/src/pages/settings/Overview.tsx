@@ -16,6 +16,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { useSettings } from '@/context/settings.tsx'
 import { Card, CardContent } from '@/components/ui/card.tsx'
 import pkg from '../../../package.json'
+import HeaderFixed from '@/components/Header.tsx'
 
 // Common IANA timezone identifiers with friendly labels
 const TIMEZONES = [
@@ -56,7 +57,7 @@ const TIMEZONES = [
   { value: 'Pacific/Auckland', label: 'Pacific/Auckland — New Zealand (UTC+12/13)' },
 ]
 
-// GeneralSettings ──────────────────────────────────────────────────────────
+// GeneralSettings
 
 function GeneralSettings() {
   const { data, loading } = useFetch<Record<string, string>>('/cms/admin/settings/general')
@@ -124,19 +125,19 @@ function GeneralSettings() {
   )
 }
 
-// SettingsOverview ─────────────────────────────────────────────────────────
+// SettingsOverview
 
 export function SettingsOverview() {
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Overview</h1>
+    <>
+      <HeaderFixed sidebar>
+        <h1 className="text-2xl font-bold -mt-2">Overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           General configuration for your CMS instance.
         </p>
-      </div>
+      </HeaderFixed>
 
-      <Tabs defaultValue="general">
+      <Tabs defaultValue="general" className="mt-24">
         <TabsList className="mb-6">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="media">Media Library</TabsTrigger>
@@ -150,6 +151,6 @@ export function SettingsOverview() {
           <MediaSettings />
         </TabsContent>
       </Tabs>
-    </div>
+    </>
   )
 }

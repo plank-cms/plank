@@ -53,6 +53,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/components/ui/tooltip.tsx'
+import HeaderFixed from '@/components/Header'
 
 // Types
 
@@ -179,7 +180,7 @@ function MediaThumbnail({ value }: { value: string }) {
   )
 }
 
-// FieldCell ─────
+// FieldCell
 
 function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   const { timezone } = useSettings()
@@ -232,7 +233,7 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   )
 }
 
-// AuthorAvatar ──
+// AuthorAvatar
 
 function AuthorAvatar({ entry }: { entry: Entry }) {
   const first = entry._author_first_name
@@ -259,7 +260,7 @@ function AuthorAvatar({ entry }: { entry: Entry }) {
   )
 }
 
-// StatusBadge ───
+// StatusBadge
 
 function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
   const { timezone } = useSettings()
@@ -292,7 +293,7 @@ function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
   return <Badge variant={isStale ? 'secondary' : 'default'}>Published</Badge>
 }
 
-// ConfigureViewDialog ──────────────────────────────────────────────────────
+// ConfigureViewDialog
 
 function ConfigureViewDialog({
   open,
@@ -484,7 +485,7 @@ function ConfigureViewDialog({
   )
 }
 
-// EntriesList ───
+// EntriesList
 
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
@@ -652,235 +653,247 @@ export function EntriesList() {
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">{ct.name}</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setConfigOpen(true)} className="gap-1.5">
-            <Settings2Icon className="size-3.5" />
-            Configure the view
-          </Button>
-          <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
-            <PlusIcon className="size-4" />
-            New entry
-          </Button>
+      <HeaderFixed sidebar>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold -mt-6">{ct.name}</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setConfigOpen(true)} className="gap-1.5">
+              <Settings2Icon className="size-3.5" />
+              Configure the view
+            </Button>
+            <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
+              <PlusIcon className="size-4" />
+              New entry
+            </Button>
+          </div>
         </div>
-      </div>
+      </HeaderFixed>
 
-      {loadingEntries && (
-        <div className="flex items-center gap-2 py-12 text-muted-foreground">
-          <Spinner className="size-4" />
-          <span className="text-sm">Loading entries…</span>
-        </div>
-      )}
+      <section className="mt-24">
+        {loadingEntries && (
+          <div className="flex items-center gap-2 py-12 text-muted-foreground">
+            <Spinner className="size-4" />
+            <span className="text-sm">Loading entries…</span>
+          </div>
+        )}
 
-      {!loadingEntries && (entries?.data ?? []).length === 0 && (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FileTextIcon />
-            </EmptyMedia>
-            <EmptyTitle>No entries yet</EmptyTitle>
-            <EmptyDescription>Create your first entry for {ct.name}.</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>
-          </EmptyContent>
-        </Empty>
-      )}
+        {!loadingEntries && (entries?.data ?? []).length === 0 && (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FileTextIcon />
+              </EmptyMedia>
+              <EmptyTitle>No entries yet</EmptyTitle>
+              <EmptyDescription>Create your first entry for {ct.name}.</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>
+            </EmptyContent>
+          </Empty>
+        )}
 
-      {!loadingEntries && (entries?.data ?? []).length > 0 && (
-        <TooltipProvider>
-          {selected.size > 0 && (
-            <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
-              <span className="text-sm font-medium">{selected.size} selected</span>
-              <div className="flex items-center gap-2 ml-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={bulkLoading}
-                  onClick={handleBulkUnpublish}
-                >
-                  {bulkLoading ? <Spinner className="size-3.5" /> : null}
-                  Unpublish
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={bulkLoading}
-                  onClick={() => setBulkConfirmDelete(true)}
-                >
-                  <Trash2Icon className="size-3.5" />
-                  Delete
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/50">
-                <tr>
-                  <th className="w-10 px-4 py-3">
-                    <Checkbox
-                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
-                      onCheckedChange={toggleAll}
-                      aria-label="Select all"
-                    />
-                  </th>
-                  {visibleFields.map((field) => (
-                    <th
-                      key={field.name}
-                      className="px-4 py-3 text-left font-medium text-muted-foreground"
-                    >
-                      {humanize(field.name)}
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Pub / Sch
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {(entries?.data ?? []).map((entry) => (
-                  <tr
-                    key={entry.id}
-                    className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}
+        {!loadingEntries && (entries?.data ?? []).length > 0 && (
+          <TooltipProvider>
+            {selected.size > 0 && (
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+                <span className="text-sm font-medium">{selected.size} selected</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={bulkLoading}
+                    onClick={handleBulkUnpublish}
                   >
-                    <td className="w-10 px-4 py-3">
+                    {bulkLoading ? <Spinner className="size-3.5" /> : null}
+                    Unpublish
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={bulkLoading}
+                    onClick={() => setBulkConfirmDelete(true)}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50">
+                  <tr>
+                    <th className="w-10 px-4 py-3">
                       <Checkbox
-                        checked={selected.has(entry.id)}
-                        onCheckedChange={() => toggleOne(entry.id)}
-                        aria-label="Select row"
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all"
                       />
-                    </td>
+                    </th>
                     {visibleFields.map((field) => (
-                      <td key={field.name} className="px-4 py-3">
-                        <FieldCell field={field} value={entry[field.name]} />
-                      </td>
+                      <th
+                        key={field.name}
+                        className="px-4 py-3 text-left font-medium text-muted-foreground"
+                      >
+                        {humanize(field.name)}
+                      </th>
                     ))}
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {formatDate(entry.created_at, timezone)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {formatDate(entry.updated_at, timezone)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {entry.status === 'scheduled' && entry.scheduled_for
-                        ? formatDate(entry.scheduled_for, timezone)
-                        : entry.published_at
-                          ? formatDate(entry.published_at, timezone)
-                          : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge entry={entry} fields={ct.fields} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <AuthorAvatar entry={entry} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/content/${slug}/${entry.id}`)}
-                          className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        >
-                          <PencilIcon className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeletingId(entry.id)}
-                          className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2Icon className="size-3.5" />
-                        </button>
-                      </div>
-                    </td>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Updated
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Pub / Sch
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Author
+                    </th>
+                    <th className="px-4 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(entries?.data ?? []).map((entry) => (
+                    <tr
+                      key={entry.id}
+                      className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}
+                    >
+                      <td className="w-10 px-4 py-3">
+                        <Checkbox
+                          checked={selected.has(entry.id)}
+                          onCheckedChange={() => toggleOne(entry.id)}
+                          aria-label="Select row"
+                        />
+                      </td>
+                      {visibleFields.map((field) => (
+                        <td key={field.name} className="px-4 py-3">
+                          <FieldCell field={field} value={entry[field.name]} />
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {formatDate(entry.created_at, timezone)}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {formatDate(entry.updated_at, timezone)}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {entry.status === 'scheduled' && entry.scheduled_for
+                          ? formatDate(entry.scheduled_for, timezone)
+                          : entry.published_at
+                            ? formatDate(entry.published_at, timezone)
+                            : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge entry={entry} fields={ct.fields} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <AuthorAvatar entry={entry} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/content/${slug}/${entry.id}`)}
+                            className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <PencilIcon className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingId(entry.id)}
+                            className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="mt-4">
-            <PaginationWrap
-              page={page}
-              totalPages={totalPages}
-              limit={limit}
-              onPageChange={setPage}
-              onLimitChange={(l) => {
-                setLimit(l)
-                setPage(1)
-              }}
-            />
-          </div>
-        </TooltipProvider>
-      )}
+            <div className="mt-4">
+              <PaginationWrap
+                page={page}
+                totalPages={totalPages}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={(l) => {
+                  setLimit(l)
+                  setPage(1)
+                }}
+              />
+            </div>
+          </TooltipProvider>
+        )}
 
-      {/* Configure view dialog */}
-      {viewConfig && (
-        <ConfigureViewDialog
-          open={configOpen}
-          onOpenChange={setConfigOpen}
-          allFields={ct.fields}
-          config={viewConfig}
-          onApply={handleApplyConfig}
-        />
-      )}
+        {/* Configure view dialog */}
+        {viewConfig && (
+          <ConfigureViewDialog
+            open={configOpen}
+            onOpenChange={setConfigOpen}
+            allFields={ct.fields}
+            config={viewConfig}
+            onApply={handleApplyConfig}
+          />
+        )}
 
-      {/* Delete dialog */}
-      <Dialog
-        open={Boolean(deletingId)}
-        onOpenChange={(v) => {
-          if (!v) setDeletingId(null)
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete entry?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Spinner className="size-4" /> : null}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Delete dialog */}
+        <Dialog
+          open={Boolean(deletingId)}
+          onOpenChange={(v) => {
+            if (!v) setDeletingId(null)
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete entry?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeletingId(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <Spinner className="size-4" /> : null}
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Bulk delete dialog */}
-      <Dialog
-        open={bulkConfirmDelete}
-        onOpenChange={(v) => {
-          if (!v) setBulkConfirmDelete(false)
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              Delete {selected.size} {selected.size === 1 ? 'entry' : 'entries'}?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
-              {bulkLoading ? <Spinner className="size-4" /> : null}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Bulk delete dialog */}
+        <Dialog
+          open={bulkConfirmDelete}
+          onOpenChange={(v) => {
+            if (!v) setBulkConfirmDelete(false)
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                Delete {selected.size} {selected.size === 1 ? 'entry' : 'entries'}?
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
+                {bulkLoading ? <Spinner className="size-4" /> : null}
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
     </>
   )
 }
