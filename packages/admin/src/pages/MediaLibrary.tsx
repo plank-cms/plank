@@ -758,7 +758,7 @@ export function MediaLibrary() {
             }
           }}
         >
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-4xl h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="truncate pr-6" title={preview?.filename}>
                 {preview?.filename}
