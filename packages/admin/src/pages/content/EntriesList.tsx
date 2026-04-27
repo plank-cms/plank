@@ -493,9 +493,9 @@ export function EntriesList() {
   const { timezone } = useSettings()
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
-  const limit = [10, 25, 50, 100].includes(Number(searchParams.get('limit')))
+  const limit = [10, 30, 50, 70, 100].includes(Number(searchParams.get('limit')))
     ? Number(searchParams.get('limit'))
-    : 25
+    : 10
 
   function setPage(p: number) {
     setSearchParams(
@@ -824,10 +824,7 @@ export function EntriesList() {
                 totalPages={totalPages}
                 limit={limit}
                 onPageChange={setPage}
-                onLimitChange={(l) => {
-                  setLimit(l)
-                  setPage(1)
-                }}
+                onLimitChange={setLimit}
               />
             </div>
           </TooltipProvider>
