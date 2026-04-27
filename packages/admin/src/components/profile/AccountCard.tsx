@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge.tsx'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible.tsx'
 import { PencilIcon, XIcon, CameraIcon, Trash2Icon } from 'lucide-react'
+import { uploadAvatarFile } from '@/lib/uploadMedia.ts'
 
 type MeResponse = { first_name: string | null; last_name: string | null; avatar_url: string | null; job_title: string | null; organization: string | null; country: string | null }
 type AvatarResponse = { avatarUrl: string }
@@ -46,18 +47,9 @@ export function AccountCard() {
     if (!file) return
     setUploadingAvatar(true)
     setAvatarError(null)
-    const token = localStorage.getItem('plank_token')
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const res = await fetch('/cms/admin/users/me/avatar', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body,
-      })
-      if (!res.ok) throw new Error('Upload failed.')
-      const data = (await res.json()) as AvatarResponse
-      updateUser({ avatarUrl: data.avatarUrl })
+      const avatarUrl = await uploadAvatarFile(file)
+      updateUser({ avatarUrl })
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {

@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { extname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { getSetting } from '../../lib/settings.js'
@@ -83,5 +84,14 @@ export const r2Provider: MediaProvider = {
   async getUrl(key) {
     const cfg = await getConfig()
     return buildStoredUrl(cfg, key)
+  },
+
+  async presign(filename, mimeType, options) {
+    const cfg = await getConfig()
+    const client = buildClient(cfg)
+    const key = buildKey(cfg, filename, options?.prefix)
+    const command = new PutObjectCommand({ Bucket: cfg.bucket!, Key: key, ContentType: mimeType })
+    const uploadUrl = await getSignedUrl(client, command, { expiresIn: 300 })
+    return { key, uploadUrl, publicUrl: buildStoredUrl(cfg, key) }
   },
 }

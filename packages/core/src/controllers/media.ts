@@ -3,6 +3,8 @@ import { randomBytes } from 'node:crypto'
 import { pool, createId } from '@plank/db'
 import { getProvider } from '../media/index.js'
 
+const MEDIA_PREFIX = 'media'
+
 type MediaRow = {
   id: string
   filename: string
@@ -76,7 +78,7 @@ export async function uploadMedia(req: Request, res: Response): Promise<void> {
     }
 
     const bundleId = randomBytes(8).toString('hex')
-    const prefix = [folderId, bundleId].filter(Boolean).join('/')
+    const prefix = [MEDIA_PREFIX, folderId, bundleId].filter(Boolean).join('/')
 
     // Strip the common root folder from relative paths (webkitRelativePath includes the folder name)
     const rootDir = m3u8File.originalname.includes('/')
@@ -110,9 +112,9 @@ export async function uploadMedia(req: Request, res: Response): Promise<void> {
     return
   }
 
-  // Regular single-file upload
+  // Regular single-file upload (local provider only — S3/R2 use presign + confirm)
   const file = files[0]
-  const { url, key } = await provider.upload(file, folderId ? { prefix: folderId } : undefined)
+  const { url, key } = await provider.upload(file, { prefix: folderId ? `${MEDIA_PREFIX}/${folderId}` : MEDIA_PREFIX })
   const id = createId()
 
   await pool.query(
@@ -143,6 +145,52 @@ export async function deleteMedia(req: Request, res: Response): Promise<void> {
   await pool.query('DELETE FROM plank_media WHERE id = $1', [id])
 
   res.status(204).end()
+}
+
+export async function presignMedia(req: Request, res: Response): Promise<void> {
+  const { filename, mimeType, folderId } = req.body as { filename: string; mimeType: string; folderId?: string | null }
+  if (!filename || !mimeType) {
+    res.status(400).json({ error: 'filename and mimeType are required' })
+    return
+  }
+
+  const provider = await getProvider()
+
+  if (!provider.presign) {
+    res.json({ mode: 'direct' })
+    return
+  }
+
+  if (folderId) {
+    const { rows } = await pool.query('SELECT id FROM plank_folders WHERE id = $1', [folderId])
+    if (!rows[0]) { res.status(404).json({ error: 'Folder not found' }); return }
+  }
+
+  const prefix = folderId ? `${MEDIA_PREFIX}/${folderId}` : MEDIA_PREFIX
+  const result = await provider.presign(filename, mimeType, { prefix })
+  res.json({ mode: 'presigned', ...result })
+}
+
+export async function confirmMedia(req: Request, res: Response): Promise<void> {
+  const { key, filename, mimeType, size, folderId } = req.body as {
+    key: string; filename: string; mimeType: string; size?: number; folderId?: string | null
+  }
+  if (!key || !filename || !mimeType) {
+    res.status(400).json({ error: 'key, filename and mimeType are required' })
+    return
+  }
+
+  const provider = await getProvider()
+  const url = await provider.getUrl(key)
+  const id = createId()
+
+  await pool.query(
+    `INSERT INTO plank_media (id, filename, url, provider_key, mime_type, size, folder_id, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, filename, url, key, mimeType, size ?? null, folderId ?? null, req.user!.id],
+  )
+
+  res.status(201).json({ id, url, filename })
 }
 
 export async function getMediaUrl(req: Request, res: Response): Promise<void> {

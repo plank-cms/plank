@@ -103,6 +103,43 @@ export async function uploadAvatar(req: Request, res: Response): Promise<void> {
   res.json({ avatarUrl, user: await resolveAvatarUrl(rows[0]) })
 }
 
+export async function presignAvatar(req: Request, res: Response): Promise<void> {
+  const { filename, mimeType } = req.body as { filename: string; mimeType: string }
+  if (!filename || !mimeType) {
+    res.status(400).json({ error: 'filename and mimeType are required' })
+    return
+  }
+
+  const provider = await getProvider()
+
+  if (!provider.presign) {
+    res.json({ mode: 'direct' })
+    return
+  }
+
+  const { key, uploadUrl } = await provider.presign(filename, mimeType, { prefix: 'avatars' })
+  res.json({ mode: 'presigned', key, uploadUrl })
+}
+
+export async function confirmAvatar(req: Request, res: Response): Promise<void> {
+  const { key } = req.body as { key: string }
+  if (!key) {
+    res.status(400).json({ error: 'key is required' })
+    return
+  }
+
+  const provider = await getProvider()
+
+  const { rows } = await pool.query<UserRow>(
+    `UPDATE plank_users SET avatar_url = $1 WHERE id = $2
+     RETURNING id, email, role_id, first_name, last_name, avatar_url, created_at`,
+    [key, req.user!.id],
+  )
+
+  const avatarUrl = await provider.getUrl(key)
+  res.json({ avatarUrl, user: await resolveAvatarUrl(rows[0]) })
+}
+
 export async function deleteAvatar(req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow>(
     'SELECT avatar_url FROM plank_users WHERE id = $1',

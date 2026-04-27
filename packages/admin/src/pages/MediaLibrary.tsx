@@ -22,6 +22,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb.tsx'
 import { useFetch } from '@/hooks/useFetch.ts'
+import { uploadMediaFile } from '@/lib/uploadMedia.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -389,11 +390,12 @@ export function MediaLibrary() {
   // ── Upload ───────
 
   async function uploadFilesWithPaths(filesWithPaths: { file: File; relativePath: string }[]) {
-    const token = localStorage.getItem('plank_token')
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     const hasM3U8 = filesWithPaths.some(({ relativePath }) => relativePath.endsWith('.m3u8'))
 
     if (hasM3U8) {
+      // HLS bundles always go through the server (need server-side bundleId generation)
+      const token = localStorage.getItem('plank_token')
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
       const body = new FormData()
       for (const { file, relativePath } of filesWithPaths) {
         body.append('files', file, relativePath)
@@ -404,30 +406,13 @@ export function MediaLibrary() {
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Upload failed.'
-        try {
-          msg = (JSON.parse(text) as { error?: string }).error ?? msg
-        } catch {
-          /* ignore */
-        }
+        try { msg = (JSON.parse(text) as { error?: string }).error ?? msg } catch { /* ignore */ }
         throw new Error(msg)
       }
     } else {
-      for (const { file } of filesWithPaths) {
-        const body = new FormData()
-        body.append('files', file, file.name)
-        if (currentFolderId) body.append('folder_id', currentFolderId)
-        const res = await fetch('/cms/admin/media', { method: 'POST', headers, body })
-        if (!res.ok) {
-          const text = await res.text()
-          let msg = 'Upload failed.'
-          try {
-            msg = (JSON.parse(text) as { error?: string }).error ?? msg
-          } catch {
-            /* ignore */
-          }
-          throw new Error(msg)
-        }
-      }
+      await Promise.all(
+        filesWithPaths.map(({ file }) => uploadMediaFile(file, { folderId: currentFolderId }))
+      )
     }
   }
 

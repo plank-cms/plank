@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { RichTextEditor } from '@/components/ui/custom/RichTextEditor.tsx'
+import { uploadMediaFile } from '@/lib/uploadMedia.ts'
 import {
   Command,
   CommandEmpty,
@@ -123,14 +124,8 @@ function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
 }
 
-async function uploadFile(file: File): Promise<{ id: string; url: string }> {
-  const token = localStorage.getItem('plank_token')
-  const auth = token ? { Authorization: `Bearer ${token}` } : {}
-  const body = new FormData()
-  body.append('files', file, file.name)
-  const res = await fetch('/cms/admin/media', { method: 'POST', headers: auth, body })
-  if (!res.ok) throw new Error('Upload failed.')
-  return res.json() as Promise<{ id: string; url: string }>
+async function uploadFile(file: File, folderId?: string | null): Promise<{ id: string; url: string }> {
+  return uploadMediaFile(file, { folderId })
 }
 
 type PickerFolder = { id: string; name: string; parent_id: string | null; item_count: number }

@@ -8,11 +8,18 @@ export interface UploadOptions {
   prefix?: string
 }
 
+export interface PresignResult {
+  key: string
+  uploadUrl: string
+  publicUrl: string
+}
+
 export interface MediaProvider {
   upload(file: Express.Multer.File, options?: UploadOptions): Promise<{ url: string; key: string }>
   uploadRaw(buffer: Buffer, exactKey: string, mimeType: string): Promise<{ url: string; key: string }>
   delete(key: string): Promise<void>
   getUrl(key: string): Promise<string>
+  presign?(filename: string, mimeType: string, options?: UploadOptions): Promise<PresignResult>
 }
 
 const providers: Record<string, MediaProvider> = {
