@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  PlusIcon, PencilIcon, Trash2Icon, FileTextIcon, ImageIcon,
-  CheckIcon, Settings2Icon, ChevronUpIcon, ChevronDownIcon,
-  PlusCircleIcon, MinusCircleIcon, FileIcon, CalendarClockIcon,
+  PlusIcon,
+  PencilIcon,
+  Trash2Icon,
+  FileTextIcon,
+  ImageIcon,
+  CheckIcon,
+  Settings2Icon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  PlusCircleIcon,
+  MinusCircleIcon,
+  FileIcon,
+  CalendarClockIcon,
 } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
@@ -12,17 +22,50 @@ import { formatDate, formatDatetime } from '@/lib/formatDate.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog.tsx'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog.tsx'
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from '@/components/ui/empty.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select.tsx'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { PaginationWrap } from '@/components/ui/custom/PaginationWrap.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip.tsx'
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components/ui/tooltip.tsx'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Types
 
-type FieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media' | 'relation' | 'uid'
+type FieldType =
+  | 'string'
+  | 'text'
+  | 'richtext'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'media'
+  | 'relation'
+  | 'uid'
 
 type FieldDef = { name: string; type: FieldType }
 
@@ -46,7 +89,7 @@ type EntriesResponse = { data: Entry[]; total: number; page: number; limit: numb
 type ColSort = { field: string; dir: 'asc' | 'desc' }
 type ViewConfig = { visibleFields: string[]; sort: ColSort }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 
 const DEFAULT_VISIBLE = 4
 const DEFAULT_SORT: ColSort = { field: 'created_at', dir: 'desc' }
@@ -62,14 +105,18 @@ function humanize(name: string) {
 }
 
 function defaultViewConfig(allFields: FieldDef[]): ViewConfig {
-  return { visibleFields: allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name), sort: DEFAULT_SORT }
+  return {
+    visibleFields: allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
+    sort: DEFAULT_SORT,
+  }
 }
 
 function parseViewConfig(saved: Partial<ViewConfig> | null, allFields: FieldDef[]): ViewConfig {
   if (!saved) return defaultViewConfig(allFields)
   const visible = (saved.visibleFields ?? []).filter((n) => allFields.some((f) => f.name === n))
   return {
-    visibleFields: visible.length > 0 ? visible : allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
+    visibleFields:
+      visible.length > 0 ? visible : allFields.slice(0, DEFAULT_VISIBLE).map((f) => f.name),
     sort: saved.sort ?? DEFAULT_SORT,
   }
 }
@@ -80,7 +127,7 @@ async function fetchViewConfig(slug: string): Promise<Partial<ViewConfig> | null
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) return null
-  const { value } = await res.json() as { value: Partial<ViewConfig> | null }
+  const { value } = (await res.json()) as { value: Partial<ViewConfig> | null }
   return value
 }
 
@@ -88,12 +135,15 @@ async function persistViewConfig(slug: string, config: ViewConfig): Promise<void
   const token = localStorage.getItem('plank_token')
   await fetch(`/cms/admin/users/me/prefs/view_${slug}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ value: config }),
   })
 }
 
-// ─── MediaThumbnail ───────────────────────────────────────────────────────────
+// MediaThumbnail
 
 function MediaThumbnail({ value }: { value: string }) {
   const [url, setUrl] = useState<string | null>(null)
@@ -118,7 +168,7 @@ function MediaThumbnail({ value }: { value: string }) {
 
   const isImage = /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i.test(url)
   if (isImage) {
-    return <img src={url} alt="" className="size-8 rounded object-cover" />
+    return <img src={url} alt="" className="size-8 object-cover" />
   }
 
   return (
@@ -129,7 +179,7 @@ function MediaThumbnail({ value }: { value: string }) {
   )
 }
 
-// ─── FieldCell ────────────────────────────────────────────────────────────────
+// FieldCell ─────
 
 function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   const { timezone } = useSettings()
@@ -139,7 +189,11 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   }
 
   if (field.type === 'boolean') {
-    return value ? <CheckIcon className="size-4 text-primary" /> : <span className="text-muted-foreground">—</span>
+    return value ? (
+      <CheckIcon className="size-4 text-primary" />
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    )
   }
 
   if (field.type === 'datetime') {
@@ -166,13 +220,19 @@ function FieldCell({ field, value }: { field: FieldDef; value: unknown }) {
   const text = String(value)
   const isUid = field.type === 'uid'
   return (
-    <span className={isUid ? 'font-mono text-xs text-muted-foreground truncate max-w-40 block' : 'font-medium truncate max-w-50 block'}>
+    <span
+      className={
+        isUid
+          ? 'font-mono text-xs text-muted-foreground truncate max-w-40 block'
+          : 'font-medium truncate max-w-50 block'
+      }
+    >
       {text.length > 60 ? text.slice(0, 60) + '…' : text}
     </span>
   )
 }
 
-// ─── AuthorAvatar ─────────────────────────────────────────────────────────────
+// AuthorAvatar ──
 
 function AuthorAvatar({ entry }: { entry: Entry }) {
   const first = entry._author_first_name
@@ -199,7 +259,7 @@ function AuthorAvatar({ entry }: { entry: Entry }) {
   )
 }
 
-// ─── StatusBadge ──────────────────────────────────────────────────────────────
+// StatusBadge ───
 
 function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
   const { timezone } = useSettings()
@@ -222,13 +282,17 @@ function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
     }
     return v
   }
-  const isStale = entry.published_data != null && fields.some(
-    (f) => JSON.stringify(normalize(entry[f.name], f.type)) !== JSON.stringify(normalize(entry.published_data![f.name], f.type))
-  )
+  const isStale =
+    entry.published_data != null &&
+    fields.some(
+      (f) =>
+        JSON.stringify(normalize(entry[f.name], f.type)) !==
+        JSON.stringify(normalize(entry.published_data![f.name], f.type)),
+    )
   return <Badge variant={isStale ? 'secondary' : 'default'}>Published</Badge>
 }
 
-// ─── ConfigureViewDialog ──────────────────────────────────────────────────────
+// ConfigureViewDialog ──────────────────────────────────────────────────────
 
 function ConfigureViewDialog({
   open,
@@ -292,7 +356,9 @@ function ConfigureViewDialog({
         <div className="flex flex-col flex-1 min-h-0 gap-5 py-1">
           {/* Displayed fields */}
           <div className="flex-none">
-            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Displayed fields</p>
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Displayed fields
+            </p>
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">No fields selected.</p>
             ) : (
@@ -300,11 +366,12 @@ function ConfigureViewDialog({
                 {visible.map((name, idx) => {
                   const field = allFields.find((f) => f.name === name)
                   return (
-                    <li key={name} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                    <li
+                      key={name}
+                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    >
                       <span className="flex-1 font-medium">{humanize(name)}</span>
-                      {field && (
-                        <span className="text-xs text-muted-foreground">{field.type}</span>
-                      )}
+                      {field && <span className="text-xs text-muted-foreground">{field.type}</span>}
                       <button
                         type="button"
                         disabled={idx === 0}
@@ -338,10 +405,15 @@ function ConfigureViewDialog({
           {/* Available fields */}
           {hidden.length > 0 && (
             <div className="flex flex-col flex-1 min-h-0">
-              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide flex-none">Available fields</p>
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide flex-none">
+                Available fields
+              </p>
               <ul className="space-y-1 overflow-y-auto flex-1 min-h-0">
                 {hidden.map((field) => (
-                  <li key={field.name} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                  <li
+                    key={field.name}
+                    className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
+                  >
                     <span className="flex-1">{humanize(field.name)}</span>
                     <span className="text-xs">{field.type}</span>
                     <button
@@ -359,19 +431,29 @@ function ConfigureViewDialog({
 
           {/* Sort */}
           <div className="flex-none">
-            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort entries</p>
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Sort entries
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              <Select value={sort.field} onValueChange={(v) => setSort((s) => ({ ...s, field: v }))}>
+              <Select
+                value={sort.field}
+                onValueChange={(v) => setSort((s) => ({ ...s, field: v }))}
+              >
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {sortOptions.map((opt) => (
-                    <SelectItem key={opt.name} value={opt.name}>{opt.label}</SelectItem>
+                    <SelectItem key={opt.name} value={opt.name}>
+                      {opt.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={sort.dir} onValueChange={(v) => setSort((s) => ({ ...s, dir: v as 'asc' | 'desc' }))}>
+              <Select
+                value={sort.dir}
+                onValueChange={(v) => setSort((s) => ({ ...s, dir: v as 'asc' | 'desc' }))}
+              >
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -385,8 +467,15 @@ function ConfigureViewDialog({
         </div>
 
         <DialogFooter className="flex-none">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => { onApply({ visibleFields: visible, sort }); onOpenChange(false) }}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              onApply({ visibleFields: visible, sort })
+              onOpenChange(false)
+            }}
+          >
             Apply
           </Button>
         </DialogFooter>
@@ -395,7 +484,7 @@ function ConfigureViewDialog({
   )
 }
 
-// ─── EntriesList ──────────────────────────────────────────────────────────────
+// EntriesList ───
 
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
@@ -403,13 +492,28 @@ export function EntriesList() {
   const { timezone } = useSettings()
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
-  const limit = [10, 25, 50, 100].includes(Number(searchParams.get('limit'))) ? Number(searchParams.get('limit')) : 25
+  const limit = [10, 25, 50, 100].includes(Number(searchParams.get('limit')))
+    ? Number(searchParams.get('limit'))
+    : 25
 
   function setPage(p: number) {
-    setSearchParams((prev) => { prev.set('page', String(p)); return prev }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        prev.set('page', String(p))
+        return prev
+      },
+      { replace: true },
+    )
   }
   function setLimit(l: number) {
-    setSearchParams((prev) => { prev.set('limit', String(l)); prev.set('page', '1'); return prev }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        prev.set('limit', String(l))
+        prev.set('page', '1')
+        return prev
+      },
+      { replace: true },
+    )
   }
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [configOpen, setConfigOpen] = useState(false)
@@ -420,7 +524,7 @@ export function EntriesList() {
   const { loading: deleting, request: requestDelete } = useApi()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
-    slug ? `/cms/admin/content-types/${slug}` : null
+    slug ? `/cms/admin/content-types/${slug}` : null,
   )
 
   useEffect(() => {
@@ -430,15 +534,24 @@ export function EntriesList() {
       .catch(() => setViewConfig(defaultViewConfig(ct.fields)))
   }, [ct?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setSelected(new Set()) }, [page, limit])
+  useEffect(() => {
+    setSelected(new Set())
+  }, [page, limit])
 
-  const config = viewConfig ?? { visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [], sort: DEFAULT_SORT }
+  const config = viewConfig ?? {
+    visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [],
+    sort: DEFAULT_SORT,
+  }
   const { sort } = config
 
-  const { data: entries, loading: loadingEntries, refetch } = useFetch<EntriesResponse>(
+  const {
+    data: entries,
+    loading: loadingEntries,
+    refetch,
+  } = useFetch<EntriesResponse>(
     slug
       ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}&sort=${sort.field}&order=${sort.dir}`
-      : null
+      : null,
   )
 
   async function handleDelete() {
@@ -475,10 +588,19 @@ export function EntriesList() {
     setBulkLoading(true)
     try {
       const token = localStorage.getItem('plank_token')
-      const headers: HeadersInit = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-      await Promise.all([...selected].map((id) =>
-        fetch(`/cms/admin/entries/${slug}/${id}/status`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'draft' }) })
-      ))
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      }
+      await Promise.all(
+        [...selected].map((id) =>
+          fetch(`/cms/admin/entries/${slug}/${id}/status`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ status: 'draft' }),
+          }),
+        ),
+      )
       setSelected(new Set())
       refetch()
     } finally {
@@ -492,9 +614,11 @@ export function EntriesList() {
     try {
       const token = localStorage.getItem('plank_token')
       const headers: HeadersInit = { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-      await Promise.all([...selected].map((id) =>
-        fetch(`/cms/admin/entries/${slug}/${id}`, { method: 'DELETE', headers })
-      ))
+      await Promise.all(
+        [...selected].map((id) =>
+          fetch(`/cms/admin/entries/${slug}/${id}`, { method: 'DELETE', headers }),
+        ),
+      )
       setBulkConfirmDelete(false)
       setSelected(new Set())
       refetch()
@@ -552,7 +676,9 @@ export function EntriesList() {
       {!loadingEntries && (entries?.data ?? []).length === 0 && (
         <Empty className="border">
           <EmptyHeader>
-            <EmptyMedia variant="icon"><FileTextIcon /></EmptyMedia>
+            <EmptyMedia variant="icon">
+              <FileTextIcon />
+            </EmptyMedia>
             <EmptyTitle>No entries yet</EmptyTitle>
             <EmptyDescription>Create your first entry for {ct.name}.</EmptyDescription>
           </EmptyHeader>
@@ -568,11 +694,21 @@ export function EntriesList() {
             <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
               <span className="text-sm font-medium">{selected.size} selected</span>
               <div className="flex items-center gap-2 ml-auto">
-                <Button variant="outline" size="sm" disabled={bulkLoading} onClick={handleBulkUnpublish}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkLoading}
+                  onClick={handleBulkUnpublish}
+                >
                   {bulkLoading ? <Spinner className="size-3.5" /> : null}
                   Unpublish
                 </Button>
-                <Button variant="destructive" size="sm" disabled={bulkLoading} onClick={() => setBulkConfirmDelete(true)}>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={bulkLoading}
+                  onClick={() => setBulkConfirmDelete(true)}
+                >
                   <Trash2Icon className="size-3.5" />
                   Delete
                 </Button>
@@ -592,13 +728,18 @@ export function EntriesList() {
                     />
                   </th>
                   {visibleFields.map((field) => (
-                    <th key={field.name} className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    <th
+                      key={field.name}
+                      className="px-4 py-3 text-left font-medium text-muted-foreground"
+                    >
                       {humanize(field.name)}
                     </th>
                   ))}
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Updated</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Pub / Sch</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Pub / Sch
+                  </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
                   <th className="px-4 py-3" />
@@ -606,7 +747,10 @@ export function EntriesList() {
               </thead>
               <tbody className="divide-y divide-border">
                 {(entries?.data ?? []).map((entry) => (
-                  <tr key={entry.id} className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}>
+                  <tr
+                    key={entry.id}
+                    className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}
+                  >
                     <td className="w-10 px-4 py-3">
                       <Checkbox
                         checked={selected.has(entry.id)}
@@ -668,7 +812,10 @@ export function EntriesList() {
               totalPages={totalPages}
               limit={limit}
               onPageChange={setPage}
-              onLimitChange={(l) => { setLimit(l); setPage(1) }}
+              onLimitChange={(l) => {
+                setLimit(l)
+                setPage(1)
+              }}
             />
           </div>
         </TooltipProvider>
@@ -686,14 +833,21 @@ export function EntriesList() {
       )}
 
       {/* Delete dialog */}
-      <Dialog open={Boolean(deletingId)} onOpenChange={(v) => { if (!v) setDeletingId(null) }}>
+      <Dialog
+        open={Boolean(deletingId)}
+        onOpenChange={(v) => {
+          if (!v) setDeletingId(null)
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete entry?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeletingId(null)}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? <Spinner className="size-4" /> : null}
               Delete
@@ -703,14 +857,23 @@ export function EntriesList() {
       </Dialog>
 
       {/* Bulk delete dialog */}
-      <Dialog open={bulkConfirmDelete} onOpenChange={(v) => { if (!v) setBulkConfirmDelete(false) }}>
+      <Dialog
+        open={bulkConfirmDelete}
+        onOpenChange={(v) => {
+          if (!v) setBulkConfirmDelete(false)
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete {selected.size} {selected.size === 1 ? 'entry' : 'entries'}?</DialogTitle>
+            <DialogTitle>
+              Delete {selected.size} {selected.size === 1 ? 'entry' : 'entries'}?
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setBulkConfirmDelete(false)}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkLoading}>
               {bulkLoading ? <Spinner className="size-4" /> : null}
               Delete
