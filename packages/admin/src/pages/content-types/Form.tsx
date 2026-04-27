@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useApi } from '@/hooks/useApi.ts'
 import { useFetch } from '@/hooks/useFetch.ts'
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import {
@@ -226,6 +227,9 @@ export function ContentTypeForm() {
   const stringFields = fields.filter((f) => f.type === 'string')
 
   const existingFieldNames = fields.map((f) => f.name)
+
+  useKeyboardShortcut('mod+s', handleSave, { enabled: isDirty && !saving && !!name.trim(), label: 'Save content type' })
+  useKeyboardShortcut('mod+k', () => setAddOpen(true), { label: 'Add field' })
 
   if (!isNew && loadingExisting) {
     return (

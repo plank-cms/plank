@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { Trash2Icon, CalendarClockIcon, ChevronDownIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { useSettings } from '@/context/settings.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
@@ -265,6 +266,10 @@ export function EntryForm() {
   const busy = saving || patching
   const canPublish = isDirty || status === 'draft' || status === 'scheduled' || isPublishedStale
   const canSchedule = !!(schedDate && schedTime)
+
+  const saveDraftEnabled = !busy && (status === 'scheduled' ? true : isDirty)
+  useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })
+  useKeyboardShortcut('mod+shift+p', handlePublish, { enabled: canPublish && !busy, label: 'Publish' })
 
   if (loading) {
     return (

@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/auth.tsx'
 import { SettingsProvider } from './context/settings.tsx'
+import { KeyboardShortcutsProvider } from './context/keyboardShortcuts.tsx'
 import { ProtectedRoute } from './components/ProtectedRoute.tsx'
 import { Layout } from './components/Layout.tsx'
 import { Login } from './pages/Login.tsx'
@@ -82,7 +83,9 @@ export default function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <RouterProvider router={router} />
+        <KeyboardShortcutsProvider>
+          <RouterProvider router={router} />
+        </KeyboardShortcutsProvider>
       </SettingsProvider>
     </AuthProvider>
   )
