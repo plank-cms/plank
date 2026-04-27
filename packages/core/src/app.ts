@@ -15,6 +15,7 @@ app.use(helmet({
     directives: {
       ...helmet.contentSecurityPolicy.getDefaultDirectives(),
       'img-src': ["'self'", 'data:', 'https:'],
+      'connect-src': ["'self'", 'https:'],
     },
   },
 }))
