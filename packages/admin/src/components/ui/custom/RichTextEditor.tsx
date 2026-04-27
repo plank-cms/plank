@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
+import { Image } from '@tiptap/extension-image'
 import {
   BoldIcon,
   ItalicIcon,
@@ -17,6 +18,7 @@ import {
   LinkIcon,
   Unlink2Icon,
   WrapTextIcon,
+  ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 
@@ -24,6 +26,7 @@ type RichTextEditorProps = {
   value: string
   onChange: (json: string) => void
   placeholder?: string
+  onInsertImage?: () => Promise<string | null>
 }
 
 type ToolbarButtonProps = {
@@ -61,13 +64,17 @@ function ToolbarDivider() {
   return <div className="mx-0.5 h-4 w-px bg-border" />
 }
 
-export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, onInsertImage }: RichTextEditorProps) {
   const [isEmpty, setIsEmpty] = useState(!value)
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         link: { openOnClick: false, HTMLAttributes: { class: 'text-primary underline' } },
+      }),
+      Image.configure({
+        HTMLAttributes: { class: 'max-w-full rounded' },
+        allowedAttributes: ['src'],
       }),
     ],
     content: (() => {
@@ -104,6 +111,12 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     if (current !== value) editor.commands.setContent(incoming, { emitUpdate: false })
     setIsEmpty(editor.isEmpty)
   }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleInsertImage() {
+    if (!editor || !onInsertImage) return
+    const url = await onInsertImage()
+    if (url) editor.chain().focus().setImage({ src: url }).run()
+  }
 
   function handleSetLink() {
     if (!editor) return
@@ -231,6 +244,12 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         </ToolbarButton>
 
         <ToolbarDivider />
+
+        {onInsertImage && (
+          <ToolbarButton title="Insert image" onClick={handleInsertImage}>
+            <ImageIcon className="size-3.5" />
+          </ToolbarButton>
+        )}
 
         <ToolbarButton
           title="Hard break (Shift + Enter)"

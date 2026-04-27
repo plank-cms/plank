@@ -1185,6 +1185,118 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const resolveRef = useRef<((url: string | null) => void) | null>(null)
+  const [insertOpen, setInsertOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  function onInsertImage(): Promise<string | null> {
+    setInsertOpen(true)
+    return new Promise((resolve) => {
+      resolveRef.current = resolve
+    })
+  }
+
+  function resolveWith(url: string | null) {
+    resolveRef.current?.(url)
+    resolveRef.current = null
+  }
+
+  function handleInsertOpenChange(open: boolean) {
+    if (!open) resolveWith(null)
+    setInsertOpen(open)
+  }
+
+  async function handleFile(file: File) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const data = await uploadFile(file)
+      resolveWith(data.url)
+      setInsertOpen(false)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  return (
+    <>
+      <RichTextEditor
+        value={String(value ?? '')}
+        onChange={onChange}
+        placeholder="Type or add your content here..."
+        onInsertImage={onInsertImage}
+      />
+      <Dialog open={insertOpen} onOpenChange={handleInsertOpenChange}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Insert Image</DialogTitle>
+          </DialogHeader>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleFile(f)
+            }}
+          />
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              const f = e.dataTransfer.files[0]
+              if (f) handleFile(f)
+            }}
+            className="flex w-full gap-2 rounded-md border border-dashed p-3"
+          >
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+            >
+              <UploadIcon className="size-4" />
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <div className="w-px bg-border" />
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => setPickerOpen(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
+            >
+              <FolderOpenIcon className="size-4" />
+              Library
+            </button>
+          </div>
+          {uploadError && <p className="mt-1 text-xs text-destructive">{uploadError}</p>}
+        </DialogContent>
+      </Dialog>
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={(open) => {
+          if (!open && !insertOpen) resolveWith(null)
+          setPickerOpen(open)
+        }}
+        allowedTypes={['image']}
+        onSelect={(item) => {
+          resolveWith(item.url)
+          setPickerOpen(false)
+          setInsertOpen(false)
+        }}
+      />
+    </>
+  )
+}
+
 export function FieldInput({ field, value, onChange, allValues }: FieldInputProps) {
   const uidManual = useRef(false)
   const { timezone } = useSettings()
@@ -1214,13 +1326,7 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
   }
 
   if (field.type === 'richtext') {
-    return (
-      <RichTextEditor
-        value={String(value ?? '')}
-        onChange={onChange}
-        placeholder="Type or add your content here..."
-      />
-    )
+    return <RichTextInput value={value} onChange={onChange} />
   }
 
   if (field.type === 'text') {
