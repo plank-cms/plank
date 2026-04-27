@@ -13,6 +13,9 @@ type Row = Record<string, unknown> & {
   _author_first_name?: string | null
   _author_last_name?: string | null
   _author_avatar_url?: string | null
+  _author_job_title?: string | null
+  _author_organization?: string | null
+  _author_country?: string | null
 }
 
 // Resolves media IDs to fresh URLs in-place across a list of serialized entries
@@ -138,7 +141,7 @@ async function resolveAuthorAvatars(entries: Record<string, unknown>[]): Promise
 
 // Builds an ordered response: id first, then CT fields in builder order, then system fields
 function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<string, unknown> {
-  const { published_data, _author_first_name, _author_last_name, _author_avatar_url, ...rest } = row
+  const { published_data, _author_first_name, _author_last_name, _author_avatar_url, _author_job_title, _author_organization, _author_country, ...rest } = row
   const source = statusParam === 'published' && published_data ? published_data : rest
 
   const out: Record<string, unknown> = { id: row.id }
@@ -150,7 +153,14 @@ function serializeEntry(row: Row, ct: ContentType, statusParam: string): Record<
   out.created_at = row.created_at
   out.updated_at = row.updated_at
   out.author = _author_first_name || _author_last_name
-    ? { first_name: _author_first_name ?? null, last_name: _author_last_name ?? null, avatar_url: _author_avatar_url ?? null }
+    ? {
+        first_name: _author_first_name ?? null,
+        last_name: _author_last_name ?? null,
+        avatar_url: _author_avatar_url ?? null,
+        job_title: _author_job_title ?? null,
+        organization: _author_organization ?? null,
+        country: _author_country ?? null,
+      }
     : null
   return out
 }
@@ -169,7 +179,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
         : ''
     const values: unknown[] = statusClause ? [statusParam] : []
     const { rows } = await pool.query(
-      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country
        FROM ${ct.tableName} e
        LEFT JOIN plank_users u ON u.id = e.created_by
        ${statusClause} LIMIT 1`,
@@ -223,7 +233,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
 
   const [{ rows }, { rows: countRows }] = await Promise.all([
     pool.query(
-      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country
        FROM ${ct.tableName} e
        LEFT JOIN plank_users u ON u.id = e.created_by
        ${where} ORDER BY e.${sortField} ${sortDir} LIMIT $${limitParam} OFFSET $${offsetParam}`,
@@ -254,7 +264,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   const values: unknown[] = statusClause ? [req.params.id, statusParam] : [req.params.id]
 
   const { rows } = await pool.query(
-    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url
+    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country
      FROM ${ct.tableName} e
      LEFT JOIN plank_users u ON u.id = e.created_by
      WHERE e.id = $1${statusClause}`,

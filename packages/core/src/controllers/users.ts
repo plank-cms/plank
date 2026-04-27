@@ -25,9 +25,12 @@ const ChangePasswordSchema = z.object({
 const UpdateMeSchema = z.object({
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
+  jobTitle: z.string().max(100).optional(),
+  organization: z.string().max(150).optional(),
+  country: z.string().max(100).optional(),
 })
 
-type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; created_at: Date }
+type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; job_title: string | null; organization: string | null; country: string | null; created_at: Date }
 
 async function resolveAvatarUrl(row: UserRow): Promise<UserRow> {
   if (!row.avatar_url || row.avatar_url.startsWith('http')) return row
@@ -44,7 +47,8 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
 
 export async function getMe(req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow & { permissions: string[] }>(
-    `SELECT u.id, u.email, u.role_id, u.first_name, u.last_name, u.avatar_url, u.created_at,
+    `SELECT u.id, u.email, u.role_id, u.first_name, u.last_name, u.avatar_url,
+            u.job_title, u.organization, u.country, u.created_at,
             r.permissions
      FROM plank_users u
      JOIN plank_roles r ON r.id = u.role_id
@@ -63,13 +67,18 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
     return
   }
 
-  const { firstName, lastName } = parsed.data
+  const { firstName, lastName, jobTitle, organization, country } = parsed.data
   const { rows } = await pool.query<UserRow>(
     `UPDATE plank_users
-     SET first_name = COALESCE($1, first_name), last_name = COALESCE($2, last_name)
-     WHERE id = $3
-     RETURNING id, email, role_id, first_name, last_name, avatar_url, created_at`,
-    [firstName ?? null, lastName ?? null, req.user!.id],
+     SET first_name   = COALESCE($1, first_name),
+         last_name    = COALESCE($2, last_name),
+         job_title    = COALESCE($3, job_title),
+         organization = COALESCE($4, organization),
+         country      = COALESCE($5, country)
+     WHERE id = $6
+     RETURNING id, email, role_id, first_name, last_name, avatar_url,
+               job_title, organization, country, created_at`,
+    [firstName ?? null, lastName ?? null, jobTitle ?? null, organization ?? null, country ?? null, req.user!.id],
   )
   if (!rows[0]) { res.status(404).json({ error: 'User not found' }); return }
   res.json(await resolveAvatarUrl(rows[0]))

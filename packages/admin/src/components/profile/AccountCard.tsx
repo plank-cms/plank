@@ -10,7 +10,7 @@ import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible.tsx'
 import { PencilIcon, XIcon, CameraIcon, Trash2Icon } from 'lucide-react'
 
-type MeResponse = { first_name: string | null; last_name: string | null; avatar_url: string | null }
+type MeResponse = { first_name: string | null; last_name: string | null; avatar_url: string | null; job_title: string | null; organization: string | null; country: string | null }
 type AvatarResponse = { avatarUrl: string }
 
 
@@ -26,11 +26,17 @@ export function AccountCard() {
   const [editing, setEditing] = useState(false)
   const [firstName, setFirstName] = useState(user?.firstName ?? '')
   const [lastName, setLastName] = useState(user?.lastName ?? '')
+  const [jobTitle, setJobTitle] = useState(user?.jobTitle ?? '')
+  const [organization, setOrganization] = useState(user?.organization ?? '')
+  const [country, setCountry] = useState(user?.country ?? '')
 
   function handleEditToggle() {
     if (editing) {
       setFirstName(user?.firstName ?? '')
       setLastName(user?.lastName ?? '')
+      setJobTitle(user?.jobTitle ?? '')
+      setOrganization(user?.organization ?? '')
+      setCountry(user?.country ?? '')
     }
     setEditing(!editing)
   }
@@ -76,8 +82,14 @@ export function AccountCard() {
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     try {
-      const updated = await request('/cms/admin/users/me', 'PATCH', { firstName, lastName })
-      updateUser({ firstName: updated.first_name, lastName: updated.last_name })
+      const updated = await request('/cms/admin/users/me', 'PATCH', { firstName, lastName, jobTitle, organization, country })
+      updateUser({
+        firstName: updated.first_name,
+        lastName: updated.last_name,
+        jobTitle: updated.job_title,
+        organization: updated.organization,
+        country: updated.country,
+      })
       setEditing(false)
     } catch {
       /* error shown via saveError */
@@ -138,8 +150,16 @@ export function AccountCard() {
                   ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
                   : user?.email}
               </p>
+              {(user?.jobTitle || user?.organization) && (
+                <p className="text-sm">
+                  {[user.jobTitle, user.organization].filter(Boolean).join(' · ')}
+                </p>
+              )}
               <p className="text-muted-foreground text-sm">{user?.email}</p>
-              <Badge className="mt-2 capitalize">{user?.role}</Badge>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Badge className="capitalize">{user?.role}</Badge>
+                {user?.country && <Badge variant="outline">{user.country}</Badge>}
+              </div>
             </div>
           </div>
 
@@ -160,6 +180,30 @@ export function AccountCard() {
                     id="lastName"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="jobTitle">Job title</Label>
+                  <Input
+                    id="jobTitle"
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="organization">Organization</Label>
+                  <Input
+                    id="organization"
+                    value={organization}
+                    onChange={(e) => setOrganization(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    id="country"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
                   />
                 </div>
               </div>

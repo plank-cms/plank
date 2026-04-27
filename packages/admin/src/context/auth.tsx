@@ -8,6 +8,9 @@ interface User {
   firstName: string | null
   lastName: string | null
   avatarUrl: string | null
+  jobTitle: string | null
+  organization: string | null
+  country: string | null
 }
 
 interface AuthState {
