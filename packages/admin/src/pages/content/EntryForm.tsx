@@ -560,15 +560,17 @@ export function EntryForm() {
             <div />
           </div>
           <div>
-            <Tabs value={activeLocale} onValueChange={(v) => setActiveLocale(v)}>
-              <TabsList>
-                {locales.map((l) => (
-                  <TabsTrigger key={l} value={l}>
-                    {l.toUpperCase()}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            {localizationEnabled && (
+              <Tabs value={activeLocale} onValueChange={(v) => setActiveLocale(v)}>
+                <TabsList>
+                  {locales.map((l) => (
+                    <TabsTrigger key={l} value={l}>
+                      {l.toUpperCase()}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-6 gap-4">
