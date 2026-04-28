@@ -8,7 +8,18 @@ import { Label } from '@/components/ui/label.tsx'
 
 interface AuthResponse {
   token: string
-  user: { id: string; email: string; role: string; permissions: string[]; firstName: string | null; lastName: string | null; avatarUrl: string | null }
+  user: {
+    id: string
+    email: string
+    role: string
+    permissions: string[]
+    firstName: string | null
+    lastName: string | null
+    avatarUrl: string | null
+    jobTitle?: string | null
+    organization?: string | null
+    country?: string | null
+  }
 }
 
 export function Login() {
@@ -43,7 +54,15 @@ export function Login() {
         await request('/cms/auth/register', 'POST', { email, password })
       }
       const res = await request('/cms/auth/login', 'POST', { email, password })
-      login(res.user, res.token)
+      login(
+        {
+          ...res.user,
+          jobTitle: res.user.jobTitle ?? null,
+          organization: res.user.organization ?? null,
+          country: res.user.country ?? null,
+        },
+        res.token,
+      )
       navigate('/')
     } catch {
       setValidationError(
@@ -61,7 +80,11 @@ export function Login() {
       {/* Left panel — form */}
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex items-center">
-          <img src={`${import.meta.env.BASE_URL}plank-logo-w.svg`} alt="Plank CMS" className="h-10" />
+          <img
+            src={`${import.meta.env.BASE_URL}plank-logo-w.svg`}
+            alt="Plank CMS"
+            className="h-10"
+          />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
@@ -114,9 +137,7 @@ export function Login() {
                 </div>
               )}
 
-              {displayError && (
-                <p className="text-sm text-destructive">{displayError}</p>
-              )}
+              {displayError && <p className="text-sm text-destructive">{displayError}</p>}
 
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? '...' : needsSetup ? 'Create account' : 'Login'}
