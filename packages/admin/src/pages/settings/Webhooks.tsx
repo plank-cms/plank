@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { PlusIcon, Trash2Icon, WebhookIcon } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAuth } from '@/context/auth.tsx'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -48,8 +49,12 @@ const ALL_EVENTS = [
 const EMPTY_FORM: CreateForm = { name: '', url: '', events: [] }
 
 export function SettingsWebhooks() {
+  const { user } = useAuth()
   const { data: webhooks, loading, refetch } = useFetch<Webhook[]>('/cms/admin/webhooks')
   const { request, loading: submitting, error: apiError } = useApi<Webhook>()
+  const permissions = user?.permissions ?? []
+  const canWrite = permissions.includes('*') || permissions.includes('settings:webhooks:write')
+  const canDelete = permissions.includes('*') || permissions.includes('settings:webhooks:delete')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)
@@ -96,14 +101,16 @@ export function SettingsWebhooks() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 text-destructive hover:text-destructive"
-          onClick={() => setDeleteWebhook(row.original)}
-        >
-          <Trash2Icon className="size-3.5" />
-        </Button>
+        canDelete ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 text-destructive hover:text-destructive"
+            onClick={() => setDeleteWebhook(row.original)}
+          >
+            <Trash2Icon className="size-3.5" />
+          </Button>
+        ) : null
       ),
     },
   ]
@@ -151,7 +158,7 @@ export function SettingsWebhooks() {
               Notify external services when content events occur.
             </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} disabled={!canWrite}>
             <PlusIcon className="size-4" />
             New webhook
           </Button>
@@ -270,7 +277,7 @@ export function SettingsWebhooks() {
               <Button
                 type="submit"
                 form="create-webhook-form"
-                disabled={submitting || form.events.length === 0}
+                disabled={submitting || form.events.length === 0 || !canWrite}
               >
                 {submitting ? 'Creating…' : 'Create webhook'}
               </Button>
@@ -297,7 +304,7 @@ export function SettingsWebhooks() {
               <Button variant="outline" onClick={() => setDeleteWebhook(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
+              <Button variant="destructive" onClick={handleDelete} disabled={submitting || !canDelete}>
                 {submitting ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>

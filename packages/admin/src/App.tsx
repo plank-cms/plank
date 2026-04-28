@@ -47,7 +47,7 @@ const router = createBrowserRouter([
       {
         path: 'content-types',
         element: (
-          <ProtectedRoute permission="content-types:read">
+          <ProtectedRoute permission="content-types:write">
             <ContentTypeBuilder />
           </ProtectedRoute>
         ),
@@ -60,17 +60,52 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: (
-          <ProtectedRoute permission="settings:read">
+          <ProtectedRoute permission="settings:overview:read">
             <Settings />
           </ProtectedRoute>
         ),
         children: [
           { index: true, element: <Navigate to="overview" replace /> },
-          { path: 'overview', element: <SettingsOverview /> },
-          { path: 'users', element: <SettingsUsers /> },
-          { path: 'roles', element: <SettingsRoles /> },
-          { path: 'api-tokens', element: <SettingsApiTokens /> },
-          { path: 'webhooks', element: <SettingsWebhooks /> },
+          {
+            path: 'overview',
+            element: (
+              <ProtectedRoute permission="settings:overview:read">
+                <SettingsOverview />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'users',
+            element: (
+              <ProtectedRoute permission="settings:users:read">
+                <SettingsUsers />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'roles',
+            element: (
+              <ProtectedRoute permission="settings:roles:read">
+                <SettingsRoles />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'api-tokens',
+            element: (
+              <ProtectedRoute permission="settings:api-tokens:read">
+                <SettingsApiTokens />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'webhooks',
+            element: (
+              <ProtectedRoute permission="settings:webhooks:read">
+                <SettingsWebhooks />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       { path: 'profile', element: <Profile /> },

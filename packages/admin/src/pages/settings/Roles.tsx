@@ -26,14 +26,14 @@ import HeaderFixed from '@/components/Header'
 type Role = { id: string; name: string; permissions: string[] }
 
 const RESOURCES = [
-  { key: 'content-types', label: 'Content Types' },
-  { key: 'entries', label: 'Entries' },
-  { key: 'media', label: 'Media' },
-  { key: 'settings:overview', label: 'Settings / Overview' },
-  { key: 'settings:users', label: 'Settings / Users' },
-  { key: 'settings:roles', label: 'Settings / Roles' },
-  { key: 'settings:api-tokens', label: 'Settings / API Tokens' },
-  { key: 'settings:webhooks', label: 'Settings / Webhooks' },
+  { key: 'content-types', label: 'Content Types', actions: ['read', 'write', 'delete'] as const },
+  { key: 'entries', label: 'Entries', actions: ['read', 'write', 'delete'] as const },
+  { key: 'media', label: 'Media', actions: ['read', 'write', 'delete'] as const },
+  { key: 'settings:overview', label: 'Settings / Overview', actions: ['read', 'write'] as const },
+  { key: 'settings:users', label: 'Settings / Users', actions: ['read', 'write', 'delete'] as const },
+  { key: 'settings:roles', label: 'Settings / Roles', actions: ['read', 'write'] as const },
+  { key: 'settings:api-tokens', label: 'Settings / API Tokens', actions: ['read', 'write', 'delete'] as const },
+  { key: 'settings:webhooks', label: 'Settings / Webhooks', actions: ['read', 'write', 'delete'] as const },
 ] as const
 
 const ACTIONS = [
@@ -46,6 +46,10 @@ type PermissionMap = Record<string, Set<string>>
 
 function toMap(roles: Role[]): PermissionMap {
   return Object.fromEntries(roles.map((r) => [r.id, new Set(r.permissions)]))
+}
+
+function supportsAction(actions: readonly string[], action: string): boolean {
+  return actions.includes(action)
 }
 
 export function SettingsRoles() {
@@ -176,7 +180,7 @@ export function SettingsRoles() {
                   </TableCell>
                 </TableRow>
               ) : (
-                RESOURCES.map(({ key: resource, label }) => (
+                RESOURCES.map(({ key: resource, label, actions }) => (
                   <TableRow key={resource}>
                     <TableCell className="font-medium">{label}</TableCell>
 
@@ -186,22 +190,31 @@ export function SettingsRoles() {
                           key={action.key}
                           className={`text-center ${i === 0 ? 'border-l' : ''}`}
                         >
-                          <Checkbox checked disabled />
+                          {supportsAction(actions, action.key) ? (
+                            <Checkbox checked disabled />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                       ))}
 
                     {editableRoles.map((role) =>
                       ACTIONS.map((action, i) => {
+                        const supported = supportsAction(actions, action.key)
                         const permission = `${resource}:${action.key}`
                         return (
                           <TableCell
                             key={`${role.id}-${action.key}`}
                             className={`text-center ${i === 0 ? 'border-l' : ''}`}
                           >
-                            <Checkbox
-                              checked={perms[role.id]?.has(permission) ?? false}
-                              onCheckedChange={() => toggle(role.id, permission)}
-                            />
+                            {supported ? (
+                              <Checkbox
+                                checked={perms[role.id]?.has(permission) ?? false}
+                                onCheckedChange={() => toggle(role.id, permission)}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                         )
                       }),

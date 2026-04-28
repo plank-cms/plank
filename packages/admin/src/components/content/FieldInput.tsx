@@ -333,10 +333,12 @@ function MediaInput({
   value,
   onChange,
   allowedTypes,
+  disabled = false,
 }: {
   value: string | null
   onChange: (v: unknown) => void
   allowedTypes?: FieldDef['allowedTypes']
+  disabled?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -410,6 +412,7 @@ function MediaInput({
             onChange(null)
             setPreviewUrl(null)
           }}
+          disabled={disabled}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -432,6 +435,7 @@ function MediaInput({
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
+          if (disabled) return
           e.preventDefault()
           const f = e.dataTransfer.files[0]
           if (f) handleFile(f)
@@ -440,7 +444,7 @@ function MediaInput({
       >
         <button
           type="button"
-          disabled={uploading}
+          disabled={uploading || disabled}
           onClick={() => inputRef.current?.click()}
           className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
         >
@@ -450,7 +454,7 @@ function MediaInput({
         <div className="w-px bg-border" />
         <button
           type="button"
-          disabled={uploading}
+          disabled={uploading || disabled}
           onClick={() => setPickerOpen(true)}
           className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
         >
@@ -477,11 +481,13 @@ function SortableGalleryItem({
   previewUrl,
   filename,
   onRemove,
+  disabled = false,
 }: {
   id: string
   previewUrl: string | null
   filename: string
   onRemove: () => void
+  disabled?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -513,10 +519,12 @@ function SortableGalleryItem({
       <button
         type="button"
         onClick={onRemove}
+        disabled={disabled}
         className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
       >
         <XIcon className="size-3" />
       </button>
+      {!disabled && (
       <button
         type="button"
         className="absolute bottom-6 left-1 flex size-5 cursor-grab items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm active:cursor-grabbing"
@@ -525,6 +533,7 @@ function SortableGalleryItem({
       >
         <GripVerticalIcon className="size-3" />
       </button>
+      )}
     </div>
   )
 }
@@ -532,9 +541,11 @@ function SortableGalleryItem({
 function MediaGalleryInput({
   value,
   onChange,
+  disabled = false,
 }: {
   value: string[] | null
   onChange: (v: unknown) => void
+  disabled?: boolean
 }) {
   const ids = Array.isArray(value) ? value : []
   const [urlCache, setUrlCache] = useState<Record<string, string>>({})
@@ -596,6 +607,7 @@ function MediaGalleryInput({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (disabled) return
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = ids.indexOf(active.id as string)
@@ -649,6 +661,7 @@ function MediaGalleryInput({
                   previewUrl={getPreviewUrl(id)}
                   filename={getFilename(id)}
                   onRemove={() => onChange(ids.filter((i) => i !== id))}
+                  disabled={disabled}
                 />
               ))}
             </div>
@@ -659,7 +672,7 @@ function MediaGalleryInput({
       <div className="flex w-full gap-2 rounded-md border border-dashed p-3">
         <button
           type="button"
-          disabled={uploading}
+          disabled={uploading || disabled}
           onClick={() => inputRef.current?.click()}
           className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
         >
@@ -669,7 +682,7 @@ function MediaGalleryInput({
         <div className="w-px bg-border" />
         <button
           type="button"
-          disabled={uploading}
+          disabled={uploading || disabled}
           onClick={() => setPickerOpen(true)}
           className="flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50"
         >
@@ -696,7 +709,15 @@ function MediaGalleryInput({
   )
 }
 
-function FloatInput({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+function FloatInput({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: unknown
+  onChange: (v: unknown) => void
+  disabled?: boolean
+}) {
   const [raw, setRaw] = useState(() =>
     value !== null && value !== undefined && value !== '' ? String(value) : '',
   )
@@ -729,6 +750,7 @@ function FloatInput({ value, onChange }: { value: unknown; onChange: (v: unknown
       value={raw}
       placeholder="0.00"
       onChange={handleChange}
+      disabled={disabled}
     />
   )
 }
@@ -737,10 +759,12 @@ function DateTimeInput({
   value,
   onChange,
   timezone,
+  disabled = false,
 }: {
   value: string | null | undefined
   onChange: (v: unknown) => void
   timezone: string
+  disabled?: boolean
 }) {
   const [calOpen, setCalOpen] = useState(false)
   const [date, setDate] = useState<Date | undefined>()
@@ -772,9 +796,9 @@ function DateTimeInput({
 
   return (
     <div className="flex items-center gap-2">
-      <Popover open={calOpen} onOpenChange={setCalOpen}>
+      <Popover open={calOpen && !disabled} onOpenChange={setCalOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="w-40 justify-between font-normal text-base">
+          <Button variant="outline" className="w-40 justify-between font-normal text-base" disabled={disabled}>
             {date ? format(date, 'MMM d, yyyy') : 'Select date'}
             <ChevronDownIcon className="size-4 opacity-50" />
           </Button>
@@ -794,6 +818,7 @@ function DateTimeInput({
         className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none text-base!"
         value={time}
         onChange={(e) => handleTimeChange(e.target.value)}
+        disabled={disabled}
       />
       {value && (
         <Button
@@ -806,6 +831,7 @@ function DateTimeInput({
             setTime('00:00')
             onChange(null)
           }}
+          disabled={disabled}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -983,6 +1009,7 @@ function RelationInput({
   currentEntryId,
   value,
   onChange,
+  disabled = false,
 }: {
   relationType: RelationType
   relatedTable: string
@@ -990,6 +1017,7 @@ function RelationInput({
   currentEntryId: string
   value: string | string[] | null
   onChange: (v: unknown) => void
+  disabled?: boolean
 }) {
   const isMulti = relationType === 'many-to-many'
   const [open, setOpen] = useState(false)
@@ -1048,13 +1076,14 @@ function RelationInput({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open && !disabled} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between font-normal text-base"
+            disabled={disabled}
           >
             <span className="truncate text-left">{triggerLabel}</span>
             <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
@@ -1078,7 +1107,10 @@ function RelationInput({
                         <CommandItem
                           key={entry.id}
                           value={entry.label}
-                          onSelect={() => toggleEntry(entry.id)}
+                          onSelect={() => {
+                            if (disabled) return
+                            toggleEntry(entry.id)
+                          }}
                         >
                           <CheckIcon
                             className={`mr-2 size-4 ${selected ? 'opacity-100' : 'opacity-0'}`}
@@ -1109,6 +1141,7 @@ function RelationInput({
               <button
                 type="button"
                 onClick={() => removeId(id)}
+                disabled={disabled}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <XIcon className="size-3" />
@@ -1132,10 +1165,12 @@ function ArrayInput({
   field,
   value,
   onChange,
+  disabled = false,
 }: {
   field: FieldDef
   value: unknown
   onChange: (v: unknown) => void
+  disabled?: boolean
 }) {
   const items = Array.isArray(value) ? (value as Record<string, unknown>[]) : []
   const subFields = field.arrayFields ?? []
@@ -1175,6 +1210,7 @@ function ArrayInput({
             <button
               type="button"
               onClick={() => handleRemoveItem(index)}
+              disabled={disabled}
               className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2Icon className="size-3.5" />
@@ -1194,6 +1230,7 @@ function ArrayInput({
                   value={item[sf.name] ?? null}
                   onChange={(v) => handleItemChange(index, sf.name, v)}
                   allValues={item}
+                  disabled={disabled}
                 />
               </div>
             ))}
@@ -1203,6 +1240,7 @@ function ArrayInput({
       <button
         type="button"
         onClick={handleAddItem}
+        disabled={disabled}
         className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
       >
         <PlusIcon className="size-3.5" />
@@ -1220,7 +1258,15 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) {
+function RichTextInput({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: unknown
+  onChange: (v: unknown) => void
+  disabled?: boolean
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const resolveRef = useRef<((img: ImageInsert | null) => void) | null>(null)
   const [insertOpen, setInsertOpen] = useState(false)
@@ -1262,12 +1308,14 @@ function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unkn
 
   return (
     <>
-      <RichTextEditor
-        value={String(value ?? '')}
-        onChange={onChange}
-        placeholder="Type or add your content here..."
-        onInsertImage={onInsertImage}
-      />
+      <div className={disabled ? 'pointer-events-none opacity-70' : ''}>
+        <RichTextEditor
+          value={String(value ?? '')}
+          onChange={onChange}
+          placeholder="Type or add your content here..."
+          onInsertImage={onInsertImage}
+        />
+      </div>
       <Dialog open={insertOpen} onOpenChange={handleInsertOpenChange}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -1405,6 +1453,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
           id={`field-${field.name}`}
           checked={Boolean(value)}
           onCheckedChange={(v) => onChange(Boolean(v))}
+          disabled={Boolean(disabled)}
         />
         <Label htmlFor={`field-${field.name}`} className="cursor-pointer font-normal text-base">
           {value ? 'Yes' : 'No'}
@@ -1414,7 +1463,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
   }
 
   if (field.type === 'richtext') {
-    return <RichTextInput value={value} onChange={onChange} />
+    return <RichTextInput value={value} onChange={onChange} disabled={Boolean(disabled)} />
   }
 
   if (field.type === 'text') {
@@ -1424,13 +1473,14 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
         value={String(value ?? '')}
         placeholder={field.name}
         onChange={(e) => onChange(e.target.value)}
+        disabled={Boolean(disabled)}
       />
     )
   }
 
   if (field.type === 'number') {
     if (field.subtype === 'float') {
-      return <FloatInput value={value} onChange={onChange} />
+      return <FloatInput value={value} onChange={onChange} disabled={Boolean(disabled)} />
     }
     return (
       <Input
@@ -1447,6 +1497,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
           }
           onChange(parseInt(raw, 10))
         }}
+        disabled={Boolean(disabled)}
       />
     )
   }
@@ -1457,6 +1508,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
         value={value as string | null | undefined}
         onChange={onChange}
         timezone={timezone}
+        disabled={Boolean(disabled)}
       />
     )
   }
@@ -1484,12 +1536,13 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
         value={value as string | null}
         onChange={onChange}
         allowedTypes={field.allowedTypes}
+        disabled={Boolean(disabled)}
       />
     )
   }
 
   if (field.type === 'media-gallery') {
-    return <MediaGalleryInput value={value as string[] | null} onChange={onChange} />
+    return <MediaGalleryInput value={value as string[] | null} onChange={onChange} disabled={Boolean(disabled)} />
   }
 
   if (field.type === 'relation') {
@@ -1501,12 +1554,13 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
         currentEntryId={String(allValues.id ?? '')}
         value={value as string | string[] | null}
         onChange={onChange}
+        disabled={Boolean(disabled)}
       />
     )
   }
 
   if (field.type === 'array') {
-    return <ArrayInput field={field} value={value} onChange={onChange} />
+    return <ArrayInput field={field} value={value} onChange={onChange} disabled={Boolean(disabled)} />
   }
 
   // string fallback
@@ -1516,6 +1570,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
       value={String(value ?? '')}
       placeholder={field.name}
       onChange={(e) => onChange(e.target.value)}
+      disabled={Boolean(disabled)}
     />
   )
 }

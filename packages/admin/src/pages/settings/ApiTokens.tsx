@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
 import { PlusIcon, Trash2Icon, CopyIcon, CheckIcon } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAuth } from '@/context/auth.tsx'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -71,8 +72,13 @@ function CopyButton({ value }: { value: string }) {
 const EMPTY_FORM: CreateForm = { name: '', accessType: '' }
 
 export function SettingsApiTokens() {
+  const { user } = useAuth()
   const { data: tokens, loading, refetch } = useFetch<ApiToken[]>('/cms/admin/api-tokens')
   const { request, loading: submitting, error: apiError } = useApi<CreatedToken>()
+  const permissions = user?.permissions ?? []
+  const canWrite = permissions.includes('*') || permissions.includes('settings:api-tokens:write')
+  const canDelete =
+    permissions.includes('*') || permissions.includes('settings:api-tokens:delete')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)
@@ -107,14 +113,16 @@ export function SettingsApiTokens() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 text-destructive hover:text-destructive"
-          onClick={() => setDeleteToken(row.original)}
-        >
-          <Trash2Icon className="size-3.5" />
-        </Button>
+        canDelete ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 text-destructive hover:text-destructive"
+            onClick={() => setDeleteToken(row.original)}
+          >
+            <Trash2Icon className="size-3.5" />
+          </Button>
+        ) : null
       ),
     },
   ]
@@ -161,7 +169,7 @@ export function SettingsApiTokens() {
               Manage tokens for consuming the public API.
             </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} disabled={!canWrite}>
             <PlusIcon className="size-4" />
             New token
           </Button>
@@ -267,7 +275,7 @@ export function SettingsApiTokens() {
                   <Button
                     type="submit"
                     form="create-token-form"
-                    disabled={submitting || !form.accessType}
+                    disabled={submitting || !form.accessType || !canWrite}
                   >
                     {submitting ? 'Generating…' : 'Generate token'}
                   </Button>
@@ -318,7 +326,7 @@ export function SettingsApiTokens() {
               <Button variant="outline" onClick={() => setDeleteToken(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
+              <Button variant="destructive" onClick={handleDelete} disabled={submitting || !canDelete}>
                 {submitting ? 'Revoking…' : 'Revoke'}
               </Button>
             </DialogFooter>

@@ -6,6 +6,7 @@ import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { useSettings } from '@/context/settings.tsx'
+import { useAuth } from '@/context/auth.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs.tsx'
@@ -32,6 +33,7 @@ import HeaderFixed from '@/components/Header'
 type ContentType = {
   name: string
   slug: string
+  kind: 'collection' | 'single'
   fields: FieldDef[]
 }
 
@@ -46,6 +48,7 @@ export function EntryForm() {
   const navigate = useNavigate()
   const isNew = !id
   const { timezone, locales: settingsLocales, defaultLocale } = useSettings()
+  const { user } = useAuth()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null,
@@ -394,13 +397,19 @@ export function EntryForm() {
 
   const loading = loadingCt || (!isNew && loadingEntry)
   const busy = saving || patching
+  const permissions = user?.permissions ?? []
+  const canWriteEntries = permissions.includes('*') || permissions.includes('entries:write')
+  const canDeleteEntries = permissions.includes('*') || permissions.includes('entries:delete')
+  const isUserRole = user?.role?.toLowerCase() === 'user'
+  const isReadOnlySingle = isUserRole && ct?.kind === 'single'
+  const readOnly = !canWriteEntries || isReadOnlySingle
   const canPublish = isDirty || status === 'draft' || status === 'scheduled' || isPublishedStale
   const canSchedule = !!(schedDate && schedTime)
 
-  const saveDraftEnabled = !busy && (status === 'scheduled' ? true : isDirty)
+  const saveDraftEnabled = !readOnly && !busy && (status === 'scheduled' ? true : isDirty)
   useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })
   useKeyboardShortcut('mod+shift+p', handlePublish, {
-    enabled: canPublish && !busy,
+    enabled: canPublish && !busy && !readOnly,
     label: 'Publish',
   })
 
@@ -448,7 +457,7 @@ export function EntryForm() {
             <p className="text-muted-foreground text-xs mt-1">{ct.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!isNew && (
+            {!isNew && canDeleteEntries && !isReadOnlySingle && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -459,13 +468,13 @@ export function EntryForm() {
                 <Trash2Icon className="size-4" />
               </Button>
             )}
-            {!isNew && status === 'published' && (
+            {!isNew && status === 'published' && !readOnly && (
               <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
                 {patching ? <Spinner className="size-4" /> : null}
                 Revert to draft
               </Button>
             )}
-            {!isNew && status === 'scheduled' && (
+            {!isNew && status === 'scheduled' && !readOnly && (
               <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
                 {patching ? <Spinner className="size-4" /> : null}
                 Cancel schedule
@@ -474,18 +483,18 @@ export function EntryForm() {
             <Button
               variant="outline"
               onClick={handleSaveDraft}
-              disabled={status === 'scheduled' ? busy : !isDirty || busy}
+              disabled={readOnly || (status === 'scheduled' ? busy : !isDirty || busy)}
             >
               {saving ? <Spinner className="size-4" /> : null}
               {status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft'}
             </Button>
             {status !== 'scheduled' && (
-              <Button variant="outline" onClick={openScheduler} disabled={busy}>
+              <Button variant="outline" onClick={openScheduler} disabled={readOnly || busy}>
                 <CalendarClockIcon className="size-4" />
                 Schedule
               </Button>
             )}
-            <Button onClick={handlePublish} disabled={!canPublish || busy}>
+            <Button onClick={handlePublish} disabled={readOnly || !canPublish || busy}>
               {patching ? <Spinner className="size-4" /> : null}
               {status === 'scheduled'
                 ? 'Publish now'
@@ -499,7 +508,7 @@ export function EntryForm() {
 
       <section className="mt-24">
         {/* Inline scheduler panel */}
-        {showScheduler && (
+        {showScheduler && !readOnly && (
           <div className="mb-6 flex items-end gap-2 rounded-lg border p-4 bg-muted/30">
             <div className="flex flex-col gap-1.5">
               <Label>Date</Label>
@@ -551,7 +560,11 @@ export function EntryForm() {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Switch checked={localizationEnabled} onCheckedChange={toggleLocalization} />
+              <Switch
+                checked={localizationEnabled}
+                onCheckedChange={toggleLocalization}
+                disabled={readOnly}
+              />
               <div>
                 <p className="text-sm font-medium">Localization</p>
                 <p className="text-xs text-muted-foreground">Enable per-entry localization</p>
@@ -564,7 +577,7 @@ export function EntryForm() {
               <Tabs value={activeLocale} onValueChange={(v) => setActiveLocale(v)}>
                 <TabsList>
                   {locales.map((l) => (
-                    <TabsTrigger key={l} value={l}>
+                    <TabsTrigger key={l} value={l} disabled={readOnly}>
                       {l.toUpperCase()}
                     </TabsTrigger>
                   ))}
@@ -616,7 +629,7 @@ export function EntryForm() {
                       __localizationEnabled: localizationEnabled,
                       __defaultLocale: defaultLocale,
                     }}
-                    disabled={Boolean(uidDisabled)}
+                    disabled={Boolean(uidDisabled) || readOnly}
                   />
                 </div>
               </div>

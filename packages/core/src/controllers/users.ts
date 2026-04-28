@@ -30,7 +30,7 @@ const UpdateMeSchema = z.object({
   country: z.string().max(100).optional(),
 })
 
-type UserRow = { id: string; email: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; job_title: string | null; organization: string | null; country: string | null; created_at: Date }
+type UserRow = { id: string; email: string; role_id: string; role_name?: string; first_name: string | null; last_name: string | null; avatar_url: string | null; job_title: string | null; organization: string | null; country: string | null; created_at: Date }
 
 async function resolveAvatarUrl(row: UserRow): Promise<UserRow> {
   if (!row.avatar_url || row.avatar_url.startsWith('http')) return row
@@ -38,9 +38,20 @@ async function resolveAvatarUrl(row: UserRow): Promise<UserRow> {
   return { ...row, avatar_url: await provider.getUrl(row.avatar_url) }
 }
 
+async function roleNameById(roleId: string): Promise<string | null> {
+  const { rows } = await pool.query<{ name: string }>(
+    'SELECT name FROM plank_roles WHERE id = $1',
+    [roleId],
+  )
+  return rows[0]?.name ?? null
+}
+
 export async function listUsers(_req: Request, res: Response): Promise<void> {
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, role_id, first_name, last_name, created_at FROM plank_users ORDER BY created_at DESC',
+    `SELECT u.id, u.email, u.role_id, r.name as role_name, u.first_name, u.last_name, u.created_at
+     FROM plank_users u
+     JOIN plank_roles r ON r.id = u.role_id
+     ORDER BY u.created_at DESC`,
   )
   res.json(rows)
 }
@@ -183,6 +194,11 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   }
 
   const { email, password, roleId } = parsed.data
+  const requesterRoleName = await roleNameById(req.user!.roleId)
+  const targetRoleName = await roleNameById(roleId)
+  if (targetRoleName === 'Super Admin' && requesterRoleName !== 'Super Admin') {
+    res.status(403).json({ error: 'Only Super Admin can assign Super Admin role' }); return
+  }
   const hashed = await bcrypt.hash(password, 12)
   const id = createId()
 
@@ -201,6 +217,22 @@ export async function updateUser(req: Request, res: Response): Promise<void> {
   }
 
   const { email, roleId, firstName, lastName } = parsed.data
+  const requesterRoleName = await roleNameById(req.user!.roleId)
+  const { rows: targetRows } = await pool.query<{ role_id: string }>(
+    'SELECT role_id FROM plank_users WHERE id = $1',
+    [req.params.id],
+  )
+  if (!targetRows[0]) { res.status(404).json({ error: 'User not found' }); return }
+  const targetCurrentRoleName = await roleNameById(targetRows[0].role_id)
+  if (targetCurrentRoleName === 'Super Admin' && requesterRoleName !== 'Super Admin') {
+    res.status(403).json({ error: 'Only Super Admin can edit Super Admin users' }); return
+  }
+  if (roleId) {
+    const nextRoleName = await roleNameById(roleId)
+    if (nextRoleName === 'Super Admin' && requesterRoleName !== 'Super Admin') {
+      res.status(403).json({ error: 'Only Super Admin can assign Super Admin role' }); return
+    }
+  }
   const { rows } = await pool.query<UserRow>(
     `UPDATE plank_users
      SET email      = COALESCE($1, email),

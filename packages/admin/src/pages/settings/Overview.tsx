@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useSettings } from '@/context/settings.tsx'
+import { useAuth } from '@/context/auth.tsx'
 import { Card, CardContent } from '@/components/ui/card.tsx'
 import pkg from '../../../package.json'
 import HeaderFixed from '@/components/Header.tsx'
@@ -61,6 +62,7 @@ const TIMEZONES = [
 // GeneralSettings
 
 function GeneralSettings() {
+  const { user } = useAuth()
   const { data, loading } = useFetch<Record<string, string>>('/cms/admin/settings/general')
   const { request, loading: saving } = useApi()
   const { refreshSettings } = useSettings()
@@ -70,6 +72,9 @@ function GeneralSettings() {
   const [defaultLocale, setDefaultLocale] = useState<string>('en')
   const [newLocale, setNewLocale] = useState<string>('')
   const [saved, setSaved] = useState(false)
+  const permissions = user?.permissions ?? []
+  const canWriteOverview =
+    permissions.includes('*') || permissions.includes('settings:overview:write')
 
   useEffect(() => {
     if (data?.timezone) setTimezone(data.timezone)
@@ -123,7 +128,7 @@ function GeneralSettings() {
       <div className="space-y-1.5">
         <Label htmlFor="timezone">Timezone</Label>
         <Select value={timezone} onValueChange={setTimezone}>
-          <SelectTrigger id="timezone" className="w-1/2">
+          <SelectTrigger id="timezone" className="w-1/2" disabled={!canWriteOverview}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="max-h-72">
@@ -147,9 +152,11 @@ function GeneralSettings() {
             value={newLocale}
             onChange={(e) => setNewLocale(e.target.value)}
             className="w-1/4"
+            disabled={!canWriteOverview}
           />
           <Button
             variant="outline"
+            disabled={!canWriteOverview}
             onClick={() => {
               const code = newLocale.trim().toLowerCase()
               if (!code) return
@@ -167,6 +174,7 @@ function GeneralSettings() {
               variant="ghost"
               size="sm"
               onClick={() => setLocales((s) => s.filter((x) => x !== l))}
+              disabled={!canWriteOverview}
             >
               {l.toUpperCase()}
             </Button>
@@ -175,7 +183,7 @@ function GeneralSettings() {
         <div className="mt-2">
           <Label htmlFor="default-locale">Default locale</Label>
           <Select value={defaultLocale} onValueChange={setDefaultLocale}>
-            <SelectTrigger id="default-locale" className="w-1/2">
+            <SelectTrigger id="default-locale" className="w-1/2" disabled={!canWriteOverview}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-72">
@@ -193,7 +201,7 @@ function GeneralSettings() {
         </div>
       </div>
 
-      <Button onClick={handleSave} disabled={saving}>
+      <Button onClick={handleSave} disabled={saving || !canWriteOverview}>
         {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
       </Button>
     </div>

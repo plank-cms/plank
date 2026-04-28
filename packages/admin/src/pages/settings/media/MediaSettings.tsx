@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
+import { useAuth } from '@/context/auth.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
@@ -24,9 +25,11 @@ const MASKED = '••••••••'
 function LocalFields({
   values,
   onChange,
+  disabled = false,
 }: {
   values: Settings
   onChange: (k: string, v: string) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -37,6 +40,7 @@ function LocalFields({
           placeholder="public/uploads"
           value={values['local.uploads_dir'] ?? ''}
           onChange={(e) => onChange('local.uploads_dir', e.target.value)}
+          disabled={disabled}
         />
         <p className="text-xs text-muted-foreground">
           Path on disk where files are stored. Relative to the server working directory.
@@ -49,6 +53,7 @@ function LocalFields({
           placeholder="http://localhost:1337"
           value={values['local.public_url'] ?? ''}
           onChange={(e) => onChange('local.public_url', e.target.value)}
+          disabled={disabled}
         />
         <p className="text-xs text-muted-foreground">
           Base URL used to build file URLs. Should match the server's public address.
@@ -67,6 +72,7 @@ function SecretInput({
   values,
   onChange,
   placeholder,
+  disabled = false,
 }: {
   id: string
   label: string
@@ -74,6 +80,7 @@ function SecretInput({
   values: Settings
   onChange: (k: string, v: string) => void
   placeholder?: string
+  disabled?: boolean
 }) {
   const [visible, setVisible] = useState(false)
   const isAlreadySet = values[fieldKey] === MASKED
@@ -90,12 +97,14 @@ function SecretInput({
           value={isAlreadySet ? '' : value}
           onChange={(e) => onChange(fieldKey, e.target.value)}
           className="pr-9"
+          disabled={disabled}
         />
         <button
           type="button"
           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           onClick={() => setVisible((v) => !v)}
           tabIndex={-1}
+          disabled={disabled}
         >
           {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
         </button>
@@ -114,9 +123,11 @@ function SecretInput({
 function S3Fields({
   values,
   onChange,
+  disabled = false,
 }: {
   values: Settings
   onChange: (k: string, v: string) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -128,6 +139,7 @@ function S3Fields({
             placeholder="AKIAIOSFODNN7EXAMPLE"
             value={values['s3.access_key_id'] ?? ''}
             onChange={(e) => onChange('s3.access_key_id', e.target.value)}
+            disabled={disabled}
           />
         </div>
         <SecretInput
@@ -136,6 +148,7 @@ function S3Fields({
           fieldKey="s3.secret_access_key"
           values={values}
           onChange={onChange}
+          disabled={disabled}
         />
       </div>
 
@@ -146,6 +159,7 @@ function S3Fields({
           placeholder="us-east-1"
           value={values['s3.region'] ?? ''}
           onChange={(e) => onChange('s3.region', e.target.value)}
+          disabled={disabled}
         />
       </div>
 
@@ -157,6 +171,7 @@ function S3Fields({
             placeholder="my-bucket"
             value={values['s3.bucket'] ?? ''}
             onChange={(e) => onChange('s3.bucket', e.target.value)}
+            disabled={disabled}
           />
         </div>
         <div className="space-y-1.5">
@@ -166,6 +181,7 @@ function S3Fields({
             placeholder="cms/media"
             value={values['s3.path_prefix'] ?? ''}
             onChange={(e) => onChange('s3.path_prefix', e.target.value)}
+            disabled={disabled}
           />
           <p className="text-xs text-muted-foreground">Optional. Shared bucket subfolder.</p>
         </div>
@@ -178,6 +194,7 @@ function S3Fields({
           placeholder="https://cdn.example.com"
           value={values['s3.public_url'] ?? ''}
           onChange={(e) => onChange('s3.public_url', e.target.value)}
+          disabled={disabled}
         />
         <p className="text-xs text-muted-foreground">
           Optional. Leave blank to use the default S3 URL.
@@ -192,9 +209,11 @@ function S3Fields({
 function R2Fields({
   values,
   onChange,
+  disabled = false,
 }: {
   values: Settings
   onChange: (k: string, v: string) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -206,6 +225,7 @@ function R2Fields({
             placeholder="R2 access key ID"
             value={values['r2.access_key_id'] ?? ''}
             onChange={(e) => onChange('r2.access_key_id', e.target.value)}
+            disabled={disabled}
           />
         </div>
         <SecretInput
@@ -214,6 +234,7 @@ function R2Fields({
           fieldKey="r2.secret_access_key"
           values={values}
           onChange={onChange}
+          disabled={disabled}
         />
       </div>
 
@@ -225,6 +246,7 @@ function R2Fields({
             placeholder="my-bucket"
             value={values['r2.bucket'] ?? ''}
             onChange={(e) => onChange('r2.bucket', e.target.value)}
+            disabled={disabled}
           />
         </div>
         <div className="space-y-1.5">
@@ -234,6 +256,7 @@ function R2Fields({
             placeholder="cms/media"
             value={values['r2.path_prefix'] ?? ''}
             onChange={(e) => onChange('r2.path_prefix', e.target.value)}
+            disabled={disabled}
           />
           <p className="text-xs text-muted-foreground">Optional. Shared bucket subfolder.</p>
         </div>
@@ -248,6 +271,7 @@ function R2Fields({
           placeholder="https://assets.example.com"
           value={values['r2.public_url'] ?? ''}
           onChange={(e) => onChange('r2.public_url', e.target.value)}
+          disabled={disabled}
         />
         <p className="text-xs text-muted-foreground">
           Required. R2 does not generate public URLs automatically.
@@ -260,6 +284,7 @@ function R2Fields({
 // Main component
 
 export function MediaSettings() {
+  const { user } = useAuth()
   const { data: saved, loading } = useFetch<Settings>('/cms/admin/settings/media')
   const { loading: saving, error, request } = useApi<Settings>()
 
@@ -268,6 +293,9 @@ export function MediaSettings() {
 
   const values: Settings = localValues ?? saved ?? { provider: 'local' }
   const provider = (values['provider'] as Provider) || 'local'
+  const permissions = user?.permissions ?? []
+  const canWriteOverview =
+    permissions.includes('*') || permissions.includes('settings:overview:write')
 
   function handleChange(key: string, value: string) {
     setLocalValues({ ...values, [key]: value })
@@ -308,7 +336,7 @@ export function MediaSettings() {
         <div className="space-y-1.5">
           <Label htmlFor="provider">Storage provider</Label>
           <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
-            <SelectTrigger id="provider">
+            <SelectTrigger id="provider" disabled={!canWriteOverview}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -326,6 +354,7 @@ export function MediaSettings() {
               placeholder="023e105f4ecef8ad9ca31a8372d0c353"
               value={values['r2.account_id'] ?? ''}
               onChange={(e) => handleChange('r2.account_id', e.target.value)}
+              disabled={!canWriteOverview}
             />
             <p className="text-xs text-muted-foreground">
               Found in the Cloudflare dashboard under R2 &gt; Overview.
@@ -335,13 +364,13 @@ export function MediaSettings() {
       </div>
 
       <div className="border-t pt-6">
-        {provider === 'local' && <LocalFields values={values} onChange={handleChange} />}
-        {provider === 's3' && <S3Fields values={values} onChange={handleChange} />}
-        {provider === 'r2' && <R2Fields values={values} onChange={handleChange} />}
+        {provider === 'local' && <LocalFields values={values} onChange={handleChange} disabled={!canWriteOverview} />}
+        {provider === 's3' && <S3Fields values={values} onChange={handleChange} disabled={!canWriteOverview} />}
+        {provider === 'r2' && <R2Fields values={values} onChange={handleChange} disabled={!canWriteOverview} />}
       </div>
 
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || !canWriteOverview}>
           {saving ? 'Saving…' : 'Save'}
         </Button>
         {saved_ && <p className="text-sm text-muted-foreground">Changes saved.</p>}

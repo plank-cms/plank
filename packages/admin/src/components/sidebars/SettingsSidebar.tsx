@@ -10,11 +10,11 @@ export function SettingsSidebar() {
   const { user } = useAuth()
 
   const items = [
-    { label: 'Overview',    to: '/settings/overview',   icon: Settings2Icon, permission: 'settings:read' },
-    { label: 'Users',       to: '/settings/users',      icon: UsersRoundIcon, permission: 'users:read' },
-    { label: 'Roles',       to: '/settings/roles',      icon: ShieldIcon,    permission: 'users:read' },
-    { label: 'API Tokens',  to: '/settings/api-tokens', icon: KeyRoundIcon,  permission: 'api-tokens:read' },
-    { label: 'Webhooks',    to: '/settings/webhooks',   icon: WebhookIcon,   permission: 'webhooks:read' },
+    { label: 'Overview',    to: '/settings/overview',   icon: Settings2Icon, permission: 'settings:overview:read' },
+    { label: 'Users',       to: '/settings/users',      icon: UsersRoundIcon, permission: 'settings:users:read' },
+    { label: 'Roles',       to: '/settings/roles',      icon: ShieldIcon,    permission: 'settings:roles:read' },
+    { label: 'API Tokens',  to: '/settings/api-tokens', icon: KeyRoundIcon,  permission: 'settings:api-tokens:read' },
+    { label: 'Webhooks',    to: '/settings/webhooks',   icon: WebhookIcon,   permission: 'settings:webhooks:read' },
   ].filter(({ permission }) => hasPermission(user, permission))
 
   return (

@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useApi } from '@/hooks/useApi.ts'
 import { useFetch } from '@/hooks/useFetch.ts'
+import { useAuth } from '@/context/auth.tsx'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -105,6 +106,10 @@ export function ContentTypeForm() {
   const { slug: routeSlug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const isNew = !routeSlug
+  const { user } = useAuth()
+  const permissions = user?.permissions ?? []
+  const canDeleteContentTypes =
+    permissions.includes('*') || permissions.includes('content-types:delete')
 
   // Remote data
   const { data: existing, loading: loadingExisting } = useFetch<ContentType>(
@@ -239,6 +244,7 @@ export function ContentTypeForm() {
   }
 
   async function handleDelete() {
+    if (!canDeleteContentTypes) return
     try {
       await requestDelete(`/cms/admin/content-types/${routeSlug}`, 'DELETE')
       window.dispatchEvent(new CustomEvent('plank:content-types-changed'))
@@ -323,7 +329,7 @@ export function ContentTypeForm() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {!isNew && (
+            {!isNew && canDeleteContentTypes && (
               <Button
                 variant="ghost"
                 size="icon"

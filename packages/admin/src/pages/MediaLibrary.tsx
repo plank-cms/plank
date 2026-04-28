@@ -22,6 +22,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb.tsx'
 import { useFetch } from '@/hooks/useFetch.ts'
+import { useAuth } from '@/context/auth.tsx'
 import { uploadMediaFile } from '@/lib/uploadMedia.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -216,6 +217,8 @@ function FolderCard({
   onOpen,
   onDelete,
   onRename,
+  canDelete,
+  canRename,
   selected,
   onToggle,
 }: {
@@ -223,6 +226,8 @@ function FolderCard({
   onOpen: (folder: Folder) => void
   onDelete: (folder: Folder) => void
   onRename: (folder: Folder) => void
+  canDelete: boolean
+  canRename: boolean
   selected: boolean
   onToggle: (id: string) => void
 }) {
@@ -256,7 +261,7 @@ function FolderCard({
           {folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}
         </p>
       </div>
-      {!selected && (
+      {!selected && (canRename || canDelete) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -267,17 +272,21 @@ function FolderCard({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onSelect={() => onRename(folder)}>
-              <PencilIcon className="size-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => onDelete(folder)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2Icon className="size-4" />
-              Delete
-            </DropdownMenuItem>
+            {canRename && (
+              <DropdownMenuItem onSelect={() => onRename(folder)}>
+                <PencilIcon className="size-4" />
+                Rename
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <DropdownMenuItem
+                onSelect={() => onDelete(folder)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2Icon className="size-4" />
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -291,12 +300,14 @@ function MediaCard({
   item,
   onDelete,
   onPreview,
+  canDelete,
   selected,
   onToggle,
 }: {
   item: MediaItem
   onDelete: (item: MediaItem) => void
   onPreview: (item: MediaItem) => void
+  canDelete: boolean
   selected: boolean
   onToggle: (id: string) => void
 }) {
@@ -334,7 +345,7 @@ function MediaCard({
           className="bg-background/80 backdrop-blur-sm"
         />
       </div>
-      {!selected && (
+      {!selected && canDelete && (
         <button
           onClick={() => onDelete(item)}
           className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:text-destructive group-hover:opacity-100"
@@ -356,6 +367,10 @@ function MediaCard({
 
 export function MediaLibrary() {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
+  const permissions = user?.permissions ?? []
+  const canWriteMedia = permissions.includes('*') || permissions.includes('media:write')
+  const canDeleteMedia = permissions.includes('*') || permissions.includes('media:delete')
 
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([{ id: null, name: 'Media' }])
   const currentFolderId = breadcrumb[breadcrumb.length - 1].id
@@ -430,6 +445,7 @@ export function MediaLibrary() {
   }
 
   async function handleFiles(files: FileList | null) {
+    if (!canWriteMedia) return
     if (!files || files.length === 0) return
     setUploading(true)
     setUploadError(null)
@@ -449,6 +465,7 @@ export function MediaLibrary() {
   }
 
   async function handleDrop(e: React.DragEvent) {
+    if (!canWriteMedia) return
     e.preventDefault()
     const items = Array.from(e.dataTransfer.items)
     const hasEntry = items.some((i) => typeof i.webkitGetAsEntry === 'function')
@@ -489,6 +506,7 @@ export function MediaLibrary() {
   // Folder CRUD
 
   async function handleCreateFolder() {
+    if (!canWriteMedia) return
     if (!newFolderName.trim()) return
     try {
       await folderRequest('/cms/admin/folders', 'POST', {
@@ -504,6 +522,7 @@ export function MediaLibrary() {
   }
 
   async function handleRenameFolder() {
+    if (!canWriteMedia) return
     if (!folderToRename || !renameValue.trim()) return
     try {
       await folderRequest(`/cms/admin/folders/${folderToRename.id}`, 'PATCH', {
@@ -517,6 +536,7 @@ export function MediaLibrary() {
   }
 
   async function handleDeleteFolder() {
+    if (!canDeleteMedia) return
     if (!folderToDelete) return
     try {
       await request(`/cms/admin/folders/${folderToDelete.id}`, 'DELETE')
@@ -530,6 +550,7 @@ export function MediaLibrary() {
   // Media CRUD
 
   async function handleDeleteMedia() {
+    if (!canDeleteMedia) return
     if (!toDelete) return
     try {
       await request(`/cms/admin/media/${toDelete.id}`, 'DELETE')
@@ -558,6 +579,7 @@ export function MediaLibrary() {
   const someSelected = !allSelected && allKeys.some((k) => selected.has(k))
 
   async function handleBulkDelete() {
+    if (!canDeleteMedia) return
     if (bulkLoading) return
     setBulkLoading(true)
     const token = localStorage.getItem('plank_token')
@@ -601,11 +623,12 @@ export function MediaLibrary() {
                 setNewFolderName('')
                 setNewFolderOpen(true)
               }}
+              disabled={!canWriteMedia}
             >
               <FolderPlusIcon className="size-4" />
               New folder
             </Button>
-            <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
+            <Button onClick={() => inputRef.current?.click()} disabled={uploading || !canWriteMedia}>
               {uploading ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
               {uploading ? 'Uploading…' : 'Upload'}
             </Button>
@@ -658,15 +681,17 @@ export function MediaLibrary() {
                   <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
                     Clear
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={bulkLoading}
-                    onClick={() => setBulkConfirmDelete(true)}
-                  >
-                    <Trash2Icon className="size-3.5" />
-                    Delete
-                  </Button>
+                  {canDeleteMedia && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={bulkLoading}
+                      onClick={() => setBulkConfirmDelete(true)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </>
             ) : (
@@ -692,7 +717,7 @@ export function MediaLibrary() {
         ) : empty ? (
           <div
             className="flex flex-col items-center justify-center rounded-lg border border-dashed py-20 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => inputRef.current?.click()}
+            onClick={() => canWriteMedia && inputRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
           >
@@ -720,6 +745,8 @@ export function MediaLibrary() {
                       setFolderToRename(f)
                       setRenameValue(f.name)
                     }}
+                    canDelete={canDeleteMedia}
+                    canRename={canWriteMedia}
                     selected={selected.has(`folder:${folder.id}`)}
                     onToggle={toggleOne}
                   />
@@ -739,6 +766,7 @@ export function MediaLibrary() {
                       setEditAlt(item.alt ?? '')
                       setEditError(null)
                     }}
+                    canDelete={canDeleteMedia}
                     selected={selected.has(item.id)}
                     onToggle={toggleOne}
                   />
@@ -827,6 +855,7 @@ export function MediaLibrary() {
                       onChange={(e) => setEditFilename(e.target.value)}
                       placeholder={preview.filename}
                       className="h-8 text-sm"
+                      disabled={!canWriteMedia}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -836,12 +865,13 @@ export function MediaLibrary() {
                       onChange={(e) => setEditAlt(e.target.value)}
                       placeholder="Describe the image…"
                       className="h-8 text-sm"
+                      disabled={!canWriteMedia}
                     />
                   </div>
                 </div>
                 {editError && <p className="text-xs text-destructive">{editError}</p>}
                 <div className="flex justify-end">
-                  <Button type="submit" size="sm" disabled={editSaving}>
+                  <Button type="submit" size="sm" disabled={editSaving || !canWriteMedia}>
                     {editSaving ? 'Saving…' : 'Save'}
                   </Button>
                 </div>
@@ -875,7 +905,7 @@ export function MediaLibrary() {
               <Button variant="outline" onClick={() => setNewFolderOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateFolder} disabled={folderSaving || !newFolderName.trim()}>
+              <Button onClick={handleCreateFolder} disabled={folderSaving || !newFolderName.trim() || !canWriteMedia}>
                 {folderSaving ? 'Creating…' : 'Create'}
               </Button>
             </DialogFooter>
@@ -906,7 +936,7 @@ export function MediaLibrary() {
               <Button variant="outline" onClick={() => setFolderToRename(null)}>
                 Cancel
               </Button>
-              <Button onClick={handleRenameFolder} disabled={folderSaving || !renameValue.trim()}>
+              <Button onClick={handleRenameFolder} disabled={folderSaving || !renameValue.trim() || !canWriteMedia}>
                 {folderSaving ? 'Saving…' : 'Save'}
               </Button>
             </DialogFooter>
@@ -934,7 +964,7 @@ export function MediaLibrary() {
               <Button variant="outline" onClick={() => setToDelete(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteMedia} disabled={deleting}>
+              <Button variant="destructive" onClick={handleDeleteMedia} disabled={deleting || !canDeleteMedia}>
                 {deleting ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>
@@ -962,7 +992,7 @@ export function MediaLibrary() {
               <Button variant="outline" onClick={() => setFolderToDelete(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteFolder} disabled={deleting}>
+              <Button variant="destructive" onClick={handleDeleteFolder} disabled={deleting || !canDeleteMedia}>
                 {deleting ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>

@@ -18,6 +18,7 @@ import {
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { useSettings } from '@/context/settings.tsx'
+import { useAuth } from '@/context/auth.tsx'
 import { formatDate, formatDatetime } from '@/lib/formatDate.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
@@ -491,6 +492,7 @@ export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { timezone } = useSettings()
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
   const limit = [10, 30, 50, 70, 100].includes(Number(searchParams.get('limit')))
@@ -561,6 +563,9 @@ export function EntriesList() {
     setDeletingId(null)
     refetch()
   }
+  const permissions = user?.permissions ?? []
+  const canWriteEntries = permissions.includes('*') || permissions.includes('entries:write')
+  const canDeleteEntries = permissions.includes('*') || permissions.includes('entries:delete')
 
   const currentIds = (entries?.data ?? []).map((e) => e.id)
   const allSelected = currentIds.length > 0 && currentIds.every((id) => selected.has(id))
@@ -661,10 +666,12 @@ export function EntriesList() {
               <Settings2Icon className="size-3.5" />
               Configure the view
             </Button>
-            <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
-              <PlusIcon className="size-4" />
-              New entry
-            </Button>
+            {canWriteEntries && (
+              <Button onClick={() => navigate(`/content/${slug}/new`)} className="gap-2">
+                <PlusIcon className="size-4" />
+                New entry
+              </Button>
+            )}
           </div>
         </div>
       </HeaderFixed>
@@ -687,7 +694,7 @@ export function EntriesList() {
               <EmptyDescription>Create your first entry for {ct.name}.</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>
+              {canWriteEntries && <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>}
             </EmptyContent>
           </Empty>
         )}
@@ -707,15 +714,17 @@ export function EntriesList() {
                     {bulkLoading ? <Spinner className="size-3.5" /> : null}
                     Unpublish
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={bulkLoading}
-                    onClick={() => setBulkConfirmDelete(true)}
-                  >
-                    <Trash2Icon className="size-3.5" />
-                    Delete
-                  </Button>
+                  {canDeleteEntries && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={bulkLoading}
+                      onClick={() => setBulkConfirmDelete(true)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -803,13 +812,15 @@ export function EntriesList() {
                           >
                             <PencilIcon className="size-3.5" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeletingId(entry.id)}
-                            className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2Icon className="size-3.5" />
-                          </button>
+                          {canDeleteEntries && (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingId(entry.id)}
+                              className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2Icon className="size-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

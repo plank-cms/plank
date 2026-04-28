@@ -37,6 +37,7 @@ type User = {
   id: string
   email: string
   role_id: string
+  role_name?: string
   first_name: string | null
   last_name: string | null
   created_at: string
@@ -53,9 +54,9 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   user: 'outline',
 }
 
-function RoleBadge({ roleId, roles }: { roleId: string; roles: Role[] }) {
+function RoleBadge({ roleId, roleName, roles }: { roleId: string; roleName?: string; roles: Role[] }) {
   const role = roles.find((r) => r.id === roleId)
-  const name = role?.name ?? roleId
+  const name = roleName ?? role?.name ?? roleId
   const variant = ROLE_VARIANT[name.toLowerCase()] ?? 'secondary'
   return <Badge variant={variant}>{name}</Badge>
 }
@@ -63,25 +64,36 @@ function RoleBadge({ roleId, roles }: { roleId: string; roles: Role[] }) {
 function UserActions({
   user,
   currentUserId,
+  currentUserRole,
   onEdit,
   onDelete,
 }: {
   user: User
   currentUserId: string
+  currentUserRole: string
   onEdit: (user: User) => void
   onDelete: (user: User) => void
 }) {
   const isSelf = user.id === currentUserId
+  const isSuperAdmin = (user.role_name ?? '').toLowerCase() === 'super admin'
+  const currentIsSuperAdmin = currentUserRole.toLowerCase() === 'super admin'
+  const disableEdit = isSuperAdmin && !isSelf && !currentIsSuperAdmin
   return (
     <div className="flex items-center gap-1">
-      <Button size="icon" variant="ghost" className="size-8" onClick={() => onEdit(user)}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-8 disabled:opacity-30"
+        disabled={disableEdit}
+        onClick={() => onEdit(user)}
+      >
         <PencilIcon className="size-3.5" />
       </Button>
       <Button
         size="icon"
         variant="ghost"
         className="size-8 text-destructive hover:text-destructive disabled:opacity-30"
-        disabled={isSelf}
+        disabled={isSelf || isSuperAdmin}
         onClick={() => onDelete(user)}
       >
         <Trash2Icon className="size-3.5" />
@@ -113,6 +125,10 @@ export function SettingsUsers() {
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
 
   const roleList = roles ?? []
+  const currentIsSuperAdmin = currentUser?.role?.toLowerCase() === 'super admin'
+  const assignableRoles = currentIsSuperAdmin
+    ? roleList
+    : roleList.filter((r) => r.name.toLowerCase() !== 'super admin')
 
   const columns = useMemo<ColumnDef<User>[]>(
     () => [
@@ -134,7 +150,13 @@ export function SettingsUsers() {
       {
         accessorKey: 'role_id',
         header: 'Role',
-        cell: ({ getValue }) => <RoleBadge roleId={getValue<string>()} roles={roleList} />,
+        cell: ({ row, getValue }) => (
+          <RoleBadge
+            roleId={getValue<string>()}
+            roleName={row.original.role_name}
+            roles={roleList}
+          />
+        ),
       },
       {
         id: 'actions',
@@ -143,6 +165,7 @@ export function SettingsUsers() {
           <UserActions
             user={row.original}
             currentUserId={currentUser?.id ?? ''}
+            currentUserRole={currentUser?.role ?? ''}
             onEdit={(u) => {
               setEditUser(u)
               setEditForm({
@@ -157,7 +180,7 @@ export function SettingsUsers() {
         ),
       },
     ],
-    [roleList],
+    [roleList, currentUser?.id, currentUser?.role],
   )
 
   const sortedUsers = useMemo(() => {
@@ -311,7 +334,7 @@ export function SettingsUsers() {
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roleList.map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role.id} value={role.id}>
                         {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
                       </SelectItem>
@@ -380,7 +403,7 @@ export function SettingsUsers() {
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roleList.map((role) => (
+                    {assignableRoles.map((role) => (
                       <SelectItem key={role.id} value={role.id}>
                         {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
                       </SelectItem>

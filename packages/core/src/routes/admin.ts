@@ -38,7 +38,7 @@ router.post('/content-types', authorize('content-types:write'), createContentTyp
 router.get('/content-types/:slug', authorize('content-types:read'), getContentType)
 router.put('/content-types/:slug', authorize('content-types:write'), updateContentType)
 router.put('/content-types/:slug/default', authorize('content-types:write'), setDefaultContentType)
-router.delete('/content-types/:slug', authorize('content-types:write'), deleteContentType)
+router.delete('/content-types/:slug', authorize('content-types:delete'), deleteContentType)
 
 // Entries
 router.get('/content-types/:slug/entries', authorize('entries:read'), listEntries)
@@ -47,7 +47,7 @@ router.post('/content-types/:slug/entries', authorize('entries:write'), createEn
 router.get('/entries/:slug/:id', authorize('entries:read'), getEntry)
 router.put('/entries/:slug/:id', authorize('entries:write'), updateEntry)
 router.patch('/entries/:slug/:id/status', authorize('entries:write'), patchEntryStatus)
-router.delete('/entries/:slug/:id', authorize('entries:write'), deleteEntry)
+router.delete('/entries/:slug/:id', authorize('entries:delete'), deleteEntry)
 
 // Current user profile
 router.get('/users/me', getMe)
@@ -61,26 +61,26 @@ router.get('/users/me/prefs/:key', getUserPref)
 router.put('/users/me/prefs/:key', setUserPref)
 
 // Roles
-router.get('/roles', authorize('users:read'), listRoles)
-router.put('/roles/:id', authorize('users:write'), updateRole)
-router.post('/roles/reset', authorize('users:write'), resetRoles)
+router.get('/roles', authorize('settings:users:read'), listRoles)
+router.put('/roles/:id', authorize('settings:roles:write'), updateRole)
+router.post('/roles/reset', authorize('settings:roles:write'), resetRoles)
 
 // Users
-router.get('/users', authorize('users:read'), listUsers)
-router.post('/users', authorize('users:write'), createUser)
-router.put('/users/:id', authorize('users:write'), updateUser)
-router.delete('/users/:id', authorize('users:write'), deleteUser)
+router.get('/users', authorize('settings:users:read'), listUsers)
+router.post('/users', authorize('settings:users:write'), createUser)
+router.put('/users/:id', authorize('settings:users:write'), updateUser)
+router.delete('/users/:id', authorize('settings:users:delete'), deleteUser)
 
 // API tokens
-router.get('/api-tokens', authorize('api-tokens:read'), listApiTokens)
-router.post('/api-tokens', authorize('api-tokens:write'), createApiToken)
-router.delete('/api-tokens/:id', authorize('api-tokens:write'), deleteApiToken)
+router.get('/api-tokens', authorize('settings:api-tokens:read'), listApiTokens)
+router.post('/api-tokens', authorize('settings:api-tokens:write'), createApiToken)
+router.delete('/api-tokens/:id', authorize('settings:api-tokens:delete'), deleteApiToken)
 
 // Folders
 router.get('/folders', authorize('media:read'), listFolders)
 router.post('/folders', authorize('media:write'), createFolder)
 router.patch('/folders/:id', authorize('media:write'), renameFolder)
-router.delete('/folders/:id', authorize('media:write'), deleteFolder)
+router.delete('/folders/:id', authorize('media:delete'), deleteFolder)
 
 // Media
 router.get('/media', authorize('media:read'), listMedia)
@@ -89,15 +89,15 @@ router.post('/media/confirm', authorize('media:write'), confirmMedia)
 router.post('/media', authorize('media:write'), upload.array('files', 500), uploadMedia)
 router.get('/media/:id/url', authorize('media:read'), getMediaUrl)
 router.patch('/media/:id', authorize('media:write'), updateMedia)
-router.delete('/media/:id', authorize('media:write'), deleteMedia)
+router.delete('/media/:id', authorize('media:delete'), deleteMedia)
 
 // Settings
-router.get('/settings/:namespace', authorize('settings:read'), getNamespaceSettings)
-router.put('/settings/:namespace', authorize('settings:write'), updateNamespaceSettings)
+router.get('/settings/:namespace', authorize('settings:overview:read'), getNamespaceSettings)
+router.put('/settings/:namespace', authorize('settings:overview:write'), updateNamespaceSettings)
 
 // Webhooks
-router.get('/webhooks', authorize('webhooks:read'), listWebhooks)
-router.post('/webhooks', authorize('webhooks:write'), createWebhook)
-router.delete('/webhooks/:id', authorize('webhooks:write'), deleteWebhook)
+router.get('/webhooks', authorize('settings:webhooks:read'), listWebhooks)
+router.post('/webhooks', authorize('settings:webhooks:write'), createWebhook)
+router.delete('/webhooks/:id', authorize('settings:webhooks:delete'), deleteWebhook)
 
 export default router

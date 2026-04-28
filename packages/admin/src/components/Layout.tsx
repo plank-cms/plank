@@ -35,9 +35,9 @@ const NAV_ITEMS = [
     to: '/content-types',
     icon: LayersIcon,
     label: 'Content Types',
-    permission: 'content-types:read',
+    permission: 'content-types:write',
   },
-  { to: '/settings', icon: Settings2Icon, label: 'Settings', permission: 'settings:read' },
+  { to: '/settings', icon: Settings2Icon, label: 'Settings', permission: 'settings:overview:read' },
 ]
 
 function LayoutShell() {
