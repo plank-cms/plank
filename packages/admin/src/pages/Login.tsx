@@ -148,7 +148,10 @@ export function Login() {
       </div>
 
       {/* Right panel — decorative */}
-      <div className="hidden bg-muted lg:block" />
+      <div
+        className="hidden lg:block bg-center bg-cover bg-no-repeat"
+        style={{ backgroundImage: `url(${import.meta.env.BASE_URL}particles-texture.png)` }}
+      />
     </div>
   )
 }
