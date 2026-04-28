@@ -29,9 +29,11 @@ const RESOURCES = [
   { key: 'content-types', label: 'Content Types' },
   { key: 'entries', label: 'Entries' },
   { key: 'media', label: 'Media' },
-  { key: 'users', label: 'Users' },
-  { key: 'api-tokens', label: 'API Tokens' },
-  { key: 'webhooks', label: 'Webhooks' },
+  { key: 'settings:overview', label: 'Settings / Overview' },
+  { key: 'settings:users', label: 'Settings / Users' },
+  { key: 'settings:roles', label: 'Settings / Roles' },
+  { key: 'settings:api-tokens', label: 'Settings / API Tokens' },
+  { key: 'settings:webhooks', label: 'Settings / Webhooks' },
 ] as const
 
 const ACTIONS = [
