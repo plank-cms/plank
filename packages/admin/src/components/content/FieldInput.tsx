@@ -1466,7 +1466,7 @@ export function FieldInput({ field, value, onChange, allValues, disabled }: Fiel
       <Input
         className={cn(sharedClass, 'text-base md:text-base')}
         value={String(value ?? '')}
-        placeholder="auto-generated-slug"
+        placeholder="auto-generated"
         onChange={(e) => {
           const v = e.target.value
           // If user cleared the UID, allow auto-generation again

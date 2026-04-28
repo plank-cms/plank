@@ -143,7 +143,7 @@ function GeneralSettings() {
         <Label>Locales</Label>
         <div className="flex items-center gap-2">
           <Input
-            placeholder="es, en"
+            placeholder={`E.g. "en"`}
             value={newLocale}
             onChange={(e) => setNewLocale(e.target.value)}
             className="w-1/4"
