@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs.t
 import { MediaSettings } from './media/MediaSettings.tsx'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
+import { Input } from '@/components/ui/input.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import {
@@ -65,14 +66,34 @@ function GeneralSettings() {
   const { refreshSettings } = useSettings()
 
   const [timezone, setTimezone] = useState('UTC')
+  const [locales, setLocales] = useState<string[]>([])
+  const [defaultLocale, setDefaultLocale] = useState<string>('en')
+  const [newLocale, setNewLocale] = useState<string>('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (data?.timezone) setTimezone(data.timezone)
+    if (data?.locales) {
+      try {
+        const parsed = JSON.parse(data.locales)
+        if (Array.isArray(parsed)) setLocales(parsed)
+      } catch {
+        setLocales(
+          (data.locales || '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        )
+      }
+    }
+    if (data?.default_locale) setDefaultLocale(data.default_locale)
   }, [data])
 
   async function handleSave() {
-    await request('/cms/admin/settings/general', 'PUT', { timezone })
+    const payload: Record<string, string> = { timezone }
+    if (locales.length) payload.locales = JSON.stringify(locales)
+    if (defaultLocale) payload.default_locale = defaultLocale
+    await request('/cms/admin/settings/general', 'PUT', payload)
     refreshSettings()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -116,6 +137,60 @@ function GeneralSettings() {
         <p className="text-xs text-muted-foreground">
           Used to display dates and times across the admin panel.
         </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Locales</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="es, en"
+            value={newLocale}
+            onChange={(e) => setNewLocale(e.target.value)}
+            className="w-1/4"
+          />
+          <Button
+            variant="outline"
+            onClick={() => {
+              const code = newLocale.trim().toLowerCase()
+              if (!code) return
+              if (!locales.includes(code)) setLocales((s) => [...s, code])
+              setNewLocale('')
+            }}
+          >
+            Add
+          </Button>
+        </div>
+        <div className="flex gap-2 mt-2">
+          {locales.map((l) => (
+            <Button
+              key={l}
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocales((s) => s.filter((x) => x !== l))}
+            >
+              {l.toUpperCase()}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-2">
+          <Label htmlFor="default-locale">Default locale</Label>
+          <Select value={defaultLocale} onValueChange={setDefaultLocale}>
+            <SelectTrigger id="default-locale" className="w-1/2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {locales.length === 0 ? (
+                <SelectItem value={defaultLocale}>{defaultLocale}</SelectItem>
+              ) : (
+                locales.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {l.toUpperCase()}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Button onClick={handleSave} disabled={saving}>

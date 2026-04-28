@@ -8,6 +8,8 @@ import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { useSettings } from '@/context/settings.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs.tsx'
+import { Switch } from '@/components/ui/switch.tsx'
 import { Label } from '@/components/ui/label.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
@@ -43,7 +45,7 @@ export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
   const navigate = useNavigate()
   const isNew = !id
-  const { timezone } = useSettings()
+  const { timezone, locales: settingsLocales, defaultLocale } = useSettings()
 
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null,
@@ -57,6 +59,10 @@ export function EntryForm() {
   const { loading: deleting, request: requestDelete } = useApi()
 
   const [values, setValues] = useState<Record<string, unknown>>({})
+  const [locales, setLocales] = useState<string[]>([])
+  const [activeLocale, setActiveLocale] = useState<string>('')
+  const [localizationEnabled, setLocalizationEnabled] = useState<boolean>(false)
+  // newLocale removed: locales now managed in Settings > Overview > General
   const [status, setStatus] = useState<'draft' | 'scheduled' | 'published'>('draft')
   const [scheduledFor, setScheduledFor] = useState<string>('')
   const [isPublishedStale, setIsPublishedStale] = useState(false)
@@ -77,6 +83,12 @@ export function EntryForm() {
       ct?.fields.forEach((f) => {
         empty[f.name] = f.type === 'boolean' ? false : ''
       })
+      // prepare localized container and default locales
+      empty.localized = {}
+      const defaults = settingsLocales && settingsLocales.length > 0 ? settingsLocales : ['en']
+      setLocales(defaults)
+      setActiveLocale(defaultLocale ?? defaults[0])
+      setLocalizationEnabled(false)
       setValues(empty)
       setStatus('draft')
       setScheduledFor('')
@@ -90,6 +102,25 @@ export function EntryForm() {
     ct.fields.forEach((f) => {
       initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '')
     })
+    // localized values
+    // normalize to a plain object so TS doesn't treat it as `unknown`
+    const rawLocalized = (existing as any).localized
+    const localizedObj: Record<string, any> =
+      rawLocalized && typeof rawLocalized === 'object' ? rawLocalized : {}
+    initial.localized = localizedObj
+    const detectedLocales = Object.keys(localizedObj).filter((k) => !k.startsWith('_'))
+    const meta = localizedObj._meta || {}
+    const enabled = meta.enabled ?? detectedLocales.length > 0
+    const primary = meta.primary ?? detectedLocales[0] ?? defaultLocale ?? 'en'
+    if (detectedLocales.length > 0) {
+      setLocales(detectedLocales)
+      setActiveLocale(detectedLocales[0])
+    } else {
+      const defaults = settingsLocales && settingsLocales.length > 0 ? settingsLocales : ['en']
+      setLocales(defaults)
+      setActiveLocale(defaultLocale ?? defaults[0])
+    }
+    setLocalizationEnabled(Boolean(enabled))
     setValues(initial)
     setStatus(existing.status ?? 'draft')
     original.current = JSON.stringify(initial)
@@ -143,6 +174,55 @@ export function EntryForm() {
     setValues((prev) => ({ ...prev, [name]: value }))
   }
 
+  function handleLocalizedChange(locale: string, name: string, value: unknown) {
+    setValues((prev: any) => {
+      const next: any = { ...(prev || {}) }
+      if (!next.localized || typeof next.localized !== 'object') next.localized = {}
+      next.localized[locale] = { ...(next.localized[locale] || {}) }
+      next.localized[locale][name] = value
+      return next
+    })
+  }
+
+  function toggleLocalization(enabled: boolean) {
+    setLocalizationEnabled(enabled)
+    setValues((prev: any) => {
+      const next: any = { ...(prev || {}) }
+      if (!next.localized || typeof next.localized !== 'object') next.localized = {}
+      if (!next.localized._meta) next.localized._meta = {}
+      if (enabled && defaultLocale) {
+        // Enabling: if no localized bucket for defaultLocale, copy top-level values into it
+        if (!next.localized[defaultLocale]) {
+          next.localized[defaultLocale] = {}
+          if (ct && ct.fields) {
+            ct.fields.forEach((f) => {
+              if (['string', 'text', 'richtext'].includes(f.type)) {
+                const v = next[f.name]
+                if (v !== undefined && v !== null && v !== '')
+                  next.localized[defaultLocale][f.name] = v
+              }
+            })
+          }
+        }
+        next.localized._meta.primary = defaultLocale
+      } else if (!enabled && defaultLocale) {
+        // Disabling: copy values from localized[defaultLocale] back to top-level fields
+        const src =
+          next.localized && next.localized[defaultLocale] ? next.localized[defaultLocale] : null
+        if (src && ct && ct.fields) {
+          ct.fields.forEach((f) => {
+            if (['string', 'text', 'richtext', 'uid'].includes(f.type)) {
+              const v = src[f.name]
+              if (v !== undefined) next[f.name] = v
+            }
+          })
+        }
+      }
+      next.localized._meta.enabled = enabled
+      return next
+    })
+  }
+
   function openScheduler() {
     // Pre-fill with existing scheduled_for or sensible defaults
     if (scheduledFor) {
@@ -160,14 +240,42 @@ export function EntryForm() {
   async function saveFields(): Promise<Entry | null> {
     if (!slug || !ct) return null
     const body: Record<string, unknown> = {}
+    // When localization is enabled, prefer values from localized[defaultLocale]
+    const localizedDefault: Record<string, unknown> | null =
+      localizationEnabled &&
+      values.localized &&
+      typeof values.localized === 'object' &&
+      (values.localized as Record<string, any>)[defaultLocale]
+        ? ((values.localized as Record<string, any>)[defaultLocale] as Record<string, unknown>)
+        : null
+
     ct.fields.forEach((f) => {
-      const v = values[f.name]
+      let v = (values as any)[f.name]
+      if (
+        (v === undefined || v === null || v === '') &&
+        localizedDefault &&
+        localizedDefault[f.name] !== undefined
+      ) {
+        v = localizedDefault[f.name]
+      }
       if (f.type === 'media' && v === null) {
         body[f.name] = null
       } else if (v !== '' && v !== null && v !== undefined) {
         body[f.name] = v
       }
     })
+    // Include localized object when present
+    if (values.localized && Object.keys(values.localized as Record<string, unknown>).length > 0) {
+      // ensure meta
+      // @ts-ignore
+      if (!values.localized._meta) values.localized._meta = {}
+      // @ts-ignore
+      values.localized._meta.enabled = localizationEnabled
+      // @ts-ignore
+      values.localized._meta.primary = defaultLocale
+      // @ts-ignore
+      body.localized = values.localized
+    }
 
     try {
       const saved = await request(
@@ -439,26 +547,79 @@ export function EntryForm() {
         )}
 
         {/* Fields grid */}
-        <div className="grid grid-cols-6 gap-4">
-          {ct.fields.map((field) => (
-            <div
-              key={field.name}
-              className={FIELD_WIDTH_SPAN[(field.width as FieldWidth) ?? 'full']}
-            >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={`entry-${field.name}`} className="capitalize">
-                  {field.name.replace(/_/g, ' ')}
-                  {field.required && <span className="ml-1 text-destructive">*</span>}
-                </Label>
-                <FieldInput
-                  field={field}
-                  value={values[field.name]}
-                  onChange={(v) => handleChange(field.name, v)}
-                  allValues={{ ...values, id }}
-                />
+        {/* Localization controls */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch checked={localizationEnabled} onCheckedChange={toggleLocalization} />
+              <div>
+                <p className="text-sm font-medium">Localization</p>
+                <p className="text-xs text-muted-foreground">Enable per-entry localization</p>
               </div>
             </div>
-          ))}
+            <div />
+          </div>
+          <div>
+            <Tabs value={activeLocale} onValueChange={(v) => setActiveLocale(v)}>
+              <TabsList>
+                {locales.map((l) => (
+                  <TabsTrigger key={l} value={l}>
+                    {l.toUpperCase()}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+        <div className="grid grid-cols-6 gap-4">
+          {ct.fields.map((field) => {
+            const isLocalizable = ['string', 'text', 'richtext'].includes(field.type)
+            const localizedValue =
+              values.localized && (values.localized as any)[activeLocale]
+                ? (values.localized as any)[activeLocale][field.name]
+                : undefined
+            const renderValue =
+              isLocalizable && localizationEnabled ? localizedValue : values[field.name]
+            // Disable UID when it derives from a localized target field
+            const uidDisabled =
+              field.type === 'uid' &&
+              field.targetField &&
+              localizationEnabled &&
+              ['string', 'text', 'richtext'].includes(
+                ct.fields.find((f) => f.name === field.targetField)?.type ?? '',
+              )
+
+            return (
+              <div
+                key={field.name}
+                className={FIELD_WIDTH_SPAN[(field.width as FieldWidth) ?? 'full']}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`entry-${field.name}`} className="capitalize">
+                    {field.name.replace(/_/g, ' ')}
+                    {field.required && <span className="ml-1 text-destructive">*</span>}
+                  </Label>
+                  <FieldInput
+                    field={field}
+                    value={renderValue}
+                    onChange={(v) => {
+                      if (isLocalizable && localizationEnabled)
+                        handleLocalizedChange(activeLocale, field.name, v)
+                      else handleChange(field.name, v)
+                    }}
+                    allValues={{
+                      ...values,
+                      id,
+                      __activeLocale: activeLocale,
+                      __localizationEnabled: localizationEnabled,
+                      __defaultLocale: defaultLocale,
+                    }}
+                    disabled={Boolean(uidDisabled)}
+                  />
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Delete confirmation */}

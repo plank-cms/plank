@@ -1,5 +1,10 @@
 import { pool } from '@plank/db'
-import { assertSafeIdentifier, toPostgresType, isVirtualRelation, hasRelationColumn } from './fieldTypes.js'
+import {
+  assertSafeIdentifier,
+  toPostgresType,
+  isVirtualRelation,
+  hasRelationColumn,
+} from './fieldTypes.js'
 import type { ContentType, FieldDefinition } from './types.js'
 import { findAllContentTypes } from './store.js'
 
@@ -15,7 +20,11 @@ function junctionTableName(sourceTable: string, fieldName: string): string {
   return `_rel_${sourceTable}_${fieldName}`
 }
 
-function buildJunctionTableSQL(sourceTable: string, fieldName: string, targetTable: string): string {
+function buildJunctionTableSQL(
+  sourceTable: string,
+  fieldName: string,
+  targetTable: string,
+): string {
   const jt = junctionTableName(sourceTable, fieldName)
   assertSafeIdentifier(targetTable)
   return [
@@ -43,6 +52,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
     `CREATE TABLE IF NOT EXISTS ${contentType.tableName} (`,
     `  id         TEXT PRIMARY KEY,`,
     ...columns.map((col) => `  ${col},`),
+    `  localized      JSONB,`,
     `  status         VARCHAR(20) NOT NULL DEFAULT 'draft',`,
     `  published_data JSONB,`,
     `  published_at   TIMESTAMP,`,
@@ -55,17 +65,27 @@ export async function createTable(contentType: ContentType): Promise<void> {
 
   await pool.query(sql)
 
+  // Create a GIN index for the localized JSONB column to support locale queries
+  try {
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_${contentType.tableName}_localized_gin ON ${contentType.tableName} USING gin (localized)`,
+    )
+  } catch (err) {
+    // ignore index creation errors
+  }
+
   for (const field of contentType.fields) {
-    if (field.type === 'relation' && (field.relationType ?? 'many-to-one') === 'many-to-many' && field.relatedTable) {
+    if (
+      field.type === 'relation' &&
+      (field.relationType ?? 'many-to-one') === 'many-to-many' &&
+      field.relatedTable
+    ) {
       await pool.query(buildJunctionTableSQL(contentType.tableName, field.name, field.relatedTable))
     }
   }
 }
 
-export async function syncTable(
-  next: ContentType,
-  prev: ContentType,
-): Promise<void> {
+export async function syncTable(next: ContentType, prev: ContentType): Promise<void> {
   assertSafeIdentifier(next.tableName)
 
   const prevFields = new Map(prev.fields.map((f) => [f.name, f]))
@@ -80,9 +100,14 @@ export async function syncTable(
 
       assertSafeIdentifier(name)
       const colDef = buildColumnDef(field)
-      if (colDef) statements.push(`ALTER TABLE ${next.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
+      if (colDef)
+        statements.push(`ALTER TABLE ${next.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
 
-      if (field.type === 'relation' && (field.relationType ?? 'many-to-one') === 'many-to-many' && field.relatedTable) {
+      if (
+        field.type === 'relation' &&
+        (field.relationType ?? 'many-to-one') === 'many-to-many' &&
+        field.relatedTable
+      ) {
         const sql = buildJunctionTableSQL(next.tableName, name, field.relatedTable)
         junctionOps.push(() => pool.query(sql))
       }
@@ -98,7 +123,10 @@ export async function syncTable(
         statements.push(`ALTER TABLE ${next.tableName} DROP COLUMN ${name}`)
       }
 
-      if (prevField.type === 'relation' && (prevField.relationType ?? 'many-to-one') === 'many-to-many') {
+      if (
+        prevField.type === 'relation' &&
+        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
+      ) {
         const jt = junctionTableName(next.tableName, name)
         junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${jt}`))
       }
@@ -116,7 +144,10 @@ export async function syncTable(
 
       assertSafeIdentifier(name)
 
-      if (prevField.type === 'relation' && (prevField.relationType ?? 'many-to-one') === 'many-to-many') {
+      if (
+        prevField.type === 'relation' &&
+        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
+      ) {
         const jt = junctionTableName(next.tableName, name)
         junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${jt}`))
       }
@@ -127,10 +158,15 @@ export async function syncTable(
 
       if (hasRelationColumn(nextField)) {
         const colDef = buildColumnDef(nextField)
-        if (colDef) statements.push(`ALTER TABLE ${next.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
+        if (colDef)
+          statements.push(`ALTER TABLE ${next.tableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
       }
 
-      if (nextField.type === 'relation' && (nextField.relationType ?? 'many-to-one') === 'many-to-many' && nextField.relatedTable) {
+      if (
+        nextField.type === 'relation' &&
+        (nextField.relationType ?? 'many-to-one') === 'many-to-many' &&
+        nextField.relatedTable
+      ) {
         const sql = buildJunctionTableSQL(next.tableName, name, nextField.relatedTable)
         junctionOps.push(() => pool.query(sql))
       }
@@ -180,6 +216,24 @@ export async function syncAllTables(): Promise<void> {
     )
     const existingColumns = new Set(rows.map((r) => r.column_name))
 
+    // Ensure `localized` column exists on existing tables to support per-entry JSONB localization
+    if (!existingColumns.has('localized')) {
+      try {
+        await pool.query(`ALTER TABLE ${ct.tableName} ADD COLUMN IF NOT EXISTS localized JSONB`)
+        existingColumns.add('localized')
+        try {
+          await pool.query(
+            `CREATE INDEX IF NOT EXISTS idx_${ct.tableName}_localized_gin ON ${ct.tableName} USING gin (localized)`,
+          )
+        } catch (err) {
+          // ignore index creation errors
+        }
+        console.log(`[plank] Added missing column "localized" to table "${ct.tableName}"`)
+      } catch (err) {
+        // table may not exist or other race conditions; ignore and continue
+      }
+    }
+
     for (const field of ct.fields) {
       if (!isVirtualRelation(field) && !existingColumns.has(field.name)) {
         assertSafeIdentifier(field.name)
@@ -190,7 +244,11 @@ export async function syncAllTables(): Promise<void> {
         }
       }
 
-      if (field.type === 'relation' && (field.relationType ?? 'many-to-one') === 'many-to-many' && field.relatedTable) {
+      if (
+        field.type === 'relation' &&
+        (field.relationType ?? 'many-to-one') === 'many-to-many' &&
+        field.relatedTable
+      ) {
         await pool.query(buildJunctionTableSQL(ct.tableName, field.name, field.relatedTable))
         console.log(`[plank] Created missing junction table for "${ct.tableName}.${field.name}"`)
       }

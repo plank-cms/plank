@@ -61,7 +61,14 @@ type FieldType =
   | 'uid'
   | 'array'
 type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
-type ArraySubFieldType = 'string' | 'text' | 'richtext' | 'number' | 'boolean' | 'datetime' | 'media'
+type ArraySubFieldType =
+  | 'string'
+  | 'text'
+  | 'richtext'
+  | 'number'
+  | 'boolean'
+  | 'datetime'
+  | 'media'
 type ArraySubField = {
   name: string
   type: ArraySubFieldType
@@ -91,6 +98,7 @@ type FieldInputProps = {
   value: unknown
   onChange: (value: unknown) => void
   allValues: Record<string, unknown>
+  disabled?: boolean
 }
 
 const ACCEPT_MAP: Record<string, string> = {
@@ -127,14 +135,20 @@ function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
 }
 
-async function uploadFile(file: File, folderId?: string | null): Promise<{ id: string; url: string }> {
+async function uploadFile(
+  file: File,
+  folderId?: string | null,
+): Promise<{ id: string; url: string }> {
   return uploadMediaFile(file, { folderId })
 }
 
 type PickerFolder = { id: string; name: string; parent_id: string | null; item_count: number }
 type PickerBreadcrumb = { id: string | null; name: string }
 
-function matchesAllowedTypes(mime: string | null, allowedTypes?: FieldDef['allowedTypes']): boolean {
+function matchesAllowedTypes(
+  mime: string | null,
+  allowedTypes?: FieldDef['allowedTypes'],
+): boolean {
   if (!allowedTypes || allowedTypes.length === 0) return true
   const m = mime ?? ''
   return allowedTypes.some((t) => {
@@ -178,8 +192,14 @@ function MediaPickerDialog({
         .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
         .then((d) => d.items),
     ])
-      .then(([f, m]) => { setFolders(f); setItems(m) })
-      .catch(() => { setFolders([]); setItems([]) })
+      .then(([f, m]) => {
+        setFolders(f)
+        setItems(m)
+      })
+      .catch(() => {
+        setFolders([])
+        setItems([])
+      })
       .finally(() => setLoading(false))
   }, [open, currentFolderId])
 
@@ -217,7 +237,10 @@ function MediaPickerDialog({
                     {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
                   </span>
                 ) : (
-                  <button onClick={() => navigateTo(i)} className="hover:text-foreground transition-colors">
+                  <button
+                    onClick={() => navigateTo(i)}
+                    className="hover:text-foreground transition-colors"
+                  >
                     {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
                   </button>
                 )}
@@ -232,7 +255,9 @@ function MediaPickerDialog({
           </div>
         ) : empty ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
-            {items.length === 0 && folders.length === 0 ? 'No media found.' : 'No matching files in this folder.'}
+            {items.length === 0 && folders.length === 0
+              ? 'No media found.'
+              : 'No matching files in this folder.'}
           </p>
         ) : (
           <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
@@ -264,12 +289,19 @@ function MediaPickerDialog({
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => { onSelect(item); onOpenChange(false) }}
+                    onClick={() => {
+                      onSelect(item)
+                      onOpenChange(false)
+                    }}
                     className="group relative overflow-hidden rounded-md border bg-card text-left transition-colors hover:border-primary"
                   >
                     <div className="aspect-square bg-muted">
                       {isImageMime(item.mime_type) ? (
-                        <img src={item.url} alt={item.filename} className="h-full w-full object-cover" />
+                        <img
+                          src={item.url}
+                          alt={item.filename}
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         <div className="flex h-full items-center justify-center">
                           <FileIcon className="size-6 text-muted-foreground" />
@@ -277,7 +309,10 @@ function MediaPickerDialog({
                       )}
                     </div>
                     <div className="p-1.5">
-                      <p className="truncate text-[11px] font-medium leading-tight" title={item.filename}>
+                      <p
+                        className="truncate text-[11px] font-medium leading-tight"
+                        title={item.filename}
+                      >
                         {item.filename}
                       </p>
                       <p className="text-[10px] text-muted-foreground">{formatBytes(item.size)}</p>
@@ -1106,7 +1141,9 @@ function ArrayInput({
   const subFields = field.arrayFields ?? []
 
   function buildEmptyItem(): Record<string, unknown> {
-    return Object.fromEntries(subFields.map((sf) => [sf.name, sf.type === 'boolean' ? false : null]))
+    return Object.fromEntries(
+      subFields.map((sf) => [sf.name, sf.type === 'boolean' ? false : null]),
+    )
   }
 
   function handleAddItem() {
@@ -1118,7 +1155,7 @@ function ArrayInput({
   }
 
   function handleItemChange(index: number, subFieldName: string, subValue: unknown) {
-    onChange(items.map((item, i) => i === index ? { ...item, [subFieldName]: subValue } : item))
+    onChange(items.map((item, i) => (i === index ? { ...item, [subFieldName]: subValue } : item)))
   }
 
   if (subFields.length === 0) {
@@ -1295,16 +1332,69 @@ function RichTextInput({ value, onChange }: { value: unknown; onChange: (v: unkn
   )
 }
 
-export function FieldInput({ field, value, onChange, allValues }: FieldInputProps) {
+export function FieldInput({ field, value, onChange, allValues, disabled }: FieldInputProps) {
   const uidManual = useRef(false)
   const { timezone } = useSettings()
 
-  // Auto-derive UID from targetField while user hasn't manually edited it
+  // Auto-derive UID from targetField while user hasn't manually edited it.
+  // The UID must remain global (not per-locale). Generate only from the non-localized
+  // source value (`allValues[targetField]`). If localization is active and there's no
+  // non-localized source value, do NOT auto-generate (user should disable localization
+  // or provide the non-localized value first).
   useEffect(() => {
     if (field.type !== 'uid' || !field.targetField || uidManual.current) return
-    const source = String(allValues[field.targetField] ?? '')
-    onChange(toSlug(source))
-  }, [field.type, field.targetField, allValues[field.targetField ?? '']]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const meta: any = allValues as any
+    const target = field.targetField
+
+    const localizationEnabled = Boolean(meta.__localizationEnabled)
+
+    // Prefer top-level (non-localized) value
+    const topValue = (allValues as any)[target]
+    if (topValue !== undefined && topValue !== null && String(topValue).trim() !== '') {
+      onChange(toSlug(String(topValue)))
+      return
+    }
+
+    // If localization is enabled and there's no top-level value, attempt to use
+    // the value from the default locale only. If that's absent, do not auto-generate.
+    const localized =
+      (allValues as any).localized && typeof (allValues as any).localized === 'object'
+        ? (allValues as any).localized
+        : {}
+    if (localizationEnabled) {
+      const defaultLocale = (allValues as any).__defaultLocale as string | undefined
+      if (
+        defaultLocale &&
+        localized[defaultLocale] &&
+        localized[defaultLocale][target] !== undefined &&
+        String(localized[defaultLocale][target]).trim() !== ''
+      ) {
+        onChange(toSlug(String(localized[defaultLocale][target])))
+      }
+      return
+    }
+
+    // If localization is not enabled, attempt to fall back to any localized value
+    // (rare case for legacy data), but this is secondary to top-level.
+    const keys = Object.keys(localized).filter((k) => !k.startsWith('_'))
+    for (const k of keys) {
+      if (
+        localized[k] &&
+        localized[k][target] !== undefined &&
+        String(localized[k][target]).trim() !== ''
+      ) {
+        onChange(toSlug(String(localized[k][target])))
+        return
+      }
+    }
+  }, [
+    field.type,
+    field.targetField,
+    (allValues as any)[field.targetField ?? ''],
+    JSON.stringify((allValues as any).localized ?? {}),
+    (allValues as any).__localizationEnabled,
+  ])
 
   const sharedClass = 'w-full'
 
@@ -1378,9 +1468,12 @@ export function FieldInput({ field, value, onChange, allValues }: FieldInputProp
         value={String(value ?? '')}
         placeholder="auto-generated-slug"
         onChange={(e) => {
-          uidManual.current = true
+          const v = e.target.value
+          // If user cleared the UID, allow auto-generation again
+          uidManual.current = Boolean(v && v !== '')
           onChange(e.target.value)
         }}
+        disabled={Boolean(disabled)}
       />
     )
   }
