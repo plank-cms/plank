@@ -60,16 +60,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const user = JSON.parse(raw) as User
         dispatch({ type: 'LOGIN', payload: { user, token } })
-        // Refresh avatar URL — pre-signed URLs expire, so always fetch fresh on startup
+        // Refresh profile data on startup — avatar URLs can expire and profile fields can change.
         fetch('/cms/admin/users/me', { headers: { Authorization: `Bearer ${token}` } })
           .then((r) => (r.ok ? r.json() : null))
-          .then((data: { avatar_url?: string | null } | null) => {
+          .then((data: {
+            first_name?: string | null
+            last_name?: string | null
+            avatar_url?: string | null
+            job_title?: string | null
+            organization?: string | null
+            country?: string | null
+          } | null) => {
             if (!data) return
-            const avatarUrl = data.avatar_url ?? null
-            dispatch({ type: 'UPDATE_USER', payload: { avatarUrl } })
+            const patch: Partial<User> = {
+              firstName: data.first_name ?? null,
+              lastName: data.last_name ?? null,
+              avatarUrl: data.avatar_url ?? null,
+              jobTitle: data.job_title ?? null,
+              organization: data.organization ?? null,
+              country: data.country ?? null,
+            }
+            dispatch({ type: 'UPDATE_USER', payload: patch })
             const stored = localStorage.getItem(USER_KEY)
             if (stored) {
-              localStorage.setItem(USER_KEY, JSON.stringify({ ...JSON.parse(stored), avatarUrl }))
+              localStorage.setItem(USER_KEY, JSON.stringify({ ...JSON.parse(stored), ...patch }))
             }
           })
           .catch(() => {})

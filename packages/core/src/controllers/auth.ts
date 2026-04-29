@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool, createId } from '@plank/db'
 import { z, flattenError } from 'zod'
+import { getProvider } from '../media/index.js'
 
 const LoginSchema = z.object({
   email: z.email(),
@@ -14,7 +15,18 @@ const RegisterSchema = z.object({
   password: z.string().min(8),
 })
 
-type UserRow = { id: string; email: string; password: string; role_id: string; first_name: string | null; last_name: string | null; avatar_url: string | null }
+type UserRow = {
+  id: string
+  email: string
+  password: string
+  role_id: string
+  first_name: string | null
+  last_name: string | null
+  avatar_url: string | null
+  job_title: string | null
+  organization: string | null
+  country: string | null
+}
 type CountRow = { count: string }
 type RoleRow = { id: string; name: string; permissions: string[] }
 
@@ -57,7 +69,9 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const { email, password } = parsed.data
   const { rows } = await pool.query<UserRow>(
-    'SELECT id, email, password, role_id, first_name, last_name, avatar_url FROM plank_users WHERE email = $1',
+    `SELECT id, email, password, role_id, first_name, last_name, avatar_url, job_title, organization, country
+     FROM plank_users
+     WHERE email = $1`,
     [email],
   )
 
@@ -74,6 +88,12 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   clearRateLimit(ip)
 
+  let avatarUrl = user.avatar_url
+  if (avatarUrl && !avatarUrl.startsWith('http')) {
+    const provider = await getProvider()
+    avatarUrl = await provider.getUrl(avatarUrl)
+  }
+
   const token = jwt.sign(
     { sub: user.id, roleId: user.role_id },
     process.env.PLANK_JWT_SECRET!,
@@ -89,7 +109,10 @@ export async function login(req: Request, res: Response): Promise<void> {
       permissions: roleRows[0]?.permissions ?? [],
       firstName: user.first_name,
       lastName: user.last_name,
-      avatarUrl: user.avatar_url,
+      avatarUrl,
+      jobTitle: user.job_title,
+      organization: user.organization,
+      country: user.country,
     },
   })
 }
