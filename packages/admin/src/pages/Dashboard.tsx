@@ -1,10 +1,38 @@
+import { PlusIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import HeaderFixed from '@/components/Header'
+import { useFetch } from '@/hooks/useFetch.ts'
+import { useAuth } from '@/context/auth.tsx'
+import { Button } from '@/components/ui/button.tsx'
+
+type ContentType = { slug: string; isDefault: boolean }
 
 export function Dashboard() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { data: contentTypes } = useFetch<ContentType[]>('/cms/admin/content-types')
+
+  const permissions = user?.permissions ?? []
+  const canWriteEntries = permissions.includes('*') || permissions.includes('entries:write')
+
+  function handleNewEntry() {
+    if (!contentTypes || contentTypes.length === 0) return
+    const target = contentTypes.find((ct) => ct.isDefault) ?? contentTypes[0]
+    navigate(`/content/${target.slug}/new`)
+  }
+
   return (
     <div className="relative min-h-[calc(100vh-8rem)]">
       <HeaderFixed>
-        <h1 className="text-2xl font-bold -mt-2">Dashboard</h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-2xl font-bold -mt-2">Dashboard</h1>
+          {canWriteEntries && (
+            <Button onClick={handleNewEntry} disabled={!contentTypes || contentTypes.length === 0}>
+              <PlusIcon className="size-4" />
+              New entry
+            </Button>
+          )}
+        </div>
       </HeaderFixed>
 
       <section className="mt-4">
