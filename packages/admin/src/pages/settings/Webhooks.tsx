@@ -169,7 +169,7 @@ export function SettingsWebhooks() {
           <Table>
             <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
-                <TableRow key={hg.id}>
+                <TableRow key={hg.id} className="hover:bg-transparent">
                   {hg.headers.map((header) => (
                     <TableHead key={header.id}>
                       {flexRender(header.column.columnDef.header, header.getContext())}

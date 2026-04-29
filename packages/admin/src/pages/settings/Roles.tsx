@@ -30,10 +30,22 @@ const RESOURCES = [
   { key: 'entries', label: 'Entries', actions: ['read', 'write', 'delete'] as const },
   { key: 'media', label: 'Media', actions: ['read', 'write', 'delete'] as const },
   { key: 'settings:overview', label: 'Settings / Overview', actions: ['read', 'write'] as const },
-  { key: 'settings:users', label: 'Settings / Users', actions: ['read', 'write', 'delete'] as const },
+  {
+    key: 'settings:users',
+    label: 'Settings / Users',
+    actions: ['read', 'write', 'delete'] as const,
+  },
   { key: 'settings:roles', label: 'Settings / Roles', actions: ['read', 'write'] as const },
-  { key: 'settings:api-tokens', label: 'Settings / API Tokens', actions: ['read', 'write', 'delete'] as const },
-  { key: 'settings:webhooks', label: 'Settings / Webhooks', actions: ['read', 'write', 'delete'] as const },
+  {
+    key: 'settings:api-tokens',
+    label: 'Settings / API Tokens',
+    actions: ['read', 'write', 'delete'] as const,
+  },
+  {
+    key: 'settings:webhooks',
+    label: 'Settings / Webhooks',
+    actions: ['read', 'write', 'delete'] as const,
+  },
 ] as const
 
 const ACTIONS = [
@@ -120,7 +132,7 @@ export function SettingsRoles() {
           <Table>
             <TableHeader>
               {/* Row 1: role names + save buttons */}
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableHead className="w-40" rowSpan={2} />
 
                 {superAdminRole && (
@@ -149,7 +161,7 @@ export function SettingsRoles() {
               </TableRow>
 
               {/* Row 2: R / W / D labels */}
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 {superAdminRole &&
                   ACTIONS.map((a, i) => (
                     <TableHead

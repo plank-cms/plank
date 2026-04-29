@@ -25,6 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table.tsx'
 
 type FieldDef = { name: string; type: string }
 type ContentType = {
@@ -210,10 +218,10 @@ export function Dashboard() {
       <section className="mt-24">
         <TooltipProvider>
           <div className="overflow-hidden rounded-lg border border-border bg-background">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border ">
-                <tr>
-                  <th colSpan={4} className="px-4 py-3">
+            <Table className="w-full text-sm">
+              <TableHeader className="border-b border-border font-bold uppercase">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead colSpan={4} className="px-4 py-3 h-auto">
                     <div className="flex items-center justify-between">
                       <h2 className="text-base font-semibold text-foreground">Recent content</h2>
                       <Dialog open={configureOpen} onOpenChange={setConfigureOpen}>
@@ -256,39 +264,43 @@ export function Dashboard() {
                         </DialogContent>
                       </Dialog>
                     </div>
-                  </th>
-                </tr>
-                <tr className="border-t border-border">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Entry</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  </TableHead>
+                </TableRow>
+                <TableRow className="border-t border-border hover:bg-transparent">
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Entry
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Collection Type
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Author</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Author
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Published
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {loadingRecent ? (
-                  <tr className="border-b">
-                    <td colSpan={4} className="h-24">
+                  <TableRow className="border-b">
+                    <TableCell colSpan={4} className="h-24">
                       <Spinner className="mx-auto size-5" />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : recent.length === 0 ? (
-                  <tr className="border-b">
-                    <td colSpan={4} className="h-24 text-center text-muted-foreground">
+                  <TableRow className="border-b">
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                       No recent entries found.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   recent.map((entry) => (
-                    <tr
+                    <TableRow
                       key={`${entry.slug}-${entry.id}`}
                       className="border-b last:border-b-0 transition-colors hover:bg-muted/50"
                     >
-                      <td className="px-4 py-3 align-middle">
+                      <TableCell className="px-4 py-3 align-middle">
                         <button
                           type="button"
                           onClick={() => navigate(`/content/${entry.slug}/${entry.id}`)}
@@ -311,21 +323,21 @@ export function Dashboard() {
                             )}
                           </div>
                         </button>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 align-middle">
                         <Badge variant="outline">{entry.contentTypeName}</Badge>
-                      </td>
-                      <td className="px-4 py-3 align-middle">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 align-middle">
                         <AuthorCell entry={entry} />
-                      </td>
-                      <td className="px-4 py-3 align-middle">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 align-middle">
                         {entry.published_at ? formatDate(entry.published_at, timezone) : '—'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </TooltipProvider>
       </section>

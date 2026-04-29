@@ -116,7 +116,7 @@ export function SettingsApiTokens() {
           <Button
             size="icon"
             variant="ghost"
-            className="size-8 text-destructive hover:text-destructive"
+            className="flex size-8 items-center justify-center rounded text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => setDeleteToken(row.original)}
           >
             <Trash2Icon className="size-3.5" />
@@ -179,7 +179,7 @@ export function SettingsApiTokens() {
           <Table>
             <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
-                <TableRow key={hg.id}>
+                <TableRow key={hg.id} className="hover:bg-transparent">
                   {hg.headers.map((header) => (
                     <TableHead key={header.id}>
                       {flexRender(header.column.columnDef.header, header.getContext())}

@@ -54,6 +54,14 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/components/ui/tooltip.tsx'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table.tsx'
 import HeaderFixed from '@/components/Header'
 
 // Types
@@ -374,29 +382,32 @@ function ConfigureViewDialog({
                     >
                       <span className="flex-1 font-medium">{humanize(name)}</span>
                       {field && <span className="text-xs text-muted-foreground">{field.type}</span>}
-                      <button
-                        type="button"
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         disabled={idx === 0}
                         onClick={() => move(name, -1)}
                         className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent disabled:opacity-30"
                       >
                         <ChevronUpIcon className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         disabled={idx === visible.length - 1}
                         onClick={() => move(name, 1)}
                         className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent disabled:opacity-30"
                       >
                         <ChevronDownIcon className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         onClick={() => remove(name)}
                         className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       >
                         <MinusCircleIcon className="size-3.5" />
-                      </button>
+                      </Button>
                     </li>
                   )
                 })}
@@ -732,103 +743,105 @@ export function EntriesList() {
             )}
 
             <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-sm">
-                <thead className="border-b border-border font-bold uppercase">
-                  <tr>
-                    <th className="w-10 px-4 py-3">
+              <Table className="w-full">
+                <TableHeader className="border-b border-border font-bold uppercase">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10 px-4 py-3">
                       <Checkbox
                         checked={allSelected ? true : someSelected ? 'indeterminate' : false}
                         onCheckedChange={toggleAll}
                         aria-label="Select all"
                       />
-                    </th>
+                    </TableHead>
                     {visibleFields.map((field) => (
-                      <th
+                      <TableHead
                         key={field.name}
                         className="px-4 py-3 text-left font-medium text-muted-foreground"
                       >
                         {humanize(field.name)}
-                      </th>
+                      </TableHead>
                     ))}
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Created
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Updated
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Pub / Sch
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Status
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Author
-                    </th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+                    </TableHead>
+                    <TableHead className="px-4 py-3" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border">
                   {(entries?.data ?? []).map((entry) => (
-                    <tr
+                    <TableRow
                       key={entry.id}
                       className={`group transition-colors ${selected.has(entry.id) ? 'bg-muted/40' : 'hover:bg-muted/30'}`}
                     >
-                      <td className="w-10 px-4 py-3">
+                      <TableCell className="w-10 px-4 py-3">
                         <Checkbox
                           checked={selected.has(entry.id)}
                           onCheckedChange={() => toggleOne(entry.id)}
                           aria-label="Select row"
                         />
-                      </td>
+                      </TableCell>
                       {visibleFields.map((field) => (
-                        <td key={field.name} className="px-4 py-3">
+                        <TableCell key={field.name} className="px-4 py-3">
                           <FieldCell field={field} value={entry[field.name]} />
-                        </td>
+                        </TableCell>
                       ))}
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      <TableCell className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {formatDate(entry.created_at, timezone)}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {formatDate(entry.updated_at, timezone)}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {entry.status === 'scheduled' && entry.scheduled_for
                           ? formatDate(entry.scheduled_for, timezone)
                           : entry.published_at
                             ? formatDate(entry.published_at, timezone)
                             : '—'}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         <StatusBadge entry={entry} fields={ct.fields} />
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         <AuthorAvatar entry={entry} />
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             onClick={() => navigate(`/content/${slug}/${entry.id}`)}
-                            className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                           >
                             <PencilIcon className="size-3.5" />
-                          </button>
+                          </Button>
                           {canDeleteEntries && (
-                            <button
-                              type="button"
+                            <Button
+                              size="icon"
+                              variant="ghost"
                               onClick={() => setDeletingId(entry.id)}
-                              className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              className="flex size-8 items-center justify-center rounded text-destructive hover:bg-destructive/10 hover:text-destructive"
                             >
                               <Trash2Icon className="size-3.5" />
-                            </button>
+                            </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             <div className="mt-4">

@@ -87,11 +87,11 @@ function UserActions({
   const currentIsSuperAdmin = currentUserRole.toLowerCase() === 'super admin'
   const disableEdit = isSuperAdmin && !isSelf && !currentIsSuperAdmin
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-end gap-1">
       <Button
         size="icon"
         variant="ghost"
-        className="size-8 disabled:opacity-30"
+        className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         disabled={disableEdit}
         onClick={() => onEdit(user)}
       >
@@ -100,7 +100,7 @@ function UserActions({
       <Button
         size="icon"
         variant="ghost"
-        className="size-8 text-destructive hover:text-destructive disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={isSelf || isSuperAdmin}
         onClick={() => onDelete(user)}
       >
@@ -263,7 +263,7 @@ export function SettingsUsers() {
           <Table>
             <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
-                <TableRow key={hg.id}>
+                <TableRow key={hg.id} className="hover:bg-transparent">
                   {hg.headers.map((header) => (
                     <TableHead key={header.id}>
                       {flexRender(header.column.columnDef.header, header.getContext())}
