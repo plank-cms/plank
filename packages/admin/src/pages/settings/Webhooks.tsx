@@ -100,7 +100,7 @@ export function SettingsWebhooks() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
+      cell: ({ row }) =>
         canDelete ? (
           <Button
             size="icon"
@@ -110,8 +110,7 @@ export function SettingsWebhooks() {
           >
             <Trash2Icon className="size-3.5" />
           </Button>
-        ) : null
-      ),
+        ) : null,
     },
   ]
 
@@ -168,7 +167,7 @@ export function SettingsWebhooks() {
       <section className="mt-24">
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => (
@@ -304,7 +303,11 @@ export function SettingsWebhooks() {
               <Button variant="outline" onClick={() => setDeleteWebhook(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={submitting || !canDelete}>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={submitting || !canDelete}
+              >
                 {submitting ? 'Deleting…' : 'Delete'}
               </Button>
             </DialogFooter>

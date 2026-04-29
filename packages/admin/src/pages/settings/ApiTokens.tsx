@@ -77,8 +77,7 @@ export function SettingsApiTokens() {
   const { request, loading: submitting, error: apiError } = useApi<CreatedToken>()
   const permissions = user?.permissions ?? []
   const canWrite = permissions.includes('*') || permissions.includes('settings:api-tokens:write')
-  const canDelete =
-    permissions.includes('*') || permissions.includes('settings:api-tokens:delete')
+  const canDelete = permissions.includes('*') || permissions.includes('settings:api-tokens:delete')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)
@@ -112,7 +111,7 @@ export function SettingsApiTokens() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
+      cell: ({ row }) =>
         canDelete ? (
           <Button
             size="icon"
@@ -122,8 +121,7 @@ export function SettingsApiTokens() {
           >
             <Trash2Icon className="size-3.5" />
           </Button>
-        ) : null
-      ),
+        ) : null,
     },
   ]
 
@@ -179,7 +177,7 @@ export function SettingsApiTokens() {
       <section className="mt-24">
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => (
@@ -326,7 +324,11 @@ export function SettingsApiTokens() {
               <Button variant="outline" onClick={() => setDeleteToken(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={submitting || !canDelete}>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={submitting || !canDelete}
+              >
                 {submitting ? 'Revoking…' : 'Revoke'}
               </Button>
             </DialogFooter>

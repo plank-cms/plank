@@ -54,7 +54,15 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   user: 'outline',
 }
 
-function RoleBadge({ roleId, roleName, roles }: { roleId: string; roleName?: string; roles: Role[] }) {
+function RoleBadge({
+  roleId,
+  roleName,
+  roles,
+}: {
+  roleId: string
+  roleName?: string
+  roles: Role[]
+}) {
   const role = roles.find((r) => r.id === roleId)
   const name = roleName ?? role?.name ?? roleId
   const variant = ROLE_VARIANT[name.toLowerCase()] ?? 'secondary'
@@ -253,7 +261,7 @@ export function SettingsUsers() {
       <section className="mt-24">
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="font-bold uppercase">
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => (

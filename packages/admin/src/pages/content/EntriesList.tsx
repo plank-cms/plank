@@ -694,7 +694,9 @@ export function EntriesList() {
               <EmptyDescription>Create your first entry for {ct.name}.</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              {canWriteEntries && <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>}
+              {canWriteEntries && (
+                <Button onClick={() => navigate(`/content/${slug}/new`)}>New entry</Button>
+              )}
             </EmptyContent>
           </Empty>
         )}
@@ -731,7 +733,7 @@ export function EntriesList() {
 
             <div className="overflow-hidden rounded-lg border border-border">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-muted/50">
+                <thead className="border-b border-border font-bold uppercase">
                   <tr>
                     <th className="w-10 px-4 py-3">
                       <Checkbox
