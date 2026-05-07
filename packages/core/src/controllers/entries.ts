@@ -149,8 +149,10 @@ export const listEntries: SlugParam = async (req, res) => {
 
   const mainParams: unknown[] = [limit, offset]
   const countParams: unknown[] = []
+  const statusParams: unknown[] = []
   const mainClauses: string[] = []
   const countClauses: string[] = []
+  const statusClauses: string[] = []
 
   const allowedStatuses = ['draft', 'published', 'scheduled', 'pending', 'in_review']
   const statusFilter = req.query.status ? String(req.query.status) : ''
@@ -165,8 +167,10 @@ export const listEntries: SlugParam = async (req, res) => {
     const term = `%${search}%`
     mainParams.push(term)
     countParams.push(term)
+    statusParams.push(term)
     const mainIdx = mainParams.length
     const countIdx = countParams.length
+    const statusIdx = statusParams.length
     const searchMainConditions = searchFields.map((name) => {
       assertSafeIdentifier(name)
       return `e.${quoteIdentifier(name)}::text ILIKE $${mainIdx}`
@@ -174,14 +178,19 @@ export const listEntries: SlugParam = async (req, res) => {
     const searchCountConditions = searchFields.map((name) => {
       return `e.${quoteIdentifier(name)}::text ILIKE $${countIdx}`
     })
+    const searchStatusConditions = searchFields.map((name) => {
+      return `e.${quoteIdentifier(name)}::text ILIKE $${statusIdx}`
+    })
     mainClauses.push(`(${searchMainConditions.join(' OR ')})`)
     countClauses.push(`(${searchCountConditions.join(' OR ')})`)
+    statusClauses.push(`(${searchStatusConditions.join(' OR ')})`)
   }
 
   const mainWhereClause = mainClauses.length > 0 ? `WHERE ${mainClauses.join(' AND ')}` : ''
   const countWhereClause = countClauses.length > 0 ? `WHERE ${countClauses.join(' AND ')}` : ''
+  const statusWhereClause = statusClauses.length > 0 ? `WHERE ${statusClauses.join(' AND ')}` : ''
 
-  const [{ rows }, { rows: countRows }] = await Promise.all([
+  const [{ rows }, { rows: countRows }, { rows: statusRows }] = await Promise.all([
     pool.query(
       `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url,
               ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url
@@ -196,6 +205,13 @@ export const listEntries: SlugParam = async (req, res) => {
     pool.query(
       `SELECT COUNT(*) as count FROM ${quotedTableName} e ${countWhereClause}`,
       countParams,
+    ),
+    pool.query<{ status: string }>(
+      `SELECT DISTINCT e.status
+       FROM ${quotedTableName} e
+       ${statusWhereClause}
+       ORDER BY e.status`,
+      statusParams,
     ),
   ])
 
@@ -246,7 +262,15 @@ export const listEntries: SlugParam = async (req, res) => {
     }
   }
 
-  res.json({ data, total, page, limit })
+  res.json({
+    data,
+    total,
+    page,
+    limit,
+    available_statuses: statusRows
+      .map((row) => row.status)
+      .filter((value) => allowedStatuses.includes(value)),
+  })
 }
 
 async function loadManyToManyIds(

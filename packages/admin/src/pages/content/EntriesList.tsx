@@ -111,7 +111,15 @@ type Entry = Record<string, unknown> & {
   _author_avatar_url: string | null
 }
 
-type EntriesResponse = { data: Entry[]; total: number; page: number; limit: number }
+type EntryStatus = Entry['status']
+
+type EntriesResponse = {
+  data: Entry[]
+  total: number
+  page: number
+  limit: number
+  available_statuses?: EntryStatus[]
+}
 
 type ColSort = { field: string; dir: 'asc' | 'desc' }
 type ViewConfig = { visibleFields: string[]; visibleSystemCols: string[]; sort: ColSort }
@@ -132,6 +140,16 @@ const SYSTEM_COL_DEFS = [
   { name: 'updated_at', label: 'Updated' },
   { name: 'pub_sch', label: 'Pub / Sch' },
 ] as const
+
+const STATUS_LABELS: Record<EntryStatus, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  published: 'Published',
+  pending: 'Pending',
+  in_review: 'In Review',
+}
+
+const STATUS_ORDER: EntryStatus[] = ['draft', 'pending', 'in_review', 'scheduled', 'published']
 
 function humanize(name: string) {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -785,6 +803,12 @@ export function EntriesList() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
+  const rawStatusFilter = searchParams.get('status')
+  const statusFilter: EntryStatus | '' =
+    rawStatusFilter &&
+    ['draft', 'scheduled', 'published', 'pending', 'in_review'].includes(rawStatusFilter)
+      ? (rawStatusFilter as EntryStatus)
+      : ''
   const limit = [10, 30, 50, 70, 100].includes(Number(searchParams.get('limit')))
     ? Number(searchParams.get('limit'))
     : 10
@@ -802,6 +826,17 @@ export function EntriesList() {
     setSearchParams(
       (prev) => {
         prev.set('limit', String(l))
+        prev.set('page', '1')
+        return prev
+      },
+      { replace: true },
+    )
+  }
+  function setStatusFilter(value: EntryStatus | '') {
+    setSearchParams(
+      (prev) => {
+        if (value) prev.set('status', value)
+        else prev.delete('status')
         prev.set('page', '1')
         return prev
       },
@@ -870,9 +905,15 @@ export function EntriesList() {
     refetch,
   } = useFetch<EntriesResponse>(
     slug && viewConfig
-      ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}&sort=${sort.field}&order=${sort.dir}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}&searchFields=${searchableFields.join(',')}` : ''}`
+      ? `/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}&sort=${sort.field}&order=${sort.dir}${statusFilter ? `&status=${statusFilter}` : ''}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}&searchFields=${searchableFields.join(',')}` : ''}`
       : null,
   )
+
+  const availableStatusOptions = [
+    ...new Set([...(entries?.available_statuses ?? []), ...(statusFilter ? [statusFilter] : [])]),
+  ].filter((status): status is EntryStatus =>
+    ['draft', 'scheduled', 'published', 'pending', 'in_review'].includes(status),
+  ).sort((a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b))
 
   async function handleDelete() {
     if (!deletingId || !slug) return
@@ -1020,7 +1061,23 @@ export function EntriesList() {
 
       <section className="mt-24">
         <div className="mb-3 flex items-center gap-3">
-          <div className="relative max-w-72 w-full">
+          <Select
+            value={statusFilter || 'all'}
+            onValueChange={(value) => setStatusFilter(value === 'all' ? '' : (value as EntryStatus))}
+          >
+            <SelectTrigger className="h-10 min-h-10 max-h-10 w-38">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {availableStatusOptions.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="relative w-52">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               className="pl-9"
@@ -1044,7 +1101,7 @@ export function EntriesList() {
           </div>
         )}
 
-        {!loadingEntries && (entries?.data ?? []).length === 0 && !debouncedSearch && (
+        {!loadingEntries && (entries?.data ?? []).length === 0 && !debouncedSearch && !statusFilter && (
           <Empty className="border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -1061,14 +1118,22 @@ export function EntriesList() {
           </Empty>
         )}
 
-        {!loadingEntries && (entries?.data ?? []).length === 0 && debouncedSearch && (
+        {!loadingEntries &&
+          (entries?.data ?? []).length === 0 &&
+          (debouncedSearch || statusFilter) && (
           <Empty className="border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <SearchIcon />
               </EmptyMedia>
               <EmptyTitle>No results</EmptyTitle>
-              <EmptyDescription>No entries match "{debouncedSearch}".</EmptyDescription>
+              <EmptyDescription>
+                {debouncedSearch && statusFilter
+                  ? `No entries match "${debouncedSearch}" with status "${STATUS_LABELS[statusFilter]}".`
+                  : debouncedSearch
+                    ? `No entries match "${debouncedSearch}".`
+                    : `No entries with status "${STATUS_LABELS[statusFilter]}".`}
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
