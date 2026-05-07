@@ -26,7 +26,13 @@ import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/ap
 import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, confirmMedia, updateMedia } from '../controllers/media.js'
 import { listFolders, createFolder, renameFolder, deleteFolder } from '../controllers/folders.js'
 import { upload } from '../media/index.js'
-import { getNamespaceSettings, updateNamespaceSettings, getEditorialMode, getAppModes } from '../controllers/settings.js'
+import {
+  getNamespaceSettings,
+  updateNamespaceSettings,
+  getEditorialMode,
+  getAppModes,
+  getClientSettings,
+} from '../controllers/settings.js'
 import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
 
 const router: IRouter = Router()
@@ -100,6 +106,7 @@ router.delete('/media/:id', authorize('media:delete'), deleteMedia)
 
 // Settings
 router.get('/modes', getAppModes)
+router.get('/client-settings', getClientSettings)
 router.get('/editorial-mode', getEditorialMode)
 router.get('/settings/:namespace', authorize('settings:overview:read'), getNamespaceSettings)
 router.put('/settings/:namespace', authorize('settings:overview:write'), updateNamespaceSettings)

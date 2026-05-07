@@ -30,6 +30,15 @@ export async function getAppModes(req: Request, res: Response): Promise<void> {
   res.json(modes)
 }
 
+export async function getClientSettings(_req: Request, res: Response): Promise<void> {
+  const settings = await getSettings('general')
+  res.json({
+    timezone: settings.timezone ?? 'UTC',
+    locales: settings.locales ?? '["en"]',
+    default_locale: settings.default_locale ?? 'en',
+  })
+}
+
 export async function getEditorialMode(_req: Request, res: Response): Promise<void> {
   const { editorial: enabled } = await resolveAppModes()
   res.json({ enabled })

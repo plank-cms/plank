@@ -37,13 +37,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {})
 
-    const permissions = user?.permissions ?? []
-    const canReadGeneral = permissions.includes('*') || permissions.includes('settings:overview:read')
-
-    // General settings are only fetched for users with explicit access.
-    if (!canReadGeneral) return
-
-    fetch('/cms/admin/settings/general', {
+    // Content editing needs these global settings for every authenticated role.
+    fetch('/cms/admin/client-settings', {
       credentials: 'include',
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -69,7 +64,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (data?.default_locale) setDefaultLocale(data.default_locale)
       })
       .catch(() => {})
-  }, [status, user?.permissions])
+  }, [status])
 
   useEffect(() => {
     if (status !== 'authenticated') {
