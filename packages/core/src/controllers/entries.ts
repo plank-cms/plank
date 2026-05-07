@@ -272,6 +272,40 @@ async function loadManyToManyIds(
   return result
 }
 
+async function loadHydratedEntry(
+  entryId: string,
+  tableName: string,
+  fields: import('@plank-cms/schema').FieldDefinition[],
+  locale?: string,
+  fallbacks: string[] = [],
+): Promise<Record<string, unknown> | null> {
+  const { rows } = await pool.query(
+    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url,
+            ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url
+     FROM ${quoteIdentifier(tableName)} e
+     LEFT JOIN plank_users u ON u.id = e.created_by
+     LEFT JOIN plank_users ed ON ed.id = e.editor_id
+     WHERE e.id = $1`,
+    [entryId],
+  )
+
+  if (!rows[0]) return null
+
+  const mmIds = await loadManyToManyIds(entryId, tableName, fields)
+  const provider = await getProvider()
+  const resolved = resolveLocalizedRow(rows[0], { fields }, locale, fallbacks)
+  const authorKey = resolved._author_avatar_url as string | null
+  if (authorKey && !authorKey.startsWith('http')) {
+    resolved._author_avatar_url = await provider.getUrl(authorKey)
+  }
+  const editorKey = resolved._editor_avatar_url as string | null
+  if (editorKey && !editorKey.startsWith('http')) {
+    resolved._editor_avatar_url = await provider.getUrl(editorKey)
+  }
+
+  return normalizeNavigationFields({ ...resolved, ...mmIds }, fields)
+}
+
 export const getEntry: SlugIdParam = async (req, res) => {
   const ct = await findContentTypeBySlug(req.params.slug)
   if (!ct) {
@@ -280,31 +314,14 @@ export const getEntry: SlugIdParam = async (req, res) => {
   }
 
   assertSafeIdentifier(ct.tableName)
-  const quotedTableName = quoteIdentifier(ct.tableName)
-  const { rows } = await pool.query(
-    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url,
-            ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url
-     FROM ${quotedTableName} e
-     LEFT JOIN plank_users u ON u.id = e.created_by
-     LEFT JOIN plank_users ed ON ed.id = e.editor_id
-     WHERE e.id = $1`,
-    [req.params.id],
-  )
-
-  if (!rows[0]) {
+  const locale = req.query.locale ? String(req.query.locale) : undefined
+  const fallbacks = req.query.fallback ? String(req.query.fallback).split(',') : []
+  const entry = await loadHydratedEntry(req.params.id, ct.tableName, ct.fields, locale, fallbacks)
+  if (!entry) {
     res.status(404).json({ error: 'Entry not found' })
     return
   }
-  const locale = req.query.locale ? String(req.query.locale) : undefined
-  const fallbacks = req.query.fallback ? String(req.query.fallback).split(',') : []
-  const mmIds = await loadManyToManyIds(req.params.id, ct.tableName, ct.fields)
-  const provider = await getProvider()
-  const resolved = resolveLocalizedRow(rows[0], ct, locale, fallbacks)
-  const key = resolved._author_avatar_url as string | null
-  if (key && !key.startsWith('http')) resolved._author_avatar_url = await provider.getUrl(key)
-  const editorKey = resolved._editor_avatar_url as string | null
-  if (editorKey && !editorKey.startsWith('http')) resolved._editor_avatar_url = await provider.getUrl(editorKey)
-  res.json(normalizeNavigationFields({ ...resolved, ...mmIds }, ct.fields))
+  res.json(entry)
 }
 
 export const createEntry: SlugParam = async (req, res) => {
@@ -753,7 +770,7 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
     sql = `
       UPDATE ${quotedTableName} SET
         status = 'in_review',
-        editor_id = COALESCE($2, editor_id),
+        editor_id = $2,
         review_locked_by_editor = $3,
         review_rejected = FALSE,
         updated_at = NOW()
@@ -783,7 +800,12 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
     res.status(404).json({ error: 'Entry not found' })
     return
   }
-  res.json(normalizeNavigationFields(rows[0], ct.fields))
+  const entry = await loadHydratedEntry(req.params.id, ct.tableName, ct.fields)
+  if (!entry) {
+    res.status(404).json({ error: 'Entry not found' })
+    return
+  }
+  res.json(entry)
 
   const webhookEvent =
     status === 'published' ? 'entry.published' : status === 'draft' ? 'entry.unpublished' : null
