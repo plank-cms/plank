@@ -707,7 +707,7 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
       UPDATE ${quotedTableName} SET
         status = 'published',
         published_data = ${buildSnapshotExpr(ct.tableName)},
-        published_at = NOW(),
+        published_at = COALESCE(published_at, NOW()),
         scheduled_for = NULL,
         review_rejected = FALSE,
         updated_at = NOW()

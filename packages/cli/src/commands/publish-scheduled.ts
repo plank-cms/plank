@@ -38,7 +38,7 @@ export async function publishScheduled(): Promise<void> {
           `UPDATE ${table_name} SET
             status = 'published',
             published_data = ${snapshotExpr(table_name)},
-            published_at = NOW(),
+            published_at = COALESCE(published_at, NOW()),
             scheduled_for = NULL,
             updated_at = NOW()
           WHERE id = $1`,
