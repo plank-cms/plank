@@ -113,7 +113,20 @@ const ArraySubFieldSchema = z.object({
 
 const FieldSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'Field name must be lowercase with underscores'),
-  type: z.enum(['string', 'text', 'richtext', 'number', 'boolean', 'datetime', 'media', 'media-gallery', 'relation', 'uid', 'array', 'navigation']),
+  type: z.enum([
+    'string',
+    'text',
+    'richtext',
+    'number',
+    'boolean',
+    'datetime',
+    'media',
+    'media-gallery',
+    'relation',
+    'uid',
+    'array',
+    'navigation',
+  ]),
   required: z.boolean().optional(),
   subtype: z.enum(['integer', 'float']).optional(),
   relationType: z.enum(['many-to-one', 'one-to-one', 'one-to-many', 'many-to-many']).optional(),
@@ -141,11 +154,20 @@ function isReservedSqlIdentifier(name: string): boolean {
   return RESERVED_SQL_IDENTIFIERS.has(name.toLowerCase())
 }
 
-function findReservedIdentifierErrors(ct: { tableName: string; fields: FieldDefinition[] }): string[] {
+function findReservedIdentifierErrors(ct: {
+  tableName: string
+  fields: FieldDefinition[]
+}): string[] {
   const errors: string[] = []
 
+  if (ct.tableName === 'authors') {
+    errors.push('Content type slug "authors" is reserved by the public API.')
+  }
+
   if (isReservedSqlIdentifier(ct.tableName)) {
-    errors.push(`Table name "${ct.tableName}" is reserved by SQL. Choose a different content type slug.`)
+    errors.push(
+      `Table name "${ct.tableName}" is reserved by SQL. Choose a different content type slug.`,
+    )
   }
 
   for (const field of ct.fields) {
@@ -156,7 +178,9 @@ function findReservedIdentifierErrors(ct: { tableName: string; fields: FieldDefi
     if (field.type === 'array') {
       for (const subField of field.arrayFields ?? []) {
         if (isReservedSqlIdentifier(subField.name)) {
-          errors.push(`Sub-field name "${subField.name}" in array field "${field.name}" is reserved by SQL.`)
+          errors.push(
+            `Sub-field name "${subField.name}" in array field "${field.name}" is reserved by SQL.`,
+          )
         }
       }
     }
@@ -186,10 +210,7 @@ function inverseFieldName(
 
 // Syncs the auto-inverse field on the related content type.
 // Called after saving/updating a CT that has relation fields.
-async function syncInverseFields(
-  savedCT: ContentType,
-  prevCT: ContentType | null,
-): Promise<void> {
+async function syncInverseFields(savedCT: ContentType, prevCT: ContentType | null): Promise<void> {
   // Collect all CTs that may need updating (lazy load)
   const relatedCTCache = new Map<string, ContentType | null>()
 
@@ -223,10 +244,12 @@ async function syncInverseFields(
       if (!relatedCT) continue
       const updated = relatedCT.fields.filter(
         (f) =>
-          !(f.type === 'relation' &&
+          !(
+            f.type === 'relation' &&
             f.relationType === inverseRelationType(prevField.relationType ?? 'many-to-one') &&
             f.relatedTable === savedCT.tableName &&
-            f.relatedField === fieldName),
+            f.relatedField === fieldName
+          ),
       )
       if (updated.length !== relatedCT.fields.length) {
         await updateInStore(relatedCT.slug, { ...relatedCT, fields: updated })
@@ -253,13 +276,14 @@ async function syncInverseFields(
     )
 
     const invField: FieldDefinition = {
-      name: existingInvIdx >= 0
-        ? relatedCT.fields[existingInvIdx].name
-        : inverseFieldName(
-            savedCT.tableName,
-            field.name,
-            relatedCT.fields.map((f) => f.name),
-          ),
+      name:
+        existingInvIdx >= 0
+          ? relatedCT.fields[existingInvIdx].name
+          : inverseFieldName(
+              savedCT.tableName,
+              field.name,
+              relatedCT.fields.map((f) => f.name),
+            ),
       type: 'relation',
       relationType: invType,
       relatedTable: savedCT.tableName,

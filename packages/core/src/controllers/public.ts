@@ -6,18 +6,21 @@ import { getProvider } from '../media/index.js'
 
 type SlugParam = RequestHandler<{ slug: string }>
 type SlugIdParam = RequestHandler<{ slug: string; id: string }>
+type AuthorSlugParam = RequestHandler<{ slug: string }>
 
 type Row = Record<string, unknown> & {
   published_data?: Record<string, unknown> | null
   published_at?: unknown
   _author_first_name?: string | null
   _author_last_name?: string | null
+  _author_slug?: string | null
   _author_avatar_url?: string | null
   _author_job_title?: string | null
   _author_organization?: string | null
   _author_country?: string | null
   _editor_first_name?: string | null
   _editor_last_name?: string | null
+  _editor_slug?: string | null
   _editor_avatar_url?: string | null
   _editor_job_title?: string | null
   _editor_organization?: string | null
@@ -75,6 +78,16 @@ const SYSTEM_RESPONSE_FIELDS = [
   'editor',
 ] as const
 
+type PublicAuthor = {
+  first_name: string | null
+  last_name: string | null
+  avatar_url: string | null
+  job_title: string | null
+  organization: string | null
+  country: string | null
+  slug: string
+}
+
 function parseCsvParam(value: unknown): string[] {
   if (typeof value === 'string') {
     return value
@@ -90,8 +103,7 @@ function parseCsvParam(value: unknown): string[] {
 
 function coerceFilterValue(raw: string, field: FieldDefinition): unknown {
   if (field.type === 'number') {
-    const parsed =
-      field.subtype === 'float' ? Number.parseFloat(raw) : Number.parseInt(raw, 10)
+    const parsed = field.subtype === 'float' ? Number.parseFloat(raw) : Number.parseInt(raw, 10)
     return Number.isNaN(parsed) ? raw : parsed
   }
   if (field.type === 'boolean') {
@@ -124,11 +136,18 @@ function parseFilters(
   if (filtersObject) {
     for (const [fieldName, operatorValue] of Object.entries(filtersObject)) {
       const field = fieldMap.get(fieldName)
-      if (!field || typeof operatorValue !== 'object' || operatorValue === null || Array.isArray(operatorValue)) {
+      if (
+        !field ||
+        typeof operatorValue !== 'object' ||
+        operatorValue === null ||
+        Array.isArray(operatorValue)
+      ) {
         invalidFilters.push(`filters.${fieldName}`)
         continue
       }
-      for (const [operatorKey, rawValue] of Object.entries(operatorValue as Record<string, unknown>)) {
+      for (const [operatorKey, rawValue] of Object.entries(
+        operatorValue as Record<string, unknown>,
+      )) {
         if (!isFilterOperator(operatorKey)) {
           invalidFilters.push(`filters.${fieldName}.${operatorKey}`)
           continue
@@ -473,6 +492,32 @@ async function resolveAuthorAvatars(entries: Record<string, unknown>[]): Promise
   )
 }
 
+async function resolvePublicAuthorAvatar(author: PublicAuthor): Promise<PublicAuthor> {
+  if (!author.avatar_url || author.avatar_url.startsWith('http')) return author
+  const provider = await getProvider()
+  return { ...author, avatar_url: await provider.getUrl(author.avatar_url) }
+}
+
+function serializePublicAuthor(row: {
+  public_author_slug: string
+  first_name: string | null
+  last_name: string | null
+  avatar_url: string | null
+  job_title: string | null
+  organization: string | null
+  country: string | null
+}): PublicAuthor {
+  return {
+    first_name: row.first_name,
+    last_name: row.last_name,
+    avatar_url: row.avatar_url,
+    job_title: row.job_title,
+    organization: row.organization,
+    country: row.country,
+    slug: row.public_author_slug,
+  }
+}
+
 // Builds an ordered response: id first, then CT fields in builder order, then system fields
 function serializeEntry(
   row: Row,
@@ -559,6 +604,7 @@ function serializeEntry(
           job_title: _author_job_title ?? null,
           organization: _author_organization ?? null,
           country: _author_country ?? null,
+          slug: row._author_slug ?? null,
         }
       : null
   out.editor =
@@ -570,6 +616,7 @@ function serializeEntry(
           job_title: _editor_job_title ?? null,
           organization: _editor_organization ?? null,
           country: _editor_country ?? null,
+          slug: row._editor_slug ?? null,
         }
       : null
   return out
@@ -582,10 +629,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     return
   }
 
-  const { selection, invalidFields } = parseFieldSelection(
-    req.query as Record<string, unknown>,
-    ct,
-  )
+  const { selection, invalidFields } = parseFieldSelection(req.query as Record<string, unknown>, ct)
   if (invalidFields.length > 0) {
     res.status(400).json({ error: `Unknown fields: ${invalidFields.join(', ')}` })
     return
@@ -601,8 +645,8 @@ export const listPublicEntries: SlugParam = async (req, res) => {
       statusParam === 'published' || statusParam === 'draft' ? `WHERE e.status = $1` : ''
     const values: unknown[] = statusClause ? [statusParam] : []
     const { rows } = await pool.query(
-      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
-              ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.public_author_slug AS _author_slug, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
+              ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.public_author_slug AS _editor_slug, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
        FROM ${ct.tableName} e
        LEFT JOIN plank_users u ON u.id = e.created_by
        LEFT JOIN plank_users ed ON ed.id = e.editor_id
@@ -651,6 +695,12 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   }
   // statusParam === 'all' skips the filter entirely
 
+  const authorSlug = typeof req.query.author === 'string' ? req.query.author.trim() : ''
+  if (authorSlug) {
+    filterClauses.push(`u.public_author_slug = $${filterValues.length + 1}`)
+    filterValues.push(authorSlug)
+  }
+
   const rawSort = String(req.query.sort ?? 'created_at')
   const sortField =
     knownFields.has(rawSort) || systemSortFields.has(rawSort) ? rawSort : 'created_at'
@@ -666,9 +716,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
         ? parsedFilter.rawValue[0]
         : parsedFilter.rawValue
       const coercedValue =
-        typeof rawValue === 'string'
-          ? coerceFilterValue(rawValue, parsedFilter.field)
-          : rawValue
+        typeof rawValue === 'string' ? coerceFilterValue(rawValue, parsedFilter.field) : rawValue
       filterClauses.push(
         `e.${fieldName} ${parsedFilter.operator === 'ne' ? '!=' : '='} $${filterValues.length + 1}`,
       )
@@ -690,7 +738,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     filterValues.push(coercedValues)
   }
 
-  for (const [key, value] of Object.entries(req.query)) {
+  for (const [key] of Object.entries(req.query)) {
     if (
       key === 'page' ||
       key === 'limit' ||
@@ -702,6 +750,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
       key === 'fields' ||
       key === 'select' ||
       key === 'exclude' ||
+      key === 'author' ||
       key === 'filters' ||
       key.startsWith('filters[')
     )
@@ -716,15 +765,21 @@ export const listPublicEntries: SlugParam = async (req, res) => {
 
   const [{ rows }, { rows: countRows }] = await Promise.all([
     pool.query(
-      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
-              ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
+      `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.public_author_slug AS _author_slug, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
+              ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.public_author_slug AS _editor_slug, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
        FROM ${ct.tableName} e
        LEFT JOIN plank_users u ON u.id = e.created_by
        LEFT JOIN plank_users ed ON ed.id = e.editor_id
        ${where} ORDER BY e.${sortField} ${sortDir} LIMIT $${limitParam} OFFSET $${offsetParam}`,
       [...filterValues, limit, offset],
     ),
-    pool.query(`SELECT COUNT(*) as count FROM ${ct.tableName} e ${where}`, filterValues),
+    pool.query(
+      `SELECT COUNT(*) as count
+       FROM ${ct.tableName} e
+       LEFT JOIN plank_users u ON u.id = e.created_by
+       ${where}`,
+      filterValues,
+    ),
   ])
 
   const data = rows.map((row) => serializeEntry(row, ct, statusParam, locale, fallbacks))
@@ -748,10 +803,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
     return
   }
 
-  const { selection, invalidFields } = parseFieldSelection(
-    req.query as Record<string, unknown>,
-    ct,
-  )
+  const { selection, invalidFields } = parseFieldSelection(req.query as Record<string, unknown>, ct)
   if (invalidFields.length > 0) {
     res.status(400).json({ error: `Unknown fields: ${invalidFields.join(', ')}` })
     return
@@ -764,8 +816,8 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   const values: unknown[] = statusClause ? [req.params.id, statusParam] : [req.params.id]
 
   const { rows } = await pool.query(
-    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
-            ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
+    `SELECT e.*, u.first_name AS _author_first_name, u.last_name AS _author_last_name, u.public_author_slug AS _author_slug, u.avatar_url AS _author_avatar_url, u.job_title AS _author_job_title, u.organization AS _author_organization, u.country AS _author_country,
+            ed.first_name AS _editor_first_name, ed.last_name AS _editor_last_name, ed.public_author_slug AS _editor_slug, ed.avatar_url AS _editor_avatar_url, ed.job_title AS _editor_job_title, ed.organization AS _editor_organization, ed.country AS _editor_country
      FROM ${ct.tableName} e
      LEFT JOIN plank_users u ON u.id = e.created_by
      LEFT JOIN plank_users ed ON ed.id = e.editor_id
@@ -786,4 +838,29 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
     resolveRelationFields([entry], ct),
   ])
   res.json(selectEntryFields(entry, ct, selection))
+}
+
+export const getPublicAuthor: AuthorSlugParam = async (req, res) => {
+  const { rows } = await pool.query<{
+    public_author_slug: string
+    first_name: string | null
+    last_name: string | null
+    avatar_url: string | null
+    job_title: string | null
+    organization: string | null
+    country: string | null
+  }>(
+    `SELECT public_author_slug, first_name, last_name, avatar_url, job_title, organization, country
+     FROM plank_users
+     WHERE public_author_slug = $1
+     LIMIT 1`,
+    [req.params.slug],
+  )
+
+  if (!rows[0]) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+
+  res.json(await resolvePublicAuthorAvatar(serializePublicAuthor(rows[0])))
 }
