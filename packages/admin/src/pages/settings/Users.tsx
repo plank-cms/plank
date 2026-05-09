@@ -49,8 +49,21 @@ type User = {
 
 type Role = { id: string; name: string }
 
-type CreateForm = { email: string; password: string; roleId: string; enabled: boolean }
-type EditForm = { email: string; roleId: string; firstName: string; lastName: string; enabled: boolean }
+type CreateForm = {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  roleId: string
+  enabled: boolean
+}
+type EditForm = {
+  email: string
+  roleId: string
+  firstName: string
+  lastName: string
+  enabled: boolean
+}
 
 const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   'super admin': 'default',
@@ -116,7 +129,14 @@ function UserActions({
   )
 }
 
-const EMPTY_CREATE: CreateForm = { email: '', password: '', roleId: '', enabled: true }
+const EMPTY_CREATE: CreateForm = {
+  email: '',
+  password: '',
+  firstName: '',
+  lastName: '',
+  roleId: '',
+  enabled: true,
+}
 
 export function SettingsUsers() {
   const { user: currentUser, updateUser } = useAuth()
@@ -142,7 +162,9 @@ export function SettingsUsers() {
 
   const roleList = roles ?? []
   const currentIsSuperAdmin = currentUser?.role?.toLowerCase() === 'super admin'
-  const visibleRoles = roleList.filter((r) => editorialMode || !['Editor', 'Viewer'].includes(r.name))
+  const visibleRoles = roleList.filter(
+    (r) => editorialMode || !['Editor', 'Viewer'].includes(r.name),
+  )
   const assignableRoles = currentIsSuperAdmin
     ? visibleRoles
     : visibleRoles.filter((r) => r.name.toLowerCase() !== 'super admin')
@@ -364,6 +386,24 @@ export function SettingsUsers() {
                   placeholder="Min. 8 characters"
                   value={createForm.password}
                   onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="c-fname">First name</Label>
+                <Input
+                  id="c-fname"
+                  value={createForm.firstName}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, firstName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="c-lname">Last name</Label>
+                <Input
+                  id="c-lname"
+                  value={createForm.lastName}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, lastName: e.target.value }))}
                   required
                 />
               </div>
