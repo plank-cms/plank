@@ -285,12 +285,14 @@ function PreviewSettings() {
     permissions.includes('*') || permissions.includes('settings:overview:write')
 
   const [enabled, setEnabled] = useState(false)
+  const [syncUrl, setSyncUrl] = useState('')
   const [urlTemplate, setUrlTemplate] = useState('')
   const [slugField, setSlugField] = useState('slug')
 
   useEffect(() => {
     const parsed = parsePreviewConfig(data)
     setEnabled(parsed.enabled)
+    setSyncUrl(parsed.syncUrl)
     setUrlTemplate(parsed.urlTemplate)
     setSlugField(parsed.slugField)
   }, [data])
@@ -300,6 +302,7 @@ function PreviewSettings() {
     try {
       await savePreviewRequest('/cms/admin/settings/preview', 'PUT', {
         enabled: String(enabled),
+        sync_url: syncUrl.trim(),
         url_template: urlTemplate.trim(),
         slug_field: slugField.trim() || 'slug',
       })
@@ -334,6 +337,21 @@ function PreviewSettings() {
             onCheckedChange={setEnabled}
             disabled={!canWriteOverview}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="preview-sync-url">Preview sync webhook URL</Label>
+          <Input
+            id="preview-sync-url"
+            value={syncUrl}
+            onChange={(e) => setSyncUrl(e.target.value)}
+            placeholder="https://frontend.example.com/api/plank/preview-sync"
+            disabled={!canWriteOverview}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional. When set, Plank will POST a preview sync payload to this endpoint on each
+            entry save while preview is enabled.
+          </p>
         </div>
 
         <div className="space-y-1.5">

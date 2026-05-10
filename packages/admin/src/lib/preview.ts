@@ -2,6 +2,7 @@ export type PreviewSettings = Record<string, string>
 
 export type PreviewConfig = {
   enabled: boolean
+  syncUrl: string
   urlTemplate: string
   slugField: string
 }
@@ -11,14 +12,6 @@ export type PreviewEntryLike = Record<string, unknown> & {
   status?: string
 }
 
-export type PreviewSyncMessage = {
-  source: 'plank-preview'
-  type: 'plank.preview.sync'
-  url: string
-}
-
-export const PREVIEW_MESSAGE_SOURCE = 'plank-preview'
-export const PREVIEW_MESSAGE_TYPE = 'plank.preview.sync'
 export const PREVIEW_WINDOW_NAME = 'plank-preview'
 
 type PreviewPlaceholder = 'contentType' | 'entryId' | 'slug' | 'status'
@@ -47,6 +40,7 @@ function replacePlaceholders(
 export function parsePreviewConfig(settings?: PreviewSettings | null): PreviewConfig {
   return {
     enabled: String(settings?.enabled ?? 'false').toLowerCase() === 'true',
+    syncUrl: settings?.sync_url?.trim() ?? '',
     urlTemplate: settings?.url_template?.trim() ?? '',
     slugField: settings?.slug_field?.trim() || 'slug',
   }
@@ -55,6 +49,7 @@ export function parsePreviewConfig(settings?: PreviewSettings | null): PreviewCo
 export function parsePreviewClientSettings(settings?: PreviewSettings | null): PreviewConfig {
   return {
     enabled: String(settings?.preview_enabled ?? 'false').toLowerCase() === 'true',
+    syncUrl: settings?.preview_sync_url?.trim() ?? '',
     urlTemplate: settings?.preview_url_template?.trim() ?? '',
     slugField: settings?.preview_slug_field?.trim() || 'slug',
   }
@@ -66,6 +61,13 @@ export function getPreviewSetupError(
 ): string | null {
   if (!config.enabled) return null
   if (!config.urlTemplate) return 'Set a preview URL template in Settings > Overview > Preview.'
+  if (config.syncUrl) {
+    try {
+      new URL(config.syncUrl)
+    } catch {
+      return 'Preview sync webhook URL must be an absolute URL.'
+    }
+  }
 
   if (config.urlTemplate.includes('{slug}') && !fieldNames.includes(config.slugField)) {
     return `Preview slug field "${config.slugField}" does not exist on this content type.`
@@ -114,14 +116,6 @@ export function resolvePreviewUrl(params: {
     return new URL(url).toString()
   } catch {
     return null
-  }
-}
-
-export function createPreviewSyncMessage(url: string): PreviewSyncMessage {
-  return {
-    source: PREVIEW_MESSAGE_SOURCE,
-    type: PREVIEW_MESSAGE_TYPE,
-    url,
   }
 }
 

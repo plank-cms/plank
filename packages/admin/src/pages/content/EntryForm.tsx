@@ -464,7 +464,7 @@ export function EntryForm() {
       setIsPublishedStale(true)
     }
 
-    if (syncPreview && slug && previewAvailable) {
+    if (syncPreview && slug && previewAvailable && !previewConfig.syncUrl) {
       const previewUrl = resolvePreviewUrl({
         config: previewConfig,
         contentType: slug,

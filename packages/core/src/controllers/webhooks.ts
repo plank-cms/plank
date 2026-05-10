@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import { pool, createId } from '@plank-cms/db'
 import { z, flattenError } from 'zod'
+import { getSettings } from '../lib/settings.js'
 
 export type WebhookEvent =
   | 'entry.created'
@@ -8,6 +9,16 @@ export type WebhookEvent =
   | 'entry.deleted'
   | 'entry.published'
   | 'entry.unpublished'
+
+export type PreviewSyncWebhookPayload = {
+  event: 'preview.sync'
+  content_type: string
+  entry_id: string
+  status: string | null
+  slug: string | null
+  preview_url: string | null
+  triggered_at: string
+}
 
 type WebhookRow = { id: string; name: string; url: string; events: string[]; enabled: boolean; created_at: Date }
 
@@ -83,4 +94,88 @@ export async function triggerWebhooks(
       }),
     ),
   )
+}
+
+export async function triggerPreviewSyncWebhook(params: {
+  contentType: string
+  entry: Record<string, unknown> & { id?: string; status?: string | null }
+}): Promise<void> {
+  const settings = await getSettings('preview')
+  const enabled = String(settings.enabled ?? 'false').toLowerCase() === 'true'
+  const syncUrl = settings.sync_url?.trim()
+
+  if (!enabled || !syncUrl) return
+
+  let parsedSyncUrl: URL
+  try {
+    parsedSyncUrl = new URL(syncUrl)
+  } catch {
+    return
+  }
+
+  const slugField = settings.slug_field?.trim() || 'slug'
+  const slugValue = params.entry[slugField]
+  const slug = typeof slugValue === 'string' && slugValue.trim() ? slugValue.trim() : null
+  const previewUrl = resolvePreviewUrlFromSettings(settings, {
+    contentType: params.contentType,
+    entry: params.entry,
+  })
+
+  const payload: PreviewSyncWebhookPayload = {
+    event: 'preview.sync',
+    content_type: params.contentType,
+    entry_id: params.entry.id ? String(params.entry.id) : '',
+    status: typeof params.entry.status === 'string' ? params.entry.status : null,
+    slug,
+    preview_url: previewUrl,
+    triggered_at: new Date().toISOString(),
+  }
+
+  if (!payload.entry_id) return
+
+  try {
+    await fetch(parsedSyncUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch {
+    // Preview sync is best-effort and must not block content saves.
+  }
+}
+
+function resolvePreviewUrlFromSettings(
+  settings: Record<string, string>,
+  params: {
+    contentType: string
+    entry: Record<string, unknown> & { id?: string; status?: string | null }
+  },
+): string | null {
+  const template = settings.url_template?.trim()
+  if (!template) return null
+
+  const slugField = settings.slug_field?.trim() || 'slug'
+  const slugValue = params.entry[slugField]
+  const resolved = template.replace(/\{(contentType|entryId|slug|status)\}/g, (_match, key) => {
+    if (key === 'contentType') return encodeURIComponent(params.contentType)
+    if (key === 'entryId') return params.entry.id ? encodeURIComponent(String(params.entry.id)) : ''
+    if (key === 'slug') {
+      return typeof slugValue === 'string' && slugValue.trim()
+        ? encodeURIComponent(slugValue.trim())
+        : ''
+    }
+    if (key === 'status') {
+      return typeof params.entry.status === 'string' ? encodeURIComponent(params.entry.status) : ''
+    }
+    return ''
+  })
+
+  if (/\{[^}]+\}/.test(resolved)) return null
+
+  try {
+    return new URL(resolved).toString()
+  } catch {
+    return null
+  }
 }

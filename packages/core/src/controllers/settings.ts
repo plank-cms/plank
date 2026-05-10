@@ -40,6 +40,7 @@ export async function getClientSettings(_req: Request, res: Response): Promise<v
     locales: settings.locales ?? '["en"]',
     default_locale: settings.default_locale ?? 'en',
     preview_enabled: previewSettings.enabled ?? 'false',
+    preview_sync_url: previewSettings.sync_url ?? '',
     preview_url_template: previewSettings.url_template ?? '',
     preview_slug_field: previewSettings.slug_field ?? 'slug',
   })
