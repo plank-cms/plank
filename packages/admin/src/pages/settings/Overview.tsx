@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card.tsx'
 import { toast } from 'sonner'
 import pkg from '../../../package.json'
 import HeaderFixed from '@/components/Header.tsx'
+import { parsePreviewConfig } from '@/lib/preview.ts'
 
 const TIMEZONES = [
   { value: 'UTC', label: 'UTC — Coordinated Universal Time' },
@@ -275,6 +276,109 @@ function GeneralSettings() {
   )
 }
 
+function PreviewSettings() {
+  const { user } = useAuth()
+  const { data, loading } = useFetch<Record<string, string>>('/cms/admin/settings/preview')
+  const { request: savePreviewRequest, loading: savingPreview } = useApi()
+  const permissions = user?.permissions ?? []
+  const canWriteOverview =
+    permissions.includes('*') || permissions.includes('settings:overview:write')
+
+  const [enabled, setEnabled] = useState(false)
+  const [urlTemplate, setUrlTemplate] = useState('')
+  const [slugField, setSlugField] = useState('slug')
+
+  useEffect(() => {
+    const parsed = parsePreviewConfig(data)
+    setEnabled(parsed.enabled)
+    setUrlTemplate(parsed.urlTemplate)
+    setSlugField(parsed.slugField)
+  }, [data])
+
+  async function handleSavePreview(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await savePreviewRequest('/cms/admin/settings/preview', 'PUT', {
+        enabled: String(enabled),
+        url_template: urlTemplate.trim(),
+        slug_field: slugField.trim() || 'slug',
+      })
+      toast.success('Preview settings saved')
+    } catch {
+      toast.error('Could not save preview settings')
+    }
+  }
+
+  if (loading) return <Spinner />
+
+  return (
+    <div className="space-y-6">
+      <div className="border-b pb-4">
+        <h2 className="text-2xl font-semibold">Live Preview</h2>
+        <p className="text-sm text-muted-foreground">
+          Configure a single frontend preview target that Plank can open and sync after saves.
+        </p>
+      </div>
+
+      <form onSubmit={handleSavePreview} className="space-y-6">
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label htmlFor="preview-enabled">Enable preview integration</Label>
+            <p className="text-xs text-muted-foreground">
+              Shows the preview action in the entry editor and syncs a connected frontend tab.
+            </p>
+          </div>
+          <Switch
+            id="preview-enabled"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+            disabled={!canWriteOverview}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="preview-url-template">Preview URL template</Label>
+          <Input
+            id="preview-url-template"
+            value={urlTemplate}
+            onChange={(e) => setUrlTemplate(e.target.value)}
+            placeholder="https://frontend.example.com/draft/{slug}"
+            disabled={!canWriteOverview}
+          />
+          <p className="text-xs text-muted-foreground">
+            Supported placeholders: {'{contentType}'}, {'{entryId}'}, {'{slug}'}, {'{status}'}.
+            The final result must be an absolute URL.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="preview-slug-field">Slug field</Label>
+          <Input
+            id="preview-slug-field"
+            value={slugField}
+            onChange={(e) => setSlugField(e.target.value)}
+            placeholder="slug"
+            disabled={!canWriteOverview}
+          />
+          <p className="text-xs text-muted-foreground">
+            Used when the template contains {'{slug}'}. Defaults to <code>slug</code>.
+          </p>
+        </div>
+
+        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+          Example: <code>https://frontend.example.com/draft/{'{slug}'}</code>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" variant="outline" disabled={savingPreview || !canWriteOverview}>
+            {savingPreview ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 export function SettingsOverview() {
   return (
     <>
@@ -288,11 +392,16 @@ export function SettingsOverview() {
       <Tabs defaultValue="general" className="mt-24">
         <TabsList className="mb-6">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
           <TabsTrigger value="media">Media Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
           <GeneralSettings />
+        </TabsContent>
+
+        <TabsContent value="preview">
+          <PreviewSettings />
         </TabsContent>
 
         <TabsContent value="media">

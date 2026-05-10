@@ -31,11 +31,17 @@ export async function getAppModes(req: Request, res: Response): Promise<void> {
 }
 
 export async function getClientSettings(_req: Request, res: Response): Promise<void> {
-  const settings = await getSettings('general')
+  const [settings, previewSettings] = await Promise.all([
+    getSettings('general'),
+    getSettings('preview'),
+  ])
   res.json({
     timezone: settings.timezone ?? 'UTC',
     locales: settings.locales ?? '["en"]',
     default_locale: settings.default_locale ?? 'en',
+    preview_enabled: previewSettings.enabled ?? 'false',
+    preview_url_template: previewSettings.url_template ?? '',
+    preview_slug_field: previewSettings.slug_field ?? 'slug',
   })
 }
 

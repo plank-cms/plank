@@ -43,6 +43,13 @@ import type { FieldDef } from '@/components/content/FieldInput.tsx'
 import { FIELD_WIDTH_SPAN } from '@/components/content-types/FieldCard.tsx'
 import type { FieldWidth } from '@/components/content-types/FieldCard.tsx'
 import { formatDatetime, getTimeInTimezone, combineDateAndTime } from '@/lib/formatDate.ts'
+import {
+  PREVIEW_WINDOW_NAME,
+  createPreviewSyncMessage,
+  getPreviewSetupError,
+  parsePreviewClientSettings,
+  resolvePreviewUrl,
+} from '@/lib/preview.ts'
 import HeaderFixed from '@/components/Header'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
 
@@ -77,6 +84,8 @@ type UserOption = {
 type LocalizedMeta = { enabled?: boolean; primary?: string }
 type LocalizedData = Record<string, unknown> & { _meta?: LocalizedMeta }
 
+let previewWindowRef: Window | null = null
+
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue)
   if (value && typeof value === 'object') {
@@ -110,6 +119,7 @@ export function EntryForm() {
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null,
   )
+  const { data: previewSettings } = useFetch<Record<string, string>>('/cms/admin/client-settings')
   const { data: existing, loading: loadingEntry } = useFetch<Entry>(
     slug && id ? `/cms/admin/entries/${slug}/${id}` : null,
   )
@@ -148,6 +158,21 @@ export function EntryForm() {
 
   const original = useRef<string>('{}')
   const skipBlocker = useRef(false)
+
+  const previewConfig = parsePreviewClientSettings(previewSettings)
+  const previewSetupError = ct
+    ? getPreviewSetupError(
+        previewConfig,
+        ct.fields.map((field) => field.name),
+      )
+    : null
+  const previewAvailable = previewConfig.enabled && !previewSetupError
+  const previewHint =
+    previewConfig.enabled && previewSetupError
+      ? previewSetupError
+      : previewConfig.enabled
+        ? null
+        : 'Preview is disabled. Configure Settings > Overview > Preview to enable it.'
 
   useEffect(() => {
     if (isNew) {
@@ -398,32 +423,113 @@ export function EntryForm() {
     }
   }
 
-  async function handleSaveDraft() {
+  function syncPreviewWindow(url: string) {
+    if (!previewWindowRef || previewWindowRef.closed) return
+
+    previewWindowRef.postMessage(createPreviewSyncMessage(url), new URL(url).origin)
+    previewWindowRef.focus()
+  }
+
+  async function saveDraftAndMaybeSync(
+    syncPreview: boolean,
+  ): Promise<{ entry: Entry; status: Entry['status'] } | null> {
     const saved = await saveFields()
-    if (!saved) return
+    if (!saved) return null
+
+    let nextEntry: Entry = saved
+    let nextStatus: Entry['status'] = status
 
     if (status === 'scheduled') {
       const entryId = isNew ? (saved.id as string) : id!
       try {
-        await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', {
+        const patched = await requestStatus(`/cms/admin/entries/${slug}/${entryId}/status`, 'PATCH', {
           status: 'draft',
         })
+        nextEntry = patched
+        nextStatus = 'draft'
         setStatus('draft')
         setScheduledFor('')
         setShowScheduler(false)
       } catch {
         toast.error('Could not save draft')
+        return null
       }
     } else if (status === 'published') {
+      nextStatus = 'published'
       setIsPublishedStale(true)
+    }
+
+    if (syncPreview && slug && previewAvailable) {
+      const previewUrl = resolvePreviewUrl({
+        config: previewConfig,
+        contentType: slug,
+        entry: nextEntry,
+        status: nextStatus,
+      })
+
+      if (previewUrl) syncPreviewWindow(previewUrl)
     }
 
     toast.success('Draft saved')
 
     if (isNew) {
       skipBlocker.current = true
-      navigate(`/content/${slug}/${saved.id}`, { replace: true })
+      navigate(`/content/${slug}/${nextEntry.id}`, { replace: true })
     }
+
+    return { entry: nextEntry, status: nextStatus }
+  }
+
+  async function handleSaveDraft() {
+    await saveDraftAndMaybeSync(true)
+  }
+
+  async function handleOpenPreview() {
+    if (!slug || !ct || !previewConfig.enabled) return
+
+    if (previewSetupError) {
+      toast.error(previewSetupError)
+      return
+    }
+
+    let previewEntry: Entry | null = existing ?? null
+    let previewStatus: Entry['status'] = status
+
+    if (isNew || isDirty) {
+      const result = await saveDraftAndMaybeSync(false)
+      if (!result) return
+      previewEntry = result.entry
+      previewStatus = result.status
+    }
+
+    const fallbackEntry =
+      previewEntry ??
+      ({
+        ...values,
+        id,
+        status,
+      } as Entry)
+
+    const previewUrl = resolvePreviewUrl({
+      config: previewConfig,
+      contentType: slug,
+      entry: fallbackEntry,
+      status: previewStatus,
+    })
+
+    if (!previewUrl) {
+      toast.error('Preview URL could not be resolved for this entry.')
+      return
+    }
+
+    previewWindowRef = window.open(previewUrl, PREVIEW_WINDOW_NAME)
+
+    if (!previewWindowRef) {
+      toast.error('Preview window was blocked by the browser.')
+      return
+    }
+
+    previewWindowRef.focus()
   }
 
   async function handlePublish() {
@@ -689,6 +795,9 @@ export function EntryForm() {
               {statusBadge}
             </div>
             <p className="text-muted-foreground text-xs mt-1">{ct.name}</p>
+            {previewConfig.enabled && previewSetupError && (
+              <p className="mt-1 text-xs text-amber-600">{previewSetupError}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!isNew && canDeleteCurrentEntry && !isReadOnlySingle && (
@@ -767,6 +876,16 @@ export function EntryForm() {
             {showRejectButton && (
               <Button variant="outline" size="icon" onClick={handleReject} disabled={busy}>
                 <XIcon className="size-4" />
+              </Button>
+            )}
+            {previewConfig.enabled && (
+              <Button
+                variant="outline"
+                onClick={handleOpenPreview}
+                disabled={readOnly || busy || Boolean(previewSetupError)}
+                title={previewHint ?? undefined}
+              >
+                Open preview
               </Button>
             )}
             <Button
