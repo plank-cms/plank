@@ -426,7 +426,10 @@ export function EntryForm() {
   function syncPreviewWindow(url: string) {
     if (!previewWindowRef || previewWindowRef.closed) return
 
-    previewWindowRef.postMessage(createPreviewSyncMessage(url), new URL(url).origin)
+    // The preview frontend validates the sender origin itself. Sending with '*'
+    // keeps sync working even if the preview URL redirects or canonicalizes to
+    // a different final origin than the configured template.
+    previewWindowRef.postMessage(createPreviewSyncMessage(url), '*')
     previewWindowRef.focus()
   }
 
