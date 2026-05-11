@@ -40,21 +40,6 @@ There is currently no dedicated automated test suite configured in root scripts.
 - include reproduction/verification steps in PRs.
   If you add tests, colocate them with source files and use `*.test.ts` / `*.test.tsx` naming.
 
-## Commit & Pull Request Guidelines
-
-Recent history favors short, imperative commit messages (e.g. `Fix 2FA QR generation`, `Add backup codes support`) and version-tag commits (`0.15.1`).
-
-- Keep commits focused and atomic.
-- Use imperative subject lines; optionally include a scope (`core:`, `admin:`).
-- Suggested commit messages must be 32 characters max.
-- PRs should include: purpose, affected packages, manual test steps, env/migration notes, and screenshots for UI changes.
-- Link related issues and call out breaking changes explicitly.
-- Never commit on behalf of the user. Creating commits is exclusively the user's responsibility.
-- If the user asks for help with commits, provide only: (1) a list of files and (2) suggested commit message(s) following the user's commit style.
-- If changes span multiple tasks, group files by task and propose one possible commit per group.
-- Commit assistance must always be provided as a list of suggested commits, each including the files that should be grouped together. This assistance should be automatically triggered when the user confirms a task is complete, and also whenever the user explicitly requests it.
-- Files included in commit suggestions must be exclusively those currently modified in the working tree (current `git status`).
-
 ## Shadcn Component Sourcing
 
 - If a required Shadcn component is not available in this repository, fetch it directly from the official registry: `https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/new-york-v4/ui`.
