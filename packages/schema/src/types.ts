@@ -61,6 +61,7 @@ export interface ContentType {
   name: string
   slug: string
   kind: ContentTypeKind
+  previewEnabled?: boolean
   tableName: string
   fields: FieldDefinition[]
   isDefault?: boolean

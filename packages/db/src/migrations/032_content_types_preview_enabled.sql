@@ -1,0 +1,2 @@
+ALTER TABLE plank_content_types
+  ADD COLUMN IF NOT EXISTS preview_enabled BOOLEAN NOT NULL DEFAULT TRUE;

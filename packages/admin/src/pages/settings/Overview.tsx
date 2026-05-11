@@ -360,7 +360,7 @@ function PreviewSettings() {
             id="preview-url-template"
             value={urlTemplate}
             onChange={(e) => setUrlTemplate(e.target.value)}
-            placeholder="https://frontend.example.com/draft/{slug}"
+            placeholder="https://frontend.example.com/draft/{contentType}/{slug}"
             disabled={!canWriteOverview}
           />
           <p className="text-xs text-muted-foreground">
@@ -384,7 +384,7 @@ function PreviewSettings() {
         </div>
 
         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          Example: <code>https://frontend.example.com/draft/{'{slug}'}</code>
+          Example: <code>https://frontend.example.com/draft/{'{contentType}'}/{'{slug}'}</code>
         </div>
 
         <div className="flex justify-end">

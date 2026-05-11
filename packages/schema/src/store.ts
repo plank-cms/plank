@@ -6,6 +6,7 @@ type ContentTypeRow = {
   name: string
   slug: string
   kind: ContentType['kind']
+  preview_enabled: boolean
   table_name: string
   fields: ContentType['fields']
   is_default: boolean
@@ -19,6 +20,7 @@ function rowToContentType(row: ContentTypeRow): ContentType {
     name: row.name,
     slug: row.slug,
     kind: row.kind,
+    previewEnabled: row.preview_enabled,
     tableName: row.table_name,
     fields: row.fields,
     isDefault: row.is_default,
@@ -44,10 +46,18 @@ export async function findContentTypeBySlug(slug: string): Promise<ContentType |
 
 export async function saveContentType(contentType: ContentType): Promise<ContentType> {
   const { rows } = await pool.query<ContentTypeRow>(
-    `INSERT INTO plank_content_types (id, name, slug, kind, table_name, fields)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO plank_content_types (id, name, slug, kind, preview_enabled, table_name, fields)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [createId(), contentType.name, contentType.slug, contentType.kind ?? 'collection', contentType.tableName, JSON.stringify(contentType.fields)],
+    [
+      createId(),
+      contentType.name,
+      contentType.slug,
+      contentType.kind ?? 'collection',
+      contentType.previewEnabled ?? true,
+      contentType.tableName,
+      JSON.stringify(contentType.fields),
+    ],
   )
   return rowToContentType(rows[0])
 }
@@ -58,10 +68,10 @@ export async function updateContentType(
 ): Promise<ContentType> {
   const { rows } = await pool.query<ContentTypeRow>(
     `UPDATE plank_content_types
-     SET name = $1, fields = $2, updated_at = NOW()
-     WHERE slug = $3
+     SET name = $1, fields = $2, preview_enabled = $3, updated_at = NOW()
+     WHERE slug = $4
      RETURNING *`,
-    [contentType.name, JSON.stringify(contentType.fields), slug],
+    [contentType.name, JSON.stringify(contentType.fields), contentType.previewEnabled ?? true, slug],
   )
   return rowToContentType(rows[0])
 }

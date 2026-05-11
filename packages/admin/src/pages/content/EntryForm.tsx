@@ -56,6 +56,7 @@ type ContentType = {
   name: string
   slug: string
   kind: 'collection' | 'single'
+  previewEnabled?: boolean
   fields: FieldDef[]
 }
 
@@ -159,17 +160,18 @@ export function EntryForm() {
   const skipBlocker = useRef(false)
 
   const previewConfig = parsePreviewClientSettings(previewSettings)
+  const previewAllowedForType = ct?.kind === 'collection' && ct.previewEnabled !== false
   const previewSetupError = ct
     ? getPreviewSetupError(
         previewConfig,
         ct.fields.map((field) => field.name),
       )
     : null
-  const previewAvailable = previewConfig.enabled && !previewSetupError
+  const previewAvailable = previewAllowedForType && previewConfig.enabled && !previewSetupError
   const previewHint =
-    previewConfig.enabled && previewSetupError
+    previewAllowedForType && previewConfig.enabled && previewSetupError
       ? previewSetupError
-      : previewConfig.enabled
+      : previewAllowedForType && previewConfig.enabled
         ? null
         : 'Preview is disabled. Configure Settings > Overview > Preview to enable it.'
 
@@ -723,7 +725,7 @@ export function EntryForm() {
     isPublishedStale
   const canSchedule = !!(schedDate && schedTime)
   const publishLabel = editorialMode && isContributorRole ? 'Review' : 'Publish'
-  const supportsPreviewUI = ct?.kind !== 'single'
+  const supportsPreviewUI = previewAllowedForType
 
   const saveDraftEnabled = !readOnly && !busy && (status === 'scheduled' ? true : isDirty)
   useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })

@@ -23,6 +23,7 @@ import { useAuth } from '@/context/auth.tsx'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { Switch } from '@/components/ui/switch.tsx'
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ type ContentType = {
   name: string
   slug: string
   kind: ContentTypeKind
+  previewEnabled?: boolean
   tableName: string
   fields: FieldCardData[]
 }
@@ -122,6 +124,7 @@ export function ContentTypeForm() {
   const { data: allCTs, refetch: refetchAllCTs } = useFetch<ContentType[]>(
     '/cms/admin/content-types',
   )
+  const { data: clientSettings } = useFetch<Record<string, string>>('/cms/admin/client-settings')
   const { loading: saving, request } = useApi<ContentType>()
   const { loading: deleting, request: requestDelete } = useApi()
 
@@ -129,6 +132,7 @@ export function ContentTypeForm() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [kind, setKind] = useState<ContentTypeKind>('collection')
+  const [previewEnabled, setPreviewEnabled] = useState(true)
   const [fields, setFields] = useState<FieldCardData[]>([])
 
   // Dialog state
@@ -137,9 +141,10 @@ export function ContentTypeForm() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   // Track original state for isDirty
-  const original = useRef<{ name: string; slug: string; fields: string }>({
+  const original = useRef<{ name: string; slug: string; previewEnabled: boolean; fields: string }>({
     name: '',
     slug: '',
+    previewEnabled: true,
     fields: '[]',
   })
 
@@ -153,18 +158,21 @@ export function ContentTypeForm() {
       setName('')
       setSlug('')
       setKind('collection')
+      setPreviewEnabled(true)
       setFields([])
-      original.current = { name: '', slug: '', fields: '[]' }
+      original.current = { name: '', slug: '', previewEnabled: true, fields: '[]' }
       return
     }
     if (!existing) return
     setName(existing.name)
     setSlug(existing.slug)
     setKind(existing.kind ?? 'collection')
+    setPreviewEnabled(existing.previewEnabled ?? true)
     setFields(existing.fields)
     original.current = {
       name: existing.name,
       slug: existing.slug,
+      previewEnabled: existing.previewEnabled ?? true,
       fields: JSON.stringify(existing.fields),
     }
   }, [existing, isNew])
@@ -175,7 +183,12 @@ export function ContentTypeForm() {
   }, [isNew, name])
 
   const isDirty =
-    name !== original.current.name || JSON.stringify(fields) !== original.current.fields
+    name !== original.current.name ||
+    previewEnabled !== original.current.previewEnabled ||
+    JSON.stringify(fields) !== original.current.fields
+
+  const livePreviewEnabled = String(clientSettings?.preview_enabled ?? 'false').toLowerCase() === 'true'
+  const showPreviewSwitch = livePreviewEnabled && kind === 'collection'
 
   // Ref that disables the blocker during a programmatic save+navigate.
   // useBlocker evaluates its function at navigation time and reads the ref
@@ -239,8 +252,8 @@ export function ContentTypeForm() {
   async function handleSave() {
     if (!name.trim() || !slug.trim()) return
     const body = isNew
-      ? { name: name.trim(), slug, kind, tableName: toTableName(slug), fields }
-      : { name: name.trim(), slug, tableName: toTableName(slug), fields }
+      ? { name: name.trim(), slug, kind, previewEnabled, tableName: toTableName(slug), fields }
+      : { name: name.trim(), slug, previewEnabled, tableName: toTableName(slug), fields }
     try {
       const saved = await request(
         isNew ? '/cms/admin/content-types' : `/cms/admin/content-types/${routeSlug}`,
@@ -249,10 +262,12 @@ export function ContentTypeForm() {
       )
       setName(saved.name)
       setSlug(saved.slug)
+      setPreviewEnabled(saved.previewEnabled ?? true)
       setFields(saved.fields)
       original.current = {
         name: saved.name,
         slug: saved.slug,
+        previewEnabled: saved.previewEnabled ?? true,
         fields: JSON.stringify(saved.fields),
       }
       window.dispatchEvent(new CustomEvent('plank:content-types-changed'))
@@ -348,6 +363,12 @@ export function ContentTypeForm() {
                   )}
                   {kind === 'single' ? 'Single' : 'Collection'}
                 </span>
+              )}
+              {showPreviewSwitch && (
+                <label className="ml-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <Switch checked={previewEnabled} onCheckedChange={setPreviewEnabled} />
+                  <span>Preview</span>
+                </label>
               )}
             </div>
           </div>

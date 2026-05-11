@@ -470,7 +470,9 @@ export const createEntry: SlugParam = async (req, res) => {
   )
   res.status(201).json(normalizeNavigationFields(rows[0], ct.fields))
   triggerWebhooks('entry.created', { content_type: req.params.slug, entry_id: rows[0].id })
-  triggerPreviewSyncWebhook({ contentType: req.params.slug, entry: rows[0] })
+  if ((ct as { previewEnabled?: boolean }).previewEnabled !== false) {
+    triggerPreviewSyncWebhook({ contentType: req.params.slug, entry: rows[0] })
+  }
 }
 
 export const getSingleEntry: SlugParam = async (req, res) => {
@@ -599,7 +601,9 @@ export const updateEntry: SlugIdParam = async (req, res) => {
 
   res.json(normalizeNavigationFields(rows[0], ct.fields))
   triggerWebhooks('entry.updated', { content_type: req.params.slug, entry_id: req.params.id })
-  triggerPreviewSyncWebhook({ contentType: req.params.slug, entry: rows[0] })
+  if ((ct as { previewEnabled?: boolean }).previewEnabled !== false) {
+    triggerPreviewSyncWebhook({ contentType: req.params.slug, entry: rows[0] })
+  }
 }
 
 // Columns excluded from the published_data snapshot

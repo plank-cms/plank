@@ -143,6 +143,7 @@ const ContentTypeSchema = z.object({
   name: z.string().min(1),
   slug: z.string().regex(/^[a-z][a-z0-9-]*$/, 'Slug must be lowercase with hyphens'),
   tableName: z.string().regex(/^[a-z][a-z0-9_]*$/, 'Table name must be lowercase with underscores'),
+  previewEnabled: z.boolean().default(true),
   fields: z.array(FieldSchema),
 })
 
