@@ -54,10 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    // Clear legacy token storage and bootstrap session from httpOnly cookie.
-    localStorage.removeItem('plank_token')
-    localStorage.removeItem('plank_user')
-
     fetch('/cms/admin/users/me', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: {

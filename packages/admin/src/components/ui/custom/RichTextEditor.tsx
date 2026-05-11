@@ -100,13 +100,11 @@ function getImageFilename(src: string): string {
 }
 
 async function updateMediaCaption(mediaId: string, caption: string | null) {
-  const token = localStorage.getItem('plank_token')
   const res = await fetch(`/cms/admin/media/${mediaId}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ caption }),
   })

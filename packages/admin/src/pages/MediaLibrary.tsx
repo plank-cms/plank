@@ -421,7 +421,6 @@ function MediaCard({
 
 export function MediaLibrary() {
   const { timezone } = useSettings()
-  const token = localStorage.getItem('plank_token')
   const inputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const permissions = user?.permissions ?? []
@@ -496,14 +495,17 @@ export function MediaLibrary() {
 
     if (hasM3U8) {
       // HLS bundles always go through the server (need server-side bundleId generation)
-      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
       const body = new FormData()
       for (const { file, relativePath } of filesWithPaths) {
         body.append('files', file, relativePath)
       }
       if (currentFolderId) body.append('folder_id', currentFolderId)
       body.append('bundle', 'true')
-      const res = await fetch('/cms/admin/media', { method: 'POST', headers, body })
+      const res = await fetch('/cms/admin/media', {
+        method: 'POST',
+        credentials: 'include',
+        body,
+      })
       if (!res.ok) {
         const text = await res.text()
         let msg = 'Upload failed.'
@@ -681,9 +683,9 @@ export function MediaLibrary() {
     try {
       const res = await fetch(`/cms/admin/media/${preview.id}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           filename: editFilename || preview.filename,
@@ -742,15 +744,24 @@ export function MediaLibrary() {
     if (!canDeleteMedia) return
     if (bulkLoading) return
     setBulkLoading(true)
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     try {
       await Promise.all([
         ...[...selected]
           .filter((k) => k.startsWith('folder:'))
-          .map((k) => fetch(`/cms/admin/folders/${k.slice(7)}`, { method: 'DELETE', headers })),
+          .map((k) =>
+            fetch(`/cms/admin/folders/${k.slice(7)}`, {
+              method: 'DELETE',
+              credentials: 'include',
+            }),
+          ),
         ...[...selected]
           .filter((k) => !k.startsWith('folder:'))
-          .map((k) => fetch(`/cms/admin/media/${k}`, { method: 'DELETE', headers })),
+          .map((k) =>
+            fetch(`/cms/admin/media/${k}`, {
+              method: 'DELETE',
+              credentials: 'include',
+            }),
+          ),
       ])
       toast.success('Files deleted')
       setBulkConfirmDelete(false)

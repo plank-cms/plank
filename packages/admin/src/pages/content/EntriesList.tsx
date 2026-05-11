@@ -264,12 +264,9 @@ function RelationValueCell({
     let cancelled = false
     setLoading(true)
 
-    const token = localStorage.getItem('plank_token')
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
-
     const resolveDisplayField = displayField
       ? Promise.resolve(displayField)
-      : fetch(`/cms/admin/content-types/${relatedSlug}`, { headers })
+      : fetch(`/cms/admin/content-types/${relatedSlug}`, { credentials: 'include' })
           .then((r) => (r.ok ? (r.json() as Promise<RelationContentType>) : null))
           .then((ct) => pickRelationDisplayField(ct?.fields ?? []))
           .catch(() => null)
@@ -278,7 +275,7 @@ function RelationValueCell({
       .then((resolvedDisplayField) =>
         Promise.all(
           nextIds.map((id) =>
-            fetch(`/cms/admin/entries/${relatedSlug}/${id}`, { headers })
+            fetch(`/cms/admin/entries/${relatedSlug}/${id}`, { credentials: 'include' })
               .then((r) => (r.ok ? (r.json() as Promise<Record<string, unknown>>) : null))
               .then((entry) => {
                 if (!entry) return id
@@ -345,9 +342,8 @@ function parseViewConfig(saved: Partial<ViewConfig> | null, allFields: FieldDef[
 }
 
 async function fetchViewConfig(slug: string): Promise<Partial<ViewConfig> | null> {
-  const token = localStorage.getItem('plank_token')
   const res = await fetch(`/cms/admin/users/me/prefs/view_${slug}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
   })
   if (!res.ok) return null
   const { value } = (await res.json()) as { value: Partial<ViewConfig> | null }
@@ -355,12 +351,11 @@ async function fetchViewConfig(slug: string): Promise<Partial<ViewConfig> | null
 }
 
 async function persistViewConfig(slug: string, config: ViewConfig): Promise<void> {
-  const token = localStorage.getItem('plank_token')
   await fetch(`/cms/admin/users/me/prefs/view_${slug}`, {
     method: 'PUT',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ value: config }),
   })
@@ -376,10 +371,7 @@ function MediaThumbnail({ value }: { value: string }) {
       setUrl(value)
       return
     }
-    const token = localStorage.getItem('plank_token')
-    fetch(`/cms/admin/media/${value}/url`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch(`/cms/admin/media/${value}/url`, { credentials: 'include' })
       .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
       .then((data) => setUrl(data?.url ?? null))
       .catch(() => {})
@@ -812,7 +804,6 @@ function ConfigureViewDialog({
 
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
-  const token = localStorage.getItem('plank_token')
   const navigate = useNavigate()
   const { timezone } = useSettings()
   const { user } = useAuth()
@@ -991,12 +982,12 @@ export function EntriesList() {
     try {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       }
       await Promise.all(
         editableSelectedIds.map((id) =>
           fetch(`/cms/admin/entries/${slug}/${id}/status`, {
             method: 'PATCH',
+            credentials: 'include',
             headers,
             body: JSON.stringify({ status: 'draft' }),
           }),
@@ -1016,10 +1007,9 @@ export function EntriesList() {
     if (!slug || bulkLoading) return
     setBulkLoading(true)
     try {
-      const headers: HeadersInit = { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       await Promise.all(
         deletableSelectedIds.map((id) =>
-          fetch(`/cms/admin/entries/${slug}/${id}`, { method: 'DELETE', headers }),
+          fetch(`/cms/admin/entries/${slug}/${id}`, { method: 'DELETE', credentials: 'include' }),
         ),
       )
       toast.success('Entries deleted')

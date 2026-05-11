@@ -66,11 +66,6 @@ type DashboardStats = {
 
 const RECENT_ENTRY_FIELD_PREFS_KEY = 'plank_dashboard_recent_entry_fields'
 
-function getStoredValue(key: string) {
-  if (typeof window === 'undefined') return null
-  return window.localStorage.getItem(key)
-}
-
 function AuthorCell({ entry }: { entry: RecentEntry }) {
   const first = entry._author_first_name
   const last = entry._author_last_name
@@ -140,7 +135,7 @@ export function Dashboard() {
 
   useEffect(() => {
     try {
-      const raw = getStoredValue(RECENT_ENTRY_FIELD_PREFS_KEY)
+      const raw = window.localStorage.getItem(RECENT_ENTRY_FIELD_PREFS_KEY)
       if (!raw) return
       const parsed = JSON.parse(raw) as EntryFieldMap
       setEntryFieldMap(parsed)
@@ -172,17 +167,12 @@ export function Dashboard() {
     if (!canReadEntries || collectionTypes.length === 0) return
 
     const controller = new AbortController()
-    const token = getStoredValue('plank_token')
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    }
 
     async function fetchCount(slug: string, status?: string): Promise<{ total: number; data: Entry[] }> {
       const params = new URLSearchParams({ page: '1', limit: '100' })
       if (status) params.set('status', status)
       const res = await fetch(`/cms/admin/content-types/${slug}/entries?${params}`, {
-        headers,
+        credentials: 'include',
         signal: controller.signal,
       })
       if (!res.ok) return { total: 0, data: [] }
@@ -238,18 +228,13 @@ export function Dashboard() {
     }
 
     const controller = new AbortController()
-    const token = getStoredValue('plank_token')
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    }
 
     setLoadingRecent(true)
     Promise.all(
       collectionTypes.map(async (ct) => {
         const res = await fetch(
           `/cms/admin/content-types/${ct.slug}/entries?page=1&limit=50&sort=published_at&order=desc`,
-          { headers, signal: controller.signal },
+          { credentials: 'include', signal: controller.signal },
         )
         if (!res.ok) return [] as RecentEntry[]
         const json = (await res.json()) as EntriesResponse

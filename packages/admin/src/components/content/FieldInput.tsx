@@ -242,19 +242,17 @@ function MediaPickerDialog({
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    const token = localStorage.getItem('plank_token')
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     const folderParam = currentFolderId ?? ''
     const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''
     Promise.all([
       debouncedSearch
         ? Promise.resolve([] as PickerFolder[])
-        : fetch(`/cms/admin/folders?parent_id=${folderParam}`, { headers })
+        : fetch(`/cms/admin/folders?parent_id=${folderParam}`, { credentials: 'include' })
             .then((r) => (r.ok ? (r.json() as Promise<{ folders: PickerFolder[] }>) : { folders: [] }))
             .then((d) => d.folders),
       fetch(
         `/cms/admin/media?folder_id=${folderParam}&page=${page}&limit=${PICKER_LIMIT}${searchParam}`,
-        { headers },
+        { credentials: 'include' },
       )
         .then((r) =>
           r.ok
@@ -543,10 +541,7 @@ function MediaInput({
       return
     }
     // It's a media ID — fetch a fresh URL
-    const token = localStorage.getItem('plank_token')
-    fetch(`/cms/admin/media/${value}/url`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch(`/cms/admin/media/${value}/url`, { credentials: 'include' })
       .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
       .then((data) => setPreviewUrl(data?.url ?? null))
       .catch(() => setPreviewUrl(null))
@@ -736,7 +731,6 @@ function MediaGalleryInput({
   disabled?: boolean
 }) {
   const ids = Array.isArray(value) ? value : []
-  const token = localStorage.getItem('plank_token')
   const [, setCacheVersion] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -753,9 +747,7 @@ function MediaGalleryInput({
     if (missing.length === 0) return
     Promise.all(
       missing.map((id) =>
-        fetch(`/cms/admin/media/${id}/url`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
+        fetch(`/cms/admin/media/${id}/url`, { credentials: 'include' })
           .then((r) => (r.ok ? (r.json() as Promise<{ url: string }>) : null))
           .then((data) => (data ? ([id, data.url] as const) : null))
           .catch(() => null),
@@ -774,7 +766,7 @@ function MediaGalleryInput({
   useEffect(() => {
     const missing = ids.filter((id) => !id.startsWith('http') && !(id in nameCacheRef.current))
     if (missing.length === 0) return
-    fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    fetch('/cms/admin/media', { credentials: 'include' })
       .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
       .then((data) => {
         let changed = false
@@ -1165,10 +1157,10 @@ const ctListCache: { data: CTSummary[] | null; promise: Promise<CTSummary[]> | n
   promise: null,
 }
 
-function fetchCTList(headers: HeadersInit): Promise<CTSummary[]> {
+function fetchCTList(): Promise<CTSummary[]> {
   if (ctListCache.data) return Promise.resolve(ctListCache.data)
   if (ctListCache.promise) return ctListCache.promise
-  ctListCache.promise = fetch('/cms/admin/content-types', { headers })
+  ctListCache.promise = fetch('/cms/admin/content-types', { credentials: 'include' })
     .then((r) => (r.ok ? (r.json() as Promise<CTSummary[]>) : []))
     .then((list) => {
       ctListCache.data = list
@@ -1182,8 +1174,8 @@ function resolveByTable(list: CTSummary[], tableName: string): CTSummary | null 
   return list.find((ct) => ct.tableName === tableName) ?? null
 }
 
-function fetchEntries(slug: string, headers: HeadersInit) {
-  return fetch(`/cms/admin/content-types/${slug}/entries?limit=200`, { headers })
+function fetchEntries(slug: string) {
+  return fetch(`/cms/admin/content-types/${slug}/entries?limit=200`, { credentials: 'include' })
     .then((r) => (r.ok ? (r.json() as Promise<{ data: Record<string, unknown>[] }>) : { data: [] }))
     .catch(() => ({ data: [] }))
 }
@@ -1196,15 +1188,13 @@ function useRelationEntries(relatedTable: string) {
   useEffect(() => {
     if (!relatedTable) return
     setLoading(true)
-    const token = localStorage.getItem('plank_token')
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
-    fetchCTList(headers)
+    fetchCTList()
       .then(
         (list): Promise<{ ctDef: CTSummary | null; res: { data: Record<string, unknown>[] } }> => {
           const ct = resolveByTable(list, relatedTable)
           if (!ct) return Promise.resolve({ ctDef: null, res: { data: [] } })
-          return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+          return fetchEntries(ct.slug).then((res) => ({ ctDef: ct, res }))
         },
       )
       .then(({ ctDef, res }) => {
@@ -1234,15 +1224,13 @@ function useLinkedEntries(relatedTable: string, relatedField: string, currentId:
       return
     }
     setLoading(true)
-    const token = localStorage.getItem('plank_token')
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
 
-    fetchCTList(headers)
+    fetchCTList()
       .then(
         (list): Promise<{ ctDef: CTSummary | null; res: { data: Record<string, unknown>[] } }> => {
           const ct = resolveByTable(list, relatedTable)
           if (!ct) return Promise.resolve({ ctDef: null, res: { data: [] } })
-          return fetchEntries(ct.slug, headers).then((res) => ({ ctDef: ct, res }))
+          return fetchEntries(ct.slug).then((res) => ({ ctDef: ct, res }))
         },
       )
       .then(({ ctDef, res }) => {
