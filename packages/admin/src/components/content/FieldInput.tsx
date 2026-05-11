@@ -92,6 +92,22 @@ type ArraySubField = {
 type MixedValueKind = 'string' | 'number' | 'boolean'
 type MixedValue = { kind: MixedValueKind; value: string | number | boolean }
 
+function getListItemKey(value: unknown, fallback: string) {
+  if (!value || typeof value !== 'object') return fallback
+  const record = value as Record<string, unknown>
+  for (const field of ['id', '_id', 'key', 'slug', 'name', 'title', 'label']) {
+    const fieldValue = record[field]
+    if (typeof fieldValue === 'string' || typeof fieldValue === 'number') {
+      return `${field}:${String(fieldValue)}`
+    }
+  }
+  try {
+    return JSON.stringify(record)
+  } catch {
+    return fallback
+  }
+}
+
 export type FieldDef = {
   name: string
   type: FieldType
@@ -321,7 +337,10 @@ function MediaPickerDialog({
         {!debouncedSearch && breadcrumb.length > 1 && (
           <div className="flex items-center gap-1 text-sm shrink-0">
             {breadcrumb.map((entry, i) => (
-              <span key={i} className="flex items-center gap-1 text-muted-foreground">
+              <span
+                key={`${entry.id ?? 'root'}:${entry.name}`}
+                className="flex items-center gap-1 text-muted-foreground"
+              >
                 {i > 0 && <span>/</span>}
                 {i === breadcrumb.length - 1 ? (
                   <span className="font-medium text-foreground">
@@ -717,18 +736,19 @@ function MediaGalleryInput({
   disabled?: boolean
 }) {
   const ids = Array.isArray(value) ? value : []
-  const [urlCache, setUrlCache] = useState<Record<string, string>>({})
-  const [nameCache, setNameCache] = useState<Record<string, string>>({})
+  const [, setCacheVersion] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const urlCacheRef = useRef<Record<string, string>>({})
+  const nameCacheRef = useRef<Record<string, string>>({})
+  const idsKey = ids.join(',')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  // Fetch preview URLs for IDs not yet in cache
   useEffect(() => {
-    const missing = ids.filter((id) => !id.startsWith('http') && !(id in urlCache))
+    const missing = ids.filter((id) => !id.startsWith('http') && !(id in urlCacheRef.current))
     if (missing.length === 0) return
     const token = localStorage.getItem('plank_token')
     Promise.all(
@@ -741,38 +761,41 @@ function MediaGalleryInput({
           .catch(() => null),
       ),
     ).then((results) => {
-      const updates: Record<string, string> = {}
+      let changed = false
       for (const r of results) {
-        if (r) updates[r[0]] = r[1]
+        if (!r) continue
+        urlCacheRef.current[r[0]] = r[1]
+        changed = true
       }
-      if (Object.keys(updates).length > 0) setUrlCache((prev) => ({ ...prev, ...updates }))
+      if (changed) setCacheVersion((version) => version + 1)
     })
-  }, [ids.join(',')])
+  }, [idsKey])
 
-  // Fetch filenames for IDs not yet in name cache
   useEffect(() => {
-    const missing = ids.filter((id) => !id.startsWith('http') && !(id in nameCache))
+    const missing = ids.filter((id) => !id.startsWith('http') && !(id in nameCacheRef.current))
     if (missing.length === 0) return
     const token = localStorage.getItem('plank_token')
     fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
       .then((data) => {
-        const updates: Record<string, string> = {}
+        let changed = false
         for (const item of data.items) {
-          if (missing.includes(item.id)) updates[item.id] = item.filename
+          if (!missing.includes(item.id)) continue
+          nameCacheRef.current[item.id] = item.filename
+          changed = true
         }
-        if (Object.keys(updates).length > 0) setNameCache((prev) => ({ ...prev, ...updates }))
+        if (changed) setCacheVersion((version) => version + 1)
       })
       .catch(() => {})
-  }, [ids.join(',')])
+  }, [idsKey])
 
   function getPreviewUrl(id: string): string | null {
     if (id.startsWith('http')) return id
-    return urlCache[id] ?? null
+    return urlCacheRef.current[id] ?? null
   }
 
   function getFilename(id: string): string {
-    return nameCache[id] ?? ''
+    return nameCacheRef.current[id] ?? ''
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -792,8 +815,9 @@ function MediaGalleryInput({
     try {
       for (const file of files) {
         const data = await uploadFile(file)
-        setUrlCache((prev) => ({ ...prev, [data.id]: data.url }))
-        setNameCache((prev) => ({ ...prev, [data.id]: file.name }))
+        urlCacheRef.current[data.id] = data.url
+        nameCacheRef.current[data.id] = file.name
+        setCacheVersion((version) => version + 1)
         currentIds = [...currentIds, data.id]
         onChange(currentIds)
       }
@@ -819,7 +843,6 @@ function MediaGalleryInput({
           handleFiles(files)
         }}
       />
-
       {ids.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={ids} strategy={rectSortingStrategy}>
@@ -1090,7 +1113,7 @@ function DateTimeInput({
             mode="single"
             selected={date}
             captionLayout="dropdown"
-            defaultMonth={date ?? new Date()}
+            defaultMonth={date}
             onSelect={handleDateSelect}
           />
         </PopoverContent>
@@ -1498,7 +1521,7 @@ function ArrayInput({
       <Accordion type="single" collapsible className="w-full">
         {items.map((item, index) => (
           <AccordionItem
-            key={index}
+            key={getListItemKey(item, `array-item-${index}`)}
             value={`item-${index}`}
             className="mb-2 rounded-md border border-dashed last:border-b transition-colors hover:bg-accent/50"
           >
@@ -1680,7 +1703,7 @@ function NavigationInput({
           const itemLabel = item.label?.trim() ? item.label : `Item ${index + 1}`
           return (
             <AccordionItem
-              key={index}
+              key={getListItemKey(item, `navigation-item-${depth}-${index}`)}
               value={`navigation-item-${depth}-${index}`}
               className="mb-2 rounded-md border border-dashed last:border-b transition-colors hover:bg-accent/50"
             >

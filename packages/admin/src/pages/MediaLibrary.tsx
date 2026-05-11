@@ -56,6 +56,8 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination.tsx'
 import HeaderFixed from '@/components/Header'
+import { formatDatetime } from '@/lib/formatDate.ts'
+import { useSettings } from '@/context/settings.tsx'
 
 function handleCardKeyboard(
   event: React.KeyboardEvent<HTMLElement>,
@@ -186,7 +188,9 @@ function HLSVideoPlayer({ url }: { url: string }) {
     }
   }, [url])
 
-  return <video ref={videoRef} controls className="max-h-[70vh] w-full rounded-md bg-black" />
+  return (
+    <video ref={videoRef} controls className="max-h-[70vh] w-full rounded-md bg-zinc-950" />
+  )
 }
 
 // Media Preview
@@ -209,7 +213,7 @@ function MediaPreviewContent({ item }: { item: MediaItem }) {
         src={item.url}
         controls
         preload="none"
-        className="max-h-[70vh] w-full rounded-md bg-black"
+        className="max-h-[70vh] w-full rounded-md bg-zinc-950"
       />
     )
   if (isAudio(mime))
@@ -280,7 +284,7 @@ function FolderCard({
         />
         <div
           className={`absolute inset-0 flex items-center justify-center transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <Checkbox
             checked={selected}
@@ -416,6 +420,7 @@ function MediaCard({
 // Media Library
 
 export function MediaLibrary() {
+  const { timezone } = useSettings()
   const inputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const permissions = user?.permissions ?? []
@@ -669,6 +674,37 @@ export function MediaLibrary() {
     openPreview(nextItem)
   }
 
+  async function handleSavePreview() {
+    if (!preview) return
+    setEditSaving(true)
+    setEditError(null)
+    const token = localStorage.getItem('plank_token')
+    try {
+      const res = await fetch(`/cms/admin/media/${preview.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          filename: editFilename || preview.filename,
+          alt: editAlt.trim() || null,
+          caption: editCaption.trim() || null,
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed.')
+      const updated = (await res.json()) as MediaItem
+      openPreview(updated)
+      refetchMedia()
+      toast.success('File updated')
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Save failed.')
+      toast.error('Could not update file')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   function handleFilenameChange(nextFilename: string) {
     setEditFilename(nextFilename)
     const previousDefaultAlt = buildDefaultAlt(editFilename)
@@ -737,7 +773,7 @@ export function MediaLibrary() {
       {/* Header */}
       <HeaderFixed>
         <div className="flex items-start justify-between">
-          <h1 className="text-2xl font-bold -mt-2">Media Library</h1>
+          <h1 className="text-2xl font-semibold -mt-2">Media Library</h1>
 
           <div className="flex items-center gap-2">
             <Button
@@ -768,7 +804,7 @@ export function MediaLibrary() {
           <Breadcrumb className="mb-4">
             <BreadcrumbList>
               {breadcrumb.map((entry, i) => (
-                <React.Fragment key={i}>
+                <React.Fragment key={`${entry.id ?? 'root'}:${entry.name}`}>
                   {i > 0 && <BreadcrumbSeparator />}
                   <BreadcrumbItem>
                     {i === breadcrumb.length - 1 ? (
@@ -826,6 +862,7 @@ export function MediaLibrary() {
               </>
             ) : !empty && !loading ? (
               <button
+                type="button"
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setSelected(new Set(allKeys))}
               >
@@ -951,39 +988,7 @@ export function MediaLibrary() {
               </DialogTitle>
             </DialogHeader>
             {preview && (
-              <form
-                className="grid max-h-[calc(90vh-4rem)] min-h-0 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  setEditSaving(true)
-                  setEditError(null)
-                  const token = localStorage.getItem('plank_token')
-                  try {
-                    const res = await fetch(`/cms/admin/media/${preview.id}`, {
-                      method: 'PATCH',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                      },
-                      body: JSON.stringify({
-                        filename: editFilename || preview.filename,
-                        alt: editAlt.trim() || null,
-                        caption: editCaption.trim() || null,
-                      }),
-                    })
-                    if (!res.ok) throw new Error('Save failed.')
-                    const updated = (await res.json()) as MediaItem
-                    openPreview(updated)
-                    refetchMedia()
-                    toast.success('File updated')
-                  } catch (err) {
-                    setEditError(err instanceof Error ? err.message : 'Save failed.')
-                    toast.error('Could not update file')
-                  } finally {
-                    setEditSaving(false)
-                  }
-                }}
-              >
+              <div className="grid max-h-[calc(90vh-4rem)] min-h-0 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="relative flex min-h-0 items-center justify-center overflow-hidden bg-muted/30 px-6 py-4">
                   <div className="flex h-full w-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border bg-background/70 p-4">
                     <MediaPreviewContent item={preview} />
@@ -1031,7 +1036,7 @@ export function MediaLibrary() {
                     </div>
                     <div>
                       <p className="mb-1 font-medium text-foreground">Created</p>
-                      <p>{new Date(preview.created_at).toLocaleString()}</p>
+                      <p>{formatDatetime(preview.created_at, timezone)}</p>
                     </div>
                   </div>
                   <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
@@ -1080,14 +1085,19 @@ export function MediaLibrary() {
                           Download
                         </Button>
                       </a>
-                      <Button type="submit" size="sm" disabled={editSaving || !canWriteMedia}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSavePreview}
+                        disabled={editSaving || !canWriteMedia}
+                      >
                         {editSaving ? 'Saving…' : 'Save'}
                       </Button>
                     </div>
                     {editError && <p className="text-xs text-destructive">{editError}</p>}
                   </div>
                 </div>
-              </form>
+              </div>
             )}
           </DialogContent>
         </Dialog>
@@ -1110,7 +1120,6 @@ export function MediaLibrary() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCreateFolder()
               }}
-              autoFocus
             />
             {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
             <DialogFooter>
@@ -1144,7 +1153,6 @@ export function MediaLibrary() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRenameFolder()
               }}
-              autoFocus
             />
             {folderSaveError && <p className="text-sm text-destructive">{folderSaveError}</p>}
             <DialogFooter>

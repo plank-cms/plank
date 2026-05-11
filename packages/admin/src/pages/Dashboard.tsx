@@ -66,6 +66,11 @@ type DashboardStats = {
 
 const RECENT_ENTRY_FIELD_PREFS_KEY = 'plank_dashboard_recent_entry_fields'
 
+function getStoredValue(key: string) {
+  if (typeof window === 'undefined') return null
+  return window.localStorage.getItem(key)
+}
+
 function AuthorCell({ entry }: { entry: RecentEntry }) {
   const first = entry._author_first_name
   const last = entry._author_last_name
@@ -111,6 +116,11 @@ export function Dashboard() {
     () => (contentTypes ?? []).filter((ct) => ct.kind === 'collection'),
     [contentTypes],
   )
+  const collectionCount = collectionTypes.length
+  const singleCount = useMemo(
+    () => (contentTypes ?? []).filter((ct) => ct.kind === 'single').length,
+    [contentTypes],
+  )
 
   function guessDefaultField(ct: ContentType): string {
     const preferred = ['title', 'name', 'entry']
@@ -130,7 +140,7 @@ export function Dashboard() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(RECENT_ENTRY_FIELD_PREFS_KEY)
+      const raw = getStoredValue(RECENT_ENTRY_FIELD_PREFS_KEY)
       if (!raw) return
       const parsed = JSON.parse(raw) as EntryFieldMap
       setEntryFieldMap(parsed)
@@ -155,14 +165,14 @@ export function Dashboard() {
   }, [collectionTypes])
 
   useEffect(() => {
-    localStorage.setItem(RECENT_ENTRY_FIELD_PREFS_KEY, JSON.stringify(entryFieldMap))
+    window.localStorage.setItem(RECENT_ENTRY_FIELD_PREFS_KEY, JSON.stringify(entryFieldMap))
   }, [entryFieldMap])
 
   useEffect(() => {
     if (!canReadEntries || collectionTypes.length === 0) return
 
     const controller = new AbortController()
-    const token = localStorage.getItem('plank_token')
+    const token = getStoredValue('plank_token')
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -228,7 +238,7 @@ export function Dashboard() {
     }
 
     const controller = new AbortController()
-    const token = localStorage.getItem('plank_token')
+    const token = getStoredValue('plank_token')
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -243,13 +253,16 @@ export function Dashboard() {
         )
         if (!res.ok) return [] as RecentEntry[]
         const json = (await res.json()) as EntriesResponse
-        return (json.data ?? [])
-          .filter((entry) => entry.status === 'published' && Boolean(entry.published_at))
-          .map((entry) => ({
+        const recentEntries: RecentEntry[] = []
+        for (const entry of json.data ?? []) {
+          if (entry.status !== 'published' || !entry.published_at) continue
+          recentEntries.push({
             ...entry,
             slug: ct.slug,
             contentTypeName: ct.name,
-          }))
+          })
+        }
+        return recentEntries
       }),
     )
       .then((all) => {
@@ -289,16 +302,12 @@ export function Dashboard() {
           {
             label: 'Entries',
             value: stats?.totalEntries ?? '—',
-            context: contentTypes
-              ? `${contentTypes.filter((ct) => ct.kind === 'collection').length} Content Types`
-              : '—',
+            context: contentTypes ? `${collectionCount} Content Types` : '—',
           },
           {
             label: 'Content Types',
             value: contentTypes?.length ?? '—',
-            context: contentTypes
-              ? `${contentTypes.filter((ct) => ct.kind === 'collection').length} Collection · ${contentTypes.filter((ct) => ct.kind === 'single').length} Single`
-              : '—',
+            context: contentTypes ? `${collectionCount} Collection · ${singleCount} Single` : '—',
           },
           {
             label: 'Drafts',
