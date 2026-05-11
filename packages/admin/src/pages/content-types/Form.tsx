@@ -22,6 +22,7 @@ import { useFetch } from '@/hooks/useFetch.ts'
 import { useAuth } from '@/context/auth.tsx'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { Label } from '@/components/ui/label.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Switch } from '@/components/ui/switch.tsx'
 import {
@@ -365,10 +366,16 @@ export function ContentTypeForm() {
                 </span>
               )}
               {showPreviewSwitch && (
-                <label className="ml-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-                  <Switch checked={previewEnabled} onCheckedChange={setPreviewEnabled} />
-                  <span>Preview</span>
-                </label>
+                <div className="ml-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <Switch
+                    id="content-type-preview"
+                    checked={previewEnabled}
+                    onCheckedChange={setPreviewEnabled}
+                  />
+                  <Label htmlFor="content-type-preview" className="text-xs text-muted-foreground">
+                    Preview
+                  </Label>
+                </div>
               )}
             </div>
           </div>

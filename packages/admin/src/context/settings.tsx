@@ -18,7 +18,7 @@ const SettingsContext = createContext<SettingsContextValue>({
 })
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const { status, user } = useAuth()
+  const { status } = useAuth()
   const [timezone, setTimezone] = useState('UTC')
   const [locales, setLocales] = useState<string[]>(['en'])
   const [defaultLocale, setDefaultLocale] = useState<string>('en')

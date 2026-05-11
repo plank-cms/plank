@@ -704,7 +704,6 @@ export function AddFieldDialog({
                 id="field-name"
                 placeholder="e.g. article_title"
                 value={config.name}
-                autoFocus
                 onChange={(e) => {
                   setConfig((prev) => ({ ...prev, name: e.target.value }))
                   setNameError('')
@@ -886,7 +885,6 @@ export function AddFieldDialog({
                     <div className="flex flex-col gap-1">
                       <Input
                         placeholder="sub_field_name"
-                        autoFocus
                         value={subFieldDraft.name}
                         onChange={(e) => {
                           setSubFieldDraft((prev) =>
