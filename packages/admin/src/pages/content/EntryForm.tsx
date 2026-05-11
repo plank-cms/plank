@@ -489,7 +489,7 @@ export function EntryForm() {
   }
 
   async function handleOpenPreview() {
-    if (!slug || !ct || !previewConfig.enabled) return
+    if (!slug || !ct || !previewConfig.enabled || !canOpenPreview) return
 
     if (previewSetupError) {
       toast.error(previewSetupError)
@@ -726,6 +726,12 @@ export function EntryForm() {
   const canSchedule = !!(schedDate && schedTime)
   const publishLabel = editorialMode && isContributorRole ? 'Review' : 'Publish'
   const supportsPreviewUI = previewAllowedForType
+  const canOpenPreview =
+    status === 'draft' ||
+    status === 'scheduled' ||
+    status === 'pending' ||
+    status === 'in_review' ||
+    (status === 'published' && isPublishedStale)
 
   const saveDraftEnabled = !readOnly && !busy && (status === 'scheduled' ? true : isDirty)
   useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })
@@ -883,7 +889,7 @@ export function EntryForm() {
                 <XIcon className="size-4" />
               </Button>
             )}
-            {supportsPreviewUI && previewConfig.enabled && (
+            {supportsPreviewUI && previewConfig.enabled && canOpenPreview && (
               <Button
                 variant="outline"
                 onClick={handleOpenPreview}
