@@ -736,6 +736,7 @@ function MediaGalleryInput({
   disabled?: boolean
 }) {
   const ids = Array.isArray(value) ? value : []
+  const token = localStorage.getItem('plank_token')
   const [, setCacheVersion] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -750,7 +751,6 @@ function MediaGalleryInput({
   useEffect(() => {
     const missing = ids.filter((id) => !id.startsWith('http') && !(id in urlCacheRef.current))
     if (missing.length === 0) return
-    const token = localStorage.getItem('plank_token')
     Promise.all(
       missing.map((id) =>
         fetch(`/cms/admin/media/${id}/url`, {
@@ -774,7 +774,6 @@ function MediaGalleryInput({
   useEffect(() => {
     const missing = ids.filter((id) => !id.startsWith('http') && !(id in nameCacheRef.current))
     if (missing.length === 0) return
-    const token = localStorage.getItem('plank_token')
     fetch('/cms/admin/media', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((r) => (r.ok ? (r.json() as Promise<{ items: MediaItem[] }>) : { items: [] }))
       .then((data) => {

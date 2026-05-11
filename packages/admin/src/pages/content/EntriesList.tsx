@@ -812,6 +812,7 @@ function ConfigureViewDialog({
 
 export function EntriesList() {
   const { slug } = useParams<{ slug: string }>()
+  const token = localStorage.getItem('plank_token')
   const navigate = useNavigate()
   const { timezone } = useSettings()
   const { user } = useAuth()
@@ -988,7 +989,6 @@ export function EntriesList() {
     if (!slug || bulkLoading) return
     setBulkLoading(true)
     try {
-      const token = localStorage.getItem('plank_token')
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -1016,7 +1016,6 @@ export function EntriesList() {
     if (!slug || bulkLoading) return
     setBulkLoading(true)
     try {
-      const token = localStorage.getItem('plank_token')
       const headers: HeadersInit = { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       await Promise.all(
         deletableSelectedIds.map((id) =>

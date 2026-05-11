@@ -421,6 +421,7 @@ function MediaCard({
 
 export function MediaLibrary() {
   const { timezone } = useSettings()
+  const token = localStorage.getItem('plank_token')
   const inputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const permissions = user?.permissions ?? []
@@ -495,7 +496,6 @@ export function MediaLibrary() {
 
     if (hasM3U8) {
       // HLS bundles always go through the server (need server-side bundleId generation)
-      const token = localStorage.getItem('plank_token')
       const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
       const body = new FormData()
       for (const { file, relativePath } of filesWithPaths) {
@@ -678,7 +678,6 @@ export function MediaLibrary() {
     if (!preview) return
     setEditSaving(true)
     setEditError(null)
-    const token = localStorage.getItem('plank_token')
     try {
       const res = await fetch(`/cms/admin/media/${preview.id}`, {
         method: 'PATCH',
@@ -743,7 +742,6 @@ export function MediaLibrary() {
     if (!canDeleteMedia) return
     if (bulkLoading) return
     setBulkLoading(true)
-    const token = localStorage.getItem('plank_token')
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
     try {
       await Promise.all([
