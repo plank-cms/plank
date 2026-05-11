@@ -27,6 +27,7 @@ function buildPackageJson(name: string): object {
     private: true,
     scripts: {
       start: 'plank start',
+      update: 'plank update',
     },
     dependencies: {
       '@plank-cms/plank': PACKAGE_VERSION,
@@ -100,6 +101,10 @@ export async function init(projectName?: string): Promise<void> {
       '',
       ...(!useCurrentDir ? [`  ${chalk.cyan(`cd ${name}`)}`, ''] : []),
       `  ${chalk.cyan('npm start')}`,
+      '',
+      `To update Plank later:`,
+      '',
+      `  ${chalk.cyan('npm run update')}`,
     ].join('\n'),
     'Next steps'
   )
