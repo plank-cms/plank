@@ -723,6 +723,7 @@ export function EntryForm() {
     isPublishedStale
   const canSchedule = !!(schedDate && schedTime)
   const publishLabel = editorialMode && isContributorRole ? 'Review' : 'Publish'
+  const supportsPreviewUI = ct?.kind !== 'single'
 
   const saveDraftEnabled = !readOnly && !busy && (status === 'scheduled' ? true : isDirty)
   useKeyboardShortcut('mod+s', handleSaveDraft, { enabled: saveDraftEnabled, label: 'Save draft' })
@@ -797,7 +798,7 @@ export function EntryForm() {
               {statusBadge}
             </div>
             <p className="text-muted-foreground text-xs mt-1">{ct.name}</p>
-            {previewConfig.enabled && previewSetupError && (
+            {supportsPreviewUI && previewConfig.enabled && previewSetupError && (
               <p className="mt-1 text-xs text-amber-600">{previewSetupError}</p>
             )}
           </div>
@@ -880,7 +881,7 @@ export function EntryForm() {
                 <XIcon className="size-4" />
               </Button>
             )}
-            {previewConfig.enabled && (
+            {supportsPreviewUI && previewConfig.enabled && (
               <Button
                 variant="outline"
                 onClick={handleOpenPreview}
