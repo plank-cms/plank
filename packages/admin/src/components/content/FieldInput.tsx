@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import {
@@ -1303,6 +1303,7 @@ function RelationInput({
 }) {
   const isMulti = relationType === 'many-to-many'
   const [open, setOpen] = useState(false)
+  const listId = useId()
   const { entries, loading } = useRelationEntries(relatedTable)
 
   if (relationType === 'one-to-many') {
@@ -1364,6 +1365,7 @@ function RelationInput({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-controls={listId}
             className="w-full justify-between font-normal text-base"
             disabled={disabled}
           >
@@ -1374,7 +1376,7 @@ function RelationInput({
         <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
           <Command>
             <CommandInput placeholder="Search…" />
-            <CommandList>
+            <CommandList id={listId}>
               {loading ? (
                 <div className="flex items-center justify-center py-6">
                   <Spinner className="size-4" />

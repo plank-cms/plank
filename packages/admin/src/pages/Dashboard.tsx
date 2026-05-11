@@ -66,6 +66,31 @@ type DashboardStats = {
 
 const RECENT_ENTRY_FIELD_PREFS_KEY = 'plank_dashboard_recent_entry_fields'
 
+function AuthorCell({ entry }: { entry: RecentEntry }) {
+  const first = entry._author_first_name
+  const last = entry._author_last_name
+  const label = first || last ? [first, last].filter(Boolean).join(' ') : null
+
+  const avatar = (
+    <UserAvatar
+      avatarUrl={entry._author_avatar_url}
+      firstName={entry._author_first_name}
+      lastName={entry._author_last_name}
+      className="size-7"
+      fallbackClassName="text-[10px]"
+    />
+  )
+
+  if (!label) return avatar
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{avatar}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const { timezone } = useSettings()
@@ -244,31 +269,6 @@ export function Dashboard() {
 
     return () => controller.abort()
   }, [canReadEntries, collectionTypes])
-
-  function AuthorCell({ entry }: { entry: RecentEntry }) {
-    const first = entry._author_first_name
-    const last = entry._author_last_name
-    const label = first || last ? [first, last].filter(Boolean).join(' ') : null
-
-    const avatar = (
-      <UserAvatar
-        avatarUrl={entry._author_avatar_url}
-        firstName={entry._author_first_name}
-        lastName={entry._author_last_name}
-        className="size-7"
-        fallbackClassName="text-[10px]"
-      />
-    )
-
-    if (!label) return avatar
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{avatar}</TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
-    )
-  }
 
   return (
     <div>

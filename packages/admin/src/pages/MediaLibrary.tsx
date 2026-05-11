@@ -57,6 +57,15 @@ import {
 } from '@/components/ui/pagination.tsx'
 import HeaderFixed from '@/components/Header'
 
+function handleCardKeyboard(
+  event: React.KeyboardEvent<HTMLElement>,
+  action: () => void,
+) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  action()
+}
+
 // Types
 
 type Folder = {
@@ -253,8 +262,16 @@ function FolderCard({
   return (
     <div
       className={`group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors cursor-pointer hover:bg-muted/50 ${selected ? 'ring-2 ring-primary' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       onClick={() => {
         if (!selected) onOpen(folder)
+      }}
+      onKeyDown={(event) => {
+        handleCardKeyboard(event, () => {
+          if (!selected) onOpen(folder)
+        })
       }}
     >
       <div className="relative shrink-0 size-7 flex items-center justify-center">
@@ -284,6 +301,7 @@ function FolderCard({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
+              type="button"
               className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               onClick={(e) => e.stopPropagation()}
             >
@@ -338,8 +356,16 @@ function MediaCard({
     >
       <div
         className="aspect-square bg-muted flex items-center justify-center cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
         onClick={() => {
           if (!selected) onPreview(item)
+        }}
+        onKeyDown={(event) => {
+          handleCardKeyboard(event, () => {
+            if (!selected) onPreview(item)
+          })
         }}
       >
         {isImage(mime) ? (
@@ -370,6 +396,7 @@ function MediaCard({
       </div>
       {!selected && canDelete && (
         <button
+          type="button"
           onClick={() => onDelete(item)}
           className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:text-destructive group-hover:opacity-100"
         >
