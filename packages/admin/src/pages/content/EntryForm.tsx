@@ -48,7 +48,6 @@ import {
   getPreviewSetupError,
   parsePreviewClientSettings,
   resolvePreviewUrl,
-  withPreviewNonce,
 } from '@/lib/preview.ts'
 import HeaderFixed from '@/components/Header'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
@@ -426,12 +425,10 @@ export function EntryForm() {
   function syncPreviewWindow(url: string) {
     if (!previewWindowRef || previewWindowRef.closed) return
 
-    const nextUrl = withPreviewNonce(url)
-
     // Navigating the held window reference is more robust than postMessage for
     // cross-origin previews because it does not depend on origin matching or a
     // client-side listener being mounted correctly.
-    previewWindowRef.location.href = nextUrl
+    previewWindowRef.location.href = url
     previewWindowRef.focus()
   }
 
@@ -527,7 +524,7 @@ export function EntryForm() {
       return
     }
 
-    previewWindowRef = window.open(withPreviewNonce(previewUrl), PREVIEW_WINDOW_NAME)
+    previewWindowRef = window.open(previewUrl, PREVIEW_WINDOW_NAME)
 
     if (!previewWindowRef) {
       toast.error('Preview window was blocked by the browser.')

@@ -118,17 +118,3 @@ export function resolvePreviewUrl(params: {
     return null
   }
 }
-
-export function withPreviewNonce(url: string): string {
-  const next = new URL(url)
-  next.searchParams.set('plank_preview', createPreviewNonce())
-  return next.toString()
-}
-
-function createPreviewNonce(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
