@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   PlusIcon,
@@ -175,6 +175,68 @@ function normalizeRelationIds(value: unknown): string[] {
 
   const id = String(value ?? '').trim()
   return id ? [id] : []
+}
+
+function RelationFieldSelector({
+  allFields,
+  fieldName,
+  visible,
+  setVisible,
+}: {
+  allFields: FieldDef[]
+  fieldName: string
+  visible: string[]
+  setVisible: Dispatch<SetStateAction<string[]>>
+}) {
+  const base = fieldName.split('.')[0]
+  const field = allFields.find((f) => f.name === base)
+  const relatedSlug = field?.relatedSlug
+
+  const { data: relatedCt } = useFetch<ContentType>(
+    relatedSlug ? `/cms/admin/content-types/${relatedSlug}` : null,
+  )
+
+  const selected = visible.find((v) => v.split('.')[0] === base)
+  const selectedSub = selected && selected.includes('.') ? selected.split('.')[1] : undefined
+
+  function setFieldSub(baseName: string, sub?: string) {
+    setVisible((prev) =>
+      prev.map((v) => {
+        const parts = v.split('.')
+        if (parts[0] !== baseName) return v
+        return sub ? `${baseName}.${sub}` : baseName
+      }),
+    )
+  }
+
+  useEffect(() => {
+    if (!relatedCt?.fields) return
+    if (selectedSub) return
+
+    const found = pickRelationDisplayField(relatedCt.fields)
+
+    if (found) {
+      setFieldSub(base, found)
+    }
+  }, [relatedCt, selectedSub, base])
+
+  if (!relatedCt?.fields) return null
+
+  return (
+    <Select value={selectedSub} onValueChange={(val) => setFieldSub(base, val)}>
+      <SelectTrigger className="h-8 text-sm w-32">
+        <SelectValue />
+      </SelectTrigger>
+
+      <SelectContent>
+        {relatedCt.fields.map((rf) => (
+          <SelectItem key={rf.name} value={rf.name}>
+            {rf.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 function RelationValueCell({
@@ -512,59 +574,6 @@ function ConfigureViewDialog({
 
   const hidden = allFields.filter((f) => !visible.some((v) => v.split('.')[0] === f.name))
 
-  function RelationFieldSelector({ fieldName }: { fieldName: string }) {
-    const base = fieldName.split('.')[0]
-    const field = allFields.find((f) => f.name === base)
-    const relatedSlug = field?.relatedSlug
-
-    const { data: relatedCt } = useFetch<ContentType>(
-      relatedSlug ? `/cms/admin/content-types/${relatedSlug}` : null,
-    )
-
-    const selected = visible.find((v) => v.split('.')[0] === base)
-    const selectedSub = selected && selected.includes('.') ? selected.split('.')[1] : undefined
-
-    function setFieldSub(baseName: string, sub?: string) {
-      setVisible((prev) =>
-        prev.map((v) => {
-          const parts = v.split('.')
-          if (parts[0] !== baseName) return v
-          return sub ? `${baseName}.${sub}` : baseName
-        }),
-      )
-    }
-
-    useEffect(() => {
-      if (!relatedCt?.fields) return
-      if (selectedSub) return
-
-      const preferred = ['title', 'name']
-      const found = relatedCt.fields.find((f) => preferred.includes(f.name)) || relatedCt.fields[0]
-
-      if (found) {
-        setFieldSub(base, found.name)
-      }
-    }, [relatedCt, selectedSub, base])
-
-    if (!relatedCt?.fields) return null
-
-    return (
-      <Select value={selectedSub} onValueChange={(val) => setFieldSub(base, val)}>
-        <SelectTrigger className="h-8 text-sm w-32">
-          <SelectValue />
-        </SelectTrigger>
-
-        <SelectContent>
-          {relatedCt.fields.map((rf) => (
-            <SelectItem key={rf.name} value={rf.name}>
-              {rf.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    )
-  }
-
   function move(name: string, dir: -1 | 1) {
     setVisible((prev) => {
       const idx = prev.indexOf(name)
@@ -622,7 +631,12 @@ function ConfigureViewDialog({
                       {field && <span className="text-xs text-muted-foreground">{field.type}</span>}
                       {field && field.type === 'relation' && (
                         <div className="ml-2">
-                          <RelationFieldSelector fieldName={name} />
+                          <RelationFieldSelector
+                            allFields={allFields}
+                            fieldName={name}
+                            visible={visible}
+                            setVisible={setVisible}
+                          />
                         </div>
                       )}
                       <Button

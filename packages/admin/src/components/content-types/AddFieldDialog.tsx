@@ -782,7 +782,7 @@ export function AddFieldDialog({
                       const SfIcon = opt?.icon ?? TypeIcon
                       return (
                         <div
-                          key={`subfield-${index}`}
+                          key={sf.name}
                           className={`${FIELD_WIDTH_SPAN[sf.width ?? 'full']} rounded-md border border-dashed border-border p-2`}
                         >
                           <div className="flex items-start gap-1.5">
