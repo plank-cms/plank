@@ -6,6 +6,7 @@ import { verifySync } from 'otplib'
 import { z, flattenError } from 'zod'
 import { getProvider } from '../media/index.js'
 import { decrypt } from '../lib/encrypt.js'
+import { resolveUniquePublicAuthorSlug } from '../lib/publicAuthorSlug.js'
 
 const LoginSchema = z.object({
   email: z.email(),
@@ -19,6 +20,8 @@ const Login2FASchema = z.object({
 
 const RegisterSchema = z.object({
   email: z.email(),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
   password: z.string().min(8),
 })
 
@@ -397,7 +400,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     return
   }
 
-  const { email, password } = parsed.data
+  const { email, firstName, lastName, password } = parsed.data
   const hashed = await bcrypt.hash(password, 12)
 
   const { rows: roleRows } = await pool.query<RoleRow>(
@@ -411,9 +414,12 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const id = createId()
+  const publicAuthorSlug = await resolveUniquePublicAuthorSlug({ email, firstName, lastName })
   await pool.query(
-    'INSERT INTO plank_users (id, email, password, role_id) VALUES ($1, $2, $3, $4)',
-    [id, email, hashed, superAdminRole.id],
+    `INSERT INTO plank_users
+       (id, email, password, role_id, first_name, last_name, public_author_slug)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, email, hashed, superAdminRole.id, firstName, lastName, publicAuthorSlug],
   )
 
   res.status(201).json({ id, email })

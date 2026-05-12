@@ -32,6 +32,8 @@ export function Login() {
 
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const [email, setEmail] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -77,7 +79,7 @@ export function Login() {
       }
 
       if (needsSetup) {
-        await request('/cms/auth/register', 'POST', { email, password })
+        await request('/cms/auth/register', 'POST', { email, firstName, lastName, password })
       }
       const res = await request('/cms/auth/login', 'POST', { email, password })
       if (res.requiresTwoFactor && res.challengeToken) {
@@ -144,6 +146,30 @@ export function Login() {
                   required
                 />
               </div>
+
+              {needsSetup && (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="firstName">First name</Label>
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="lastName">Last name</Label>
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="password">Password</Label>
