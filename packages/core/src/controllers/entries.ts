@@ -48,6 +48,36 @@ function junctionTableName(sourceTable: string, fieldName: string): string {
   return `_rel_${sourceTable}_${fieldName}`
 }
 
+function resolveManyToManyBinding(
+  tableName: string,
+  field: FieldDefinition,
+): {
+  junctionTable: string
+  currentIdColumn: 'source_id' | 'target_id'
+  relatedIdColumn: 'source_id' | 'target_id'
+} {
+  const isInverse =
+    (field.relationType ?? 'many-to-one') === 'many-to-many' &&
+    typeof field.relatedTable === 'string' &&
+    field.relatedTable.length > 0 &&
+    typeof field.relatedField === 'string' &&
+    field.relatedField.length > 0
+
+  if (isInverse) {
+    return {
+      junctionTable: junctionTableName(field.relatedTable!, field.relatedField!),
+      currentIdColumn: 'target_id',
+      relatedIdColumn: 'source_id',
+    }
+  }
+
+  return {
+    junctionTable: junctionTableName(tableName, field.name),
+    currentIdColumn: 'source_id',
+    relatedIdColumn: 'target_id',
+  }
+}
+
 function normalizeNavigationItems(value: unknown): unknown {
   if (!Array.isArray(value)) return value
   return value.map((item) => {
@@ -91,12 +121,19 @@ async function syncManyToMany(
   field: FieldDefinition,
   targetIds: string[],
 ): Promise<void> {
-  const jt = junctionTableName(tableName, field.name)
-  await pool.query(`DELETE FROM ${quoteIdentifier(jt)} WHERE source_id = $1`, [entryId])
-  if (targetIds.length === 0) return
-  const placeholders = targetIds.map((_, i) => `($1, $${i + 2})`).join(', ')
+  const binding = resolveManyToManyBinding(tableName, field)
   await pool.query(
-    `INSERT INTO ${quoteIdentifier(jt)} (source_id, target_id) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    `DELETE FROM ${quoteIdentifier(binding.junctionTable)} WHERE ${quoteIdentifier(binding.currentIdColumn)} = $1`,
+    [entryId],
+  )
+  if (targetIds.length === 0) return
+  const tuples = targetIds
+    .map((_, i) =>
+      binding.currentIdColumn === 'source_id' ? `($1, $${i + 2})` : `($${i + 2}, $1)`,
+    )
+    .join(', ')
+  await pool.query(
+    `INSERT INTO ${quoteIdentifier(binding.junctionTable)} (source_id, target_id) VALUES ${tuples} ON CONFLICT DO NOTHING`,
     [entryId, ...targetIds],
   )
 }
@@ -285,12 +322,14 @@ async function loadManyToManyIds(
   const result: Record<string, string[]> = {}
   await Promise.all(
     mmFields.map(async (f) => {
-      const jt = junctionTableName(tableName, f.name)
-      const { rows } = await pool.query<{ target_id: string }>(
-        `SELECT target_id FROM ${quoteIdentifier(jt)} WHERE source_id = $1`,
+      const binding = resolveManyToManyBinding(tableName, f)
+      const { rows } = await pool.query<Record<'related_id', string>>(
+        `SELECT ${quoteIdentifier(binding.relatedIdColumn)} AS related_id
+         FROM ${quoteIdentifier(binding.junctionTable)}
+         WHERE ${quoteIdentifier(binding.currentIdColumn)} = $1`,
         [entryId],
       )
-      result[f.name] = rows.map((r) => r.target_id)
+      result[f.name] = rows.map((r) => r.related_id)
     }),
   )
   return result

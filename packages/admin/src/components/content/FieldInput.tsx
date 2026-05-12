@@ -92,22 +92,6 @@ type ArraySubField = {
 type MixedValueKind = 'string' | 'number' | 'boolean'
 type MixedValue = { kind: MixedValueKind; value: string | number | boolean }
 
-function getListItemKey(value: unknown, fallback: string) {
-  if (!value || typeof value !== 'object') return fallback
-  const record = value as Record<string, unknown>
-  for (const field of ['id', '_id', 'key', 'slug', 'name', 'title', 'label']) {
-    const fieldValue = record[field]
-    if (typeof fieldValue === 'string' || typeof fieldValue === 'number') {
-      return `${field}:${String(fieldValue)}`
-    }
-  }
-  try {
-    return JSON.stringify(record)
-  } catch {
-    return fallback
-  }
-}
-
 export type FieldDef = {
   name: string
   type: FieldType
@@ -1508,7 +1492,7 @@ function ArrayInput({
       <Accordion type="single" collapsible className="w-full">
         {items.map((item, index) => (
           <AccordionItem
-            key={getListItemKey(item, `array-item-${index}`)}
+            key={index}
             value={`item-${index}`}
             className="mb-2 rounded-md border border-dashed last:border-b transition-colors hover:bg-accent/50"
           >
@@ -1690,7 +1674,7 @@ function NavigationInput({
           const itemLabel = item.label?.trim() ? item.label : `Item ${index + 1}`
           return (
             <AccordionItem
-              key={getListItemKey(item, `navigation-item-${depth}-${index}`)}
+              key={index}
               value={`navigation-item-${depth}-${index}`}
               className="mb-2 rounded-md border border-dashed last:border-b transition-colors hover:bg-accent/50"
             >
