@@ -33,6 +33,7 @@ import {
   getAppModes,
   getClientSettings,
 } from '../controllers/settings.js'
+import { getVersionInfo } from '../controllers/version.js'
 import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
 
 const router: IRouter = Router()
@@ -108,6 +109,7 @@ router.delete('/media/:id', authorize('media:delete'), deleteMedia)
 router.get('/modes', getAppModes)
 router.get('/client-settings', getClientSettings)
 router.get('/editorial-mode', getEditorialMode)
+router.get('/version', getVersionInfo)
 router.get('/settings/:namespace', authorize('settings:overview:read'), getNamespaceSettings)
 router.put('/settings/:namespace', authorize('settings:overview:write'), updateNamespaceSettings)
 

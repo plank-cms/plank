@@ -1,6 +1,10 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useFetch } from '@/hooks/useFetch.ts'
 import {
+  ArrowUpRightIcon,
+  ArrowUpIcon,
+  CheckIcon,
+  CopyIcon,
   LayoutDashboardIcon,
   LayersIcon,
   FileTextIcon,
@@ -12,8 +16,12 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/context/auth.tsx'
 import { SecondaryPanelProvider, useSecondaryPanelContext } from '@/context/secondaryPanel.tsx'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import { UserAvatar } from '@/components/ui/custom/UserAvatar.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Label } from '@/components/ui/label.tsx'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,11 +31,27 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.tsx'
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip.tsx'
+
+type VersionInfo = {
+  currentVersion: string
+  latestVersion: string | null
+  updateAvailable: boolean
+  changelogUrl: string
+  updateCommand: string
+  checkedAt: string
+}
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboardIcon, label: 'Dashboard', permission: null },
@@ -50,13 +74,75 @@ type ContentType = {
   fields?: unknown[]
 }
 
+function parseVersion(value: string): [number, number, number] {
+  const [major = 0, minor = 0, patch = 0] = value
+    .trim()
+    .replace(/^v/i, '')
+    .split('-')[0]
+    .split('.')
+    .map((part) => Number.parseInt(part, 10) || 0)
+
+  return [major, minor, patch]
+}
+
+function getVersionDistance(currentVersion: string, latestVersion: string | null): number {
+  if (!latestVersion) return 0
+
+  const [currentMajor, currentMinor, currentPatch] = parseVersion(currentVersion)
+  const [latestMajor, latestMinor, latestPatch] = parseVersion(latestVersion)
+
+  if (latestMajor !== currentMajor) {
+    return Math.abs(latestMajor - currentMajor) * 100 + Math.abs(latestMinor - currentMinor)
+  }
+
+  if (latestMinor !== currentMinor) {
+    return Math.abs(latestMinor - currentMinor)
+  }
+
+  return Math.abs(latestPatch - currentPatch)
+}
+
+function getUpdateTone(distance: number) {
+  if (distance >= 5) {
+    return {
+      panel: 'border-rose-600/20 bg-[#370815] text-rose-600',
+      label: 'text-rose-600/80',
+      button:
+        'border-rose-600/20 bg-[#370815] text-rose-600 hover:bg-[#45101b] hover:text-rose-500',
+    }
+  }
+
+  if (distance >= 3) {
+    return {
+      panel: 'border-amber-400/20 bg-[#3b2d08] text-amber-400',
+      label: 'text-amber-400/80',
+      button:
+        'border-amber-400/20 bg-[#3b2d08] text-amber-400 hover:bg-[#4a3809] hover:text-amber-300',
+    }
+  }
+
+  return {
+    panel: 'border-emerald-500/20 bg-[#082019] text-emerald-500',
+    label: 'text-emerald-500/80',
+    button:
+      'border-emerald-500/20 bg-[#082019] text-emerald-500 hover:bg-[#0d2c23] hover:text-emerald-400',
+  }
+}
+
 function LayoutShell() {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { content: secondaryPanel } = useSecondaryPanelContext()
   const { data: contentTypes } = useFetch<ContentType[]>('/cms/admin/content-types')
+  const { data: versionInfo } = useFetch<VersionInfo>('/cms/admin/version')
   const collectionTypes = (contentTypes ?? []).filter((ct) => ct.kind === 'collection')
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false)
+  const [commandCopied, setCommandCopied] = useState(false)
+  const updateDistance = versionInfo
+    ? getVersionDistance(versionInfo.currentVersion, versionInfo.latestVersion)
+    : 0
+  const updateTone = getUpdateTone(updateDistance)
 
   function isActive(to: string) {
     return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(to + '/')
@@ -70,6 +156,23 @@ function LayoutShell() {
       return !permission || permissions.includes('*') || permissions.includes(permission)
     },
   )
+
+  async function handleCopyUpdateCommand() {
+    if (!versionInfo?.updateCommand) return
+
+    try {
+      await navigator.clipboard.writeText(versionInfo.updateCommand)
+      setCommandCopied(true)
+      toast.success('Update command copied')
+    } catch {
+      toast.error('Could not copy the update command')
+    }
+  }
+
+  function handleUpdateDialogChange(open: boolean) {
+    setUpdateDialogOpen(open)
+    if (!open) setCommandCopied(false)
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -116,6 +219,80 @@ function LayoutShell() {
               </Tooltip>
             ))}
           </nav>
+
+          {versionInfo?.updateAvailable && (
+            <div className="px-3">
+              <Dialog open={updateDialogOpen} onOpenChange={handleUpdateDialogChange}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className={updateTone.button}
+                      onClick={() => setUpdateDialogOpen(true)}
+                    >
+                      <ArrowUpIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Update to {versionInfo.latestVersion}
+                  </TooltipContent>
+                </Tooltip>
+
+                <DialogContent className="max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Update available</DialogTitle>
+                    <DialogDescription>
+                      Plank {versionInfo.latestVersion} is ready. Run the command below in your
+                      project terminal to update your installation.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-5">
+                    <div className={`grid gap-3 rounded-lg border p-4 sm:grid-cols-2 ${updateTone.panel}`}>
+                      <div>
+                        <p className={`text-xs font-medium uppercase ${updateTone.label}`}>
+                          Current version
+                        </p>
+                        <p className="mt-1 text-base font-semibold">{versionInfo.currentVersion}</p>
+                      </div>
+                      <div>
+                        <p className={`text-xs font-medium uppercase ${updateTone.label}`}>
+                          Latest version
+                        </p>
+                        <p className="mt-1 text-base font-semibold">{versionInfo.latestVersion}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="plank-update-command">Update command</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="plank-update-command"
+                          value={versionInfo.updateCommand}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button type="button" variant="outline" onClick={handleCopyUpdateCommand}>
+                          {commandCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+                          {commandCopied ? 'Copied' : 'Copy'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button asChild variant="outline">
+                        <a href={versionInfo.changelogUrl} target="_blank" rel="noreferrer">
+                          View changelog
+                          <ArrowUpRightIcon className="size-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
 
           {/* User avatar */}
           <DropdownMenu>
