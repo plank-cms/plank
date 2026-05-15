@@ -1161,10 +1161,41 @@ function resolveByTable(list: CTSummary[], tableName: string): CTSummary | null 
   return list.find((ct) => ct.tableName === tableName) ?? null
 }
 
-function fetchEntries(slug: string) {
-  return fetch(`/cms/admin/content-types/${slug}/entries?limit=200`, { credentials: 'include' })
-    .then((r) => (r.ok ? (r.json() as Promise<{ data: Record<string, unknown>[] }>) : { data: [] }))
-    .catch(() => ({ data: [] }))
+type EntriesResponse = {
+  data: Record<string, unknown>[]
+  total: number
+  page: number
+  limit: number
+}
+
+function fetchEntriesPage(slug: string, page: number, limit: number): Promise<EntriesResponse> {
+  return fetch(`/cms/admin/content-types/${slug}/entries?page=${page}&limit=${limit}`, {
+    credentials: 'include',
+  })
+    .then((r) =>
+      r.ok
+        ? (r.json() as Promise<EntriesResponse>)
+        : { data: [], total: 0, page, limit },
+    )
+    .catch(() => ({ data: [], total: 0, page, limit }))
+}
+
+async function fetchEntries(slug: string): Promise<{ data: Record<string, unknown>[] }> {
+  const limit = 100
+  const firstPage = await fetchEntriesPage(slug, 1, limit)
+  const totalPages = Math.max(1, Math.ceil(firstPage.total / limit))
+
+  if (totalPages === 1) {
+    return { data: firstPage.data }
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) => fetchEntriesPage(slug, index + 2, limit)),
+  )
+
+  return {
+    data: [firstPage, ...remainingPages].flatMap((pageResult) => pageResult.data),
+  }
 }
 
 // For M:1, 1:1, M:M — fetch all entries from the related CT for selection
