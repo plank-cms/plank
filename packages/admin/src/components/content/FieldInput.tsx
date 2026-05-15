@@ -1126,8 +1126,11 @@ type CTField = { name: string; type: string }
 
 function pickDisplayField(fields: CTField[]): string | null {
   return (
+    fields.find((f) => f.name === 'title')?.name ??
+    fields.find((f) => f.name === 'name')?.name ??
     fields.find((f) => f.type === 'uid')?.name ??
     fields.find((f) => f.type === 'string')?.name ??
+    fields.find((f) => f.type === 'text')?.name ??
     null
   )
 }
@@ -1186,7 +1189,9 @@ function useRelationEntries(relatedTable: string) {
         setEntries(
           res.data.map((e) => ({
             id: String(e.id),
-            label: displayField ? String(e[displayField] ?? e.id) : String(e.id),
+            label: String(
+              (displayField && e[displayField]) ?? e.title ?? e.name ?? e.id,
+            ),
           })),
         )
       })
@@ -1223,7 +1228,9 @@ function useLinkedEntries(relatedTable: string, relatedField: string, currentId:
         setEntries(
           linked.map((e) => ({
             id: String(e.id),
-            label: displayField ? String(e[displayField] ?? e.id) : String(e.id),
+            label: String(
+              (displayField && e[displayField]) ?? e.title ?? e.name ?? e.id,
+            ),
           })),
         )
       })
