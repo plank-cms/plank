@@ -6,7 +6,10 @@ const PACKAGE_NAME = '@plank-cms/plank'
 const CHANGELOG_BASE_URL = 'https://github.com/plank-cms/plank/releases'
 const REGISTRY_URL = `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest`
 const CACHE_TTL_MS = 1000 * 60 * 30
-const packageJsonUrl = new URL('../../package.json', import.meta.url)
+const packageJsonUrls = [
+  new URL('../../package.json', import.meta.url),
+  new URL('../package.json', import.meta.url),
+]
 
 type VersionCheckResult = {
   currentVersion: string
@@ -101,10 +104,21 @@ async function detectPackageManagerFromLockfiles(): Promise<string | null> {
 }
 
 async function readCurrentVersion(): Promise<string> {
-  const packageJsonPath = fileURLToPath(packageJsonUrl)
-  const raw = await readFile(packageJsonPath, 'utf8')
-  const parsed = JSON.parse(raw) as { version?: string }
-  return parsed.version ?? '0.0.0'
+  for (const packageJsonUrl of packageJsonUrls) {
+    try {
+      const packageJsonPath = fileURLToPath(packageJsonUrl)
+      const raw = await readFile(packageJsonPath, 'utf8')
+      const parsed = JSON.parse(raw) as { version?: string }
+
+      if (parsed.version) {
+        return parsed.version
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return '0.0.0'
 }
 
 export async function getVersionCheck(): Promise<VersionCheckResult> {
