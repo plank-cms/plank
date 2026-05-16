@@ -9,6 +9,7 @@ import {
   LayersIcon,
   FileTextIcon,
   ImageIcon,
+  PuzzleIcon,
   Settings2Icon,
   LogOutIcon,
   UserRoundIcon,
@@ -63,6 +64,7 @@ const NAV_ITEMS = [
     label: 'Content Types',
     permission: 'content-types:write',
   },
+  { to: '/add-ons', icon: PuzzleIcon, label: 'Add-ons', permission: 'addons:read' },
   { to: '/settings', icon: Settings2Icon, label: 'Settings', permission: 'settings:overview:read' },
 ]
 

@@ -14,7 +14,10 @@ import { ContentIndex } from './pages/content/Index.tsx'
 import { ContentSlugIndex } from './pages/content/SlugIndex.tsx'
 import { EntryForm } from './pages/content/EntryForm.tsx'
 import { MediaLibrary } from './pages/MediaLibrary.tsx'
+import { Addons } from './pages/Addons.tsx'
 import { Settings } from './pages/Settings.tsx'
+import { AddonDetail } from './pages/add-ons/Detail.tsx'
+import { AddonsOverview } from './pages/add-ons/Overview.tsx'
 import { SettingsOverview } from './pages/settings/Overview.tsx'
 import { SettingsUsers } from './pages/settings/Users.tsx'
 import { SettingsRoles } from './pages/settings/Roles.tsx'
@@ -77,6 +80,33 @@ const router = createBrowserRouter([
           { index: true, element: <ContentTypesIndex /> },
           { path: 'new', element: <ContentTypeForm /> },
           { path: ':slug', element: <ContentTypeForm /> },
+        ],
+      },
+      {
+        path: 'add-ons',
+        element: (
+          <ProtectedRoute permission="addons:read" roles={NON_VIEWER_ROLES} redirectTo="/content">
+            <Addons />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <Navigate to="overview" replace /> },
+          {
+            path: 'overview',
+            element: (
+              <ProtectedRoute permission="addons:read">
+                <AddonsOverview />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: ':addonId',
+            element: (
+              <ProtectedRoute permission="addons:read">
+                <AddonDetail />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {

@@ -34,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table.tsx'
+import { type AdminAddonsRegistryResponse } from '@/lib/addons.ts'
 
 type FieldDef = { name: string; type: string }
 type ContentType = {
@@ -96,6 +97,7 @@ export function Dashboard() {
   const { timezone } = useSettings()
   const { user } = useAuth()
   const { data: contentTypes } = useFetch<ContentType[]>('/cms/admin/content-types')
+  const { data: addonsRegistry } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
   const [recent, setRecent] = useState<RecentEntry[]>([])
   const [loadingRecent, setLoadingRecent] = useState(false)
   const [configureOpen, setConfigureOpen] = useState(false)
@@ -111,6 +113,7 @@ export function Dashboard() {
     () => (contentTypes ?? []).filter((ct) => ct.kind === 'collection'),
     [contentTypes],
   )
+  const dashboardWidgets = addonsRegistry?.slots.dashboardWidgets ?? []
   const collectionCount = collectionTypes.length
   const singleCount = useMemo(
     () => (contentTypes ?? []).filter((ct) => ct.kind === 'single').length,
@@ -315,6 +318,32 @@ export function Dashboard() {
             </CardContent>
           </Card>
         ))}
+      </section>
+
+      <section className="mt-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-bold uppercase">Extension Slots</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dashboardWidgets.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {dashboardWidgets.map((slot) => (
+                  <div key={slot.slotId} className="rounded-lg border border-dashed p-4">
+                    <div className="font-medium">{slot.title}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {slot.addonId} · {slot.slotId} · order {slot.order}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No add-on dashboard widgets are registered yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       <section className="mt-4">
