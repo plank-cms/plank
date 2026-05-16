@@ -33,7 +33,7 @@ export function AddonDetail() {
 
   if (!addon) {
     return (
-      <div className="p-4">
+      <section className="mt-24">
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -45,7 +45,7 @@ export function AddonDetail() {
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      </div>
+      </section>
     )
   }
 
@@ -56,7 +56,7 @@ export function AddonDetail() {
         <p className="mt-1 text-sm text-muted-foreground">{addon.packageName}</p>
       </HeaderFixed>
 
-      <div className="mt-24 flex min-w-0 flex-1 flex-col gap-6 p-4">
+      <section className="mt-24 space-y-6">
         <div className="flex items-center gap-2">
           <Badge variant={addon.enabled ? 'secondary' : 'outline'}>
             {addon.enabled ? 'Enabled' : 'Disabled'}
@@ -167,7 +167,7 @@ export function AddonDetail() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </section>
     </>
   )
 }

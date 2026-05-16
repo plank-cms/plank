@@ -73,7 +73,7 @@ export function AddonsOverview() {
       <div className="flex h-full items-center justify-center">
         <Spinner className="size-8" />
       </div>
-      )
+    )
   }
 
   return (
@@ -85,7 +85,7 @@ export function AddonsOverview() {
         </p>
       </HeaderFixed>
 
-      <div className="mt-24 flex min-w-0 flex-1 flex-col gap-6 p-4">
+      <section className="mt-24 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -275,7 +275,7 @@ export function AddonsOverview() {
             Could not load add-ons registry: {error}
           </p>
         )}
-      </div>
+      </section>
     </>
   )
 }
