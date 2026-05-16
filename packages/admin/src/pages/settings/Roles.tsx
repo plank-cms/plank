@@ -31,6 +31,7 @@ const RESOURCES = [
   { key: 'content-types', label: 'Content Types', actions: ['read', 'write', 'delete'] as const },
   { key: 'entries', label: 'Entries', actions: ['read', 'write', 'delete'] as const },
   { key: 'media', label: 'Media', actions: ['read', 'write', 'delete'] as const },
+  { key: 'addons', label: 'Add-ons', actions: ['read', 'write'] as const },
   { key: 'settings:overview', label: 'Settings / Overview', actions: ['read', 'write'] as const },
   {
     key: 'settings:users',

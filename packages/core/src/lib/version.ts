@@ -103,7 +103,7 @@ async function detectPackageManagerFromLockfiles(): Promise<string | null> {
   return null
 }
 
-async function readCurrentVersion(): Promise<string> {
+export async function getCurrentVersion(): Promise<string> {
   for (const packageJsonUrl of packageJsonUrls) {
     try {
       const packageJsonPath = fileURLToPath(packageJsonUrl)
@@ -126,7 +126,7 @@ export async function getVersionCheck(): Promise<VersionCheckResult> {
     return cachedVersionCheck.value
   }
 
-  const currentVersion = await readCurrentVersion()
+  const currentVersion = await getCurrentVersion()
   const packageManager = await detectProjectPackageManager()
   let latestVersion: string | null = null
 

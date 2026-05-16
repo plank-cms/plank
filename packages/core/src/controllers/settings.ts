@@ -21,6 +21,10 @@ function maskSettings(namespace: string, settings: Record<string, string>): Reco
 
 export async function getNamespaceSettings(req: Request<{ namespace: string }>, res: Response): Promise<void> {
   const { namespace } = req.params
+  if (namespace.startsWith('addon:')) {
+    res.status(403).json({ error: 'Addon settings must be accessed through the add-ons API' })
+    return
+  }
   const settings = await getSettings(namespace)
   res.json(maskSettings(namespace, settings))
 }
@@ -53,6 +57,10 @@ export async function getEditorialMode(_req: Request, res: Response): Promise<vo
 
 export async function updateNamespaceSettings(req: Request<{ namespace: string }>, res: Response): Promise<void> {
   const { namespace } = req.params
+  if (namespace.startsWith('addon:')) {
+    res.status(403).json({ error: 'Addon settings must be accessed through the add-ons API' })
+    return
+  }
   const incoming = req.body as Record<string, string>
 
   if (typeof incoming !== 'object' || Array.isArray(incoming)) {

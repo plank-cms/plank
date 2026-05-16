@@ -1,6 +1,7 @@
 import { migrate } from '@plank-cms/db'
 import { syncAllTables } from '@plank-cms/schema'
 import app from './app.js'
+import { syncInstalledAddons } from './lib/addons.js'
 
 export async function start(): Promise<void> {
   const PORT = process.env.PLANK_PORT ?? 5500
@@ -8,6 +9,7 @@ export async function start(): Promise<void> {
 
   await migrate()
   await syncAllTables()
+  await syncInstalledAddons()
 
   app.listen(PORT, () => {
     const coreBase = `http://localhost:${PORT}`

@@ -4,6 +4,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'content-types:read', 'content-types:write',
     'entries:read', 'entries:write', 'entries:delete',
     'media:read', 'media:write', 'media:delete',
+    'addons:read', 'addons:write',
     'settings:overview:read',
     'settings:users:read', 'settings:users:write', 'settings:users:delete',
     'settings:webhooks:read', 'settings:webhooks:write', 'settings:webhooks:delete',

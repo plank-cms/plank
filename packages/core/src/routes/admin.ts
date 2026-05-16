@@ -35,6 +35,14 @@ import {
 } from '../controllers/settings.js'
 import { getVersionInfo } from '../controllers/version.js'
 import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webhooks.js'
+import {
+  disableAddon,
+  enableAddon,
+  getAddonsRegistry,
+  getAddonSettings,
+  listAddons,
+  updateAddonSettings,
+} from '../controllers/addons.js'
 
 const router: IRouter = Router()
 
@@ -112,6 +120,12 @@ router.get('/editorial-mode', getEditorialMode)
 router.get('/version', getVersionInfo)
 router.get('/settings/:namespace', authorize('settings:overview:read'), getNamespaceSettings)
 router.put('/settings/:namespace', authorize('settings:overview:write'), updateNamespaceSettings)
+router.get('/addons/registry', authorize('addons:read'), getAddonsRegistry)
+router.get('/addons', authorize('addons:read'), listAddons)
+router.post('/addons/:id/enable', authorize('addons:write'), enableAddon)
+router.post('/addons/:id/disable', authorize('addons:write'), disableAddon)
+router.get('/addons/:id/settings', authorize('addons:read'), getAddonSettings)
+router.put('/addons/:id/settings', authorize('addons:write'), updateAddonSettings)
 
 // Webhooks
 router.get('/webhooks', authorize('settings:webhooks:read'), listWebhooks)
