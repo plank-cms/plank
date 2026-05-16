@@ -144,18 +144,28 @@ export function AddonsOverview() {
           </Empty>
         ) : (
           <Card className="gap-0 bg-background py-0">
-            <CardHeader className="py-4 pb-4">
+            <CardHeader className="border-b py-4">
               <CardTitle>Registry</CardTitle>
             </CardHeader>
             <CardContent className="px-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="font-bold uppercase">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Add-on</TableHead>
-                    <TableHead>Package</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Settings</TableHead>
-                    <TableHead className="w-28 text-right">Enabled</TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Add-on
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Package
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Status
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Settings
+                    </TableHead>
+                    <TableHead className="w-28 px-4 py-3 text-right font-medium text-muted-foreground">
+                      Enabled
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
