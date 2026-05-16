@@ -67,6 +67,7 @@ import {
   TableRow,
 } from '@/components/ui/table.tsx'
 import HeaderFixed from '@/components/Header'
+import type { AdminAddonsRegistryResponse } from '@/lib/addons.ts'
 
 // Types
 
@@ -121,6 +122,15 @@ type EntriesResponse = {
   available_statuses?: EntryStatus[]
 }
 
+type ContentHealthSettings = {
+  contentTypes: Array<{
+    slug: string
+    enabled: boolean
+    checkStaleDrafts: boolean
+  }>
+  staleDraftDays: number
+}
+
 type ColSort = { field: string; dir: 'asc' | 'desc' }
 type ViewConfig = { visibleFields: string[]; visibleSystemCols: string[]; sort: ColSort }
 
@@ -153,6 +163,41 @@ const STATUS_ORDER: EntryStatus[] = ['draft', 'pending', 'in_review', 'scheduled
 
 function humanize(name: string) {
   return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function parseContentHealthSettings(settings: Record<string, string> | null): ContentHealthSettings | null {
+  if (!settings) return null
+
+  const staleDraftDays = Number.parseInt(settings.staleDraftDays ?? '30', 10)
+  const contentTypes = (() => {
+    try {
+      const parsed = JSON.parse(settings.contentTypes ?? '[]')
+      if (!Array.isArray(parsed)) return []
+
+      return parsed
+        .filter((value): value is Record<string, unknown> => typeof value === 'object' && value !== null)
+        .map((value) => ({
+          slug: typeof value.slug === 'string' ? value.slug : '',
+          enabled: value.enabled !== false,
+          checkStaleDrafts: value.checkStaleDrafts !== false,
+        }))
+        .filter((value) => value.slug.length > 0)
+    } catch {
+      return []
+    }
+  })()
+
+  return {
+    contentTypes,
+    staleDraftDays: Number.isFinite(staleDraftDays) ? staleDraftDays : 30,
+  }
+}
+
+function getStaleDraftAgeDays(updatedAt: string): number {
+  const updated = new Date(updatedAt)
+  if (Number.isNaN(updated.getTime())) return 0
+  const diff = Date.now() - updated.getTime()
+  return Math.max(0, Math.floor(diff / 86400000))
 }
 
 type RelationCTField = { name: string; type: string }
@@ -870,6 +915,14 @@ export function EntriesList() {
   const { data: ct, loading: loadingCt } = useFetch<ContentType>(
     slug ? `/cms/admin/content-types/${slug}` : null,
   )
+  const { data: addonsRegistry } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
+  const contentHealthAddon = addonsRegistry?.addons.find((addon) => addon.id === 'content-health') ?? null
+  const contentHealthActive = Boolean(
+    contentHealthAddon?.installed && contentHealthAddon.enabled && contentHealthAddon.compatible,
+  )
+  const { data: contentHealthSettings } = useFetch<Record<string, string>>(
+    contentHealthActive ? '/cms/admin/addons/content-health/settings' : null,
+  )
 
   useEffect(() => {
     if (!ct || !slug) return
@@ -888,6 +941,13 @@ export function EntriesList() {
     sort: DEFAULT_SORT,
   }
   const { sort } = config
+  const parsedContentHealthSettings = parseContentHealthSettings(contentHealthSettings)
+  const staleDraftConfig = slug
+    ? parsedContentHealthSettings?.contentTypes.find(
+        (contentType) =>
+          contentType.slug === slug && contentType.enabled && contentType.checkStaleDrafts,
+      ) ?? null
+    : null
 
   // columns: derived from config.visibleFields — support relation.field notation
   type Column = { field: FieldDef; displayField?: string }
@@ -1278,7 +1338,34 @@ export function EntriesList() {
                         </TableCell>
                       )}
                       <TableCell className="px-4 py-3">
-                        <StatusBadge entry={entry} fields={ct.fields} />
+                        {(() => {
+                          const staleDays =
+                            contentHealthActive &&
+                            staleDraftConfig &&
+                            entry.status === 'draft'
+                              ? getStaleDraftAgeDays(entry.updated_at)
+                              : 0
+                          const isStaleDraft =
+                            Boolean(staleDraftConfig)
+                            && entry.status === 'draft'
+                            && staleDays >= (parsedContentHealthSettings?.staleDraftDays ?? 30)
+
+                          return (
+                            <div className="flex items-center gap-2">
+                              <StatusBadge entry={entry} fields={ct.fields} />
+                              {isStaleDraft && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="size-2 shrink-0 rounded-full bg-yellow-400 animate-pulse" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Draft stale for {staleDays} {staleDays === 1 ? 'day' : 'days'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="px-4 py-3">
                         <AuthorAvatar entry={entry} />
