@@ -44,7 +44,6 @@ export function AddonDetail() {
   const addon = data?.addons.find((item) => item.id === addonId) ?? null
   const sections = (data?.slots.addonsSections ?? []).filter((slot) => slot.addonId === addonId)
   const widgets = (data?.slots.dashboardWidgets ?? []).filter((slot) => slot.addonId === addonId)
-  const hasAdminTab = Boolean(addon?.hasAdminUi)
 
   useEffect(() => {
     if (!addon || !canOpenAddonAdmin(addon)) {
@@ -138,6 +137,10 @@ export function AddonDetail() {
     )
   }
 
+  const hasDashboardTab = Boolean(runtimeModule?.DashboardPage)
+  const hasAdminTab = Boolean(runtimeModule?.AdminPage)
+  const defaultTab = hasDashboardTab ? 'dashboard' : hasAdminTab ? 'admin' : 'details'
+
   return (
     <>
       <HeaderFixed>
@@ -155,11 +158,56 @@ export function AddonDetail() {
           </Badge>
         </div>
 
-        <Tabs defaultValue={hasAdminTab ? 'admin' : 'details'}>
+        <Tabs key={defaultTab} defaultValue={defaultTab}>
           <TabsList className="mb-6">
+            {hasDashboardTab && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
             {hasAdminTab && <TabsTrigger value="admin">Admin</TabsTrigger>}
             <TabsTrigger value="details">Details</TabsTrigger>
           </TabsList>
+
+          {hasDashboardTab && (
+            <TabsContent value="dashboard" className="space-y-4">
+              {!canOpenAddonAdmin(addon) ? (
+                <Empty className="border">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Settings2Icon />
+                    </EmptyMedia>
+                    <EmptyTitle>Dashboard unavailable</EmptyTitle>
+                    <EmptyDescription>
+                      Enable the add-on and make sure it exposes an admin entry before mounting its
+                      dashboard surface.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : loadingModule || loadingSettings || loadingContentTypes || loadingRuntime ? (
+                <div className="flex h-40 items-center justify-center rounded-lg border bg-background">
+                  <Spinner className="size-6" />
+                </div>
+              ) : adminModule && settings && runtimeModule?.DashboardPage ? (
+                <runtimeModule.DashboardPage
+                  addon={addon}
+                  definition={adminModule}
+                  settings={settings}
+                  contentTypes={contentTypes ?? []}
+                  runAction={runAction}
+                  saveSettings={saveSettings}
+                />
+              ) : (
+                <Empty className="border">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Settings2Icon />
+                    </EmptyMedia>
+                    <EmptyTitle>Dashboard runtime unavailable</EmptyTitle>
+                    <EmptyDescription>
+                      {runtimeError ?? 'This add-on does not expose a mountable dashboard runtime yet.'}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </TabsContent>
+          )}
 
           {hasAdminTab && (
             <TabsContent value="admin" className="space-y-4">
@@ -180,7 +228,7 @@ export function AddonDetail() {
                 <div className="flex h-40 items-center justify-center rounded-lg border bg-background">
                   <Spinner className="size-6" />
                 </div>
-              ) : adminModule && settings && runtimeModule ? (
+              ) : adminModule && settings && runtimeModule?.AdminPage ? (
                 <runtimeModule.AdminPage
                   addon={addon}
                   definition={adminModule}

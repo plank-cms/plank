@@ -98,7 +98,8 @@ export type AdminAddonRuntimeProps = {
 
 export type AdminAddonRuntimeModule = {
   addonId: string
-  AdminPage: ComponentType<AdminAddonRuntimeProps>
+  DashboardPage?: ComponentType<AdminAddonRuntimeProps>
+  AdminPage?: ComponentType<AdminAddonRuntimeProps>
 }
 
 export const ADDONS_REGISTRY_UPDATED_EVENT = 'plank:addons-registry-updated'
