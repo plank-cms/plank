@@ -1,16 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { BoxIcon, PackageCheckIcon, PuzzleIcon, Settings2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import HeaderFixed from '@/components/Header'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Badge } from '@/components/ui/badge.tsx'
-import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -147,18 +144,17 @@ export function AddonsOverview() {
           </Empty>
         ) : (
           <Card className="gap-0 bg-background py-0">
-            <CardHeader className="border-b py-4">
+            <CardHeader className="py-4 pb-4">
               <CardTitle>Registry</CardTitle>
             </CardHeader>
             <CardContent className="px-0">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Add-on</TableHead>
                     <TableHead>Package</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Settings</TableHead>
-                    <TableHead>Admin</TableHead>
                     <TableHead className="w-28 text-right">Enabled</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -200,17 +196,6 @@ export function AddonsOverview() {
                             <span className="text-muted-foreground">None</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {canOpenAddonAdmin(addon) ? (
-                            <Button asChild variant="outline" size="sm">
-                              <Link to={`/add-ons/${addon.id}`}>Open</Link>
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground">
-                              {addon.hasAdminUi ? 'Enable first' : 'No UI'}
-                            </span>
-                          )}
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="inline-flex items-center gap-3">
                             {disabled && <Spinner className="size-4" />}
@@ -229,59 +214,6 @@ export function AddonsOverview() {
             </CardContent>
           </Card>
         )}
-
-        <Card className="bg-background">
-          <CardHeader>
-            <CardTitle>Slots</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border p-4">
-              <div className="mb-2 text-sm font-medium">Dashboard Widgets</div>
-              {data && data.slots.dashboardWidgets.length > 0 ? (
-                <div className="space-y-2">
-                  {data.slots.dashboardWidgets.map((slot) => (
-                    <div
-                      key={slot.slotId}
-                      className="rounded-md border border-dashed px-3 py-2 text-sm"
-                    >
-                      <div className="font-medium">{slot.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {slot.addonId} · {slot.slotId} · order {slot.order}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyContent>
-                  <EmptyDescription>No dashboard widgets registered yet.</EmptyDescription>
-                </EmptyContent>
-              )}
-            </div>
-
-            <div className="rounded-lg border p-4">
-              <div className="mb-2 text-sm font-medium">Add-on Sections</div>
-              {data && data.slots.addonsSections.length > 0 ? (
-                <div className="space-y-2">
-                  {data.slots.addonsSections.map((slot) => (
-                    <div
-                      key={slot.slotId}
-                      className="rounded-md border border-dashed px-3 py-2 text-sm"
-                    >
-                      <div className="font-medium">{slot.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {slot.addonId} · {slot.slotId} · order {slot.order}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyContent>
-                  <EmptyDescription>No admin sections registered yet.</EmptyDescription>
-                </EmptyContent>
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
         {error && (
           <p className="text-sm text-destructive">Could not load add-ons registry: {error}</p>
