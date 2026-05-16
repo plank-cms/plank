@@ -4,6 +4,14 @@ import { randomBytes } from 'node:crypto'
 import { resolve, join } from 'node:path'
 import fs from 'fs-extra'
 import { execa } from 'execa'
+import {
+  detectPackageManager,
+  getInstallCommand,
+  getPackageManagerVersion,
+  getStartScriptCommand,
+  getUpdateScriptCommand,
+  type PackageManagerName,
+} from '../packageManager.js'
 
 const PACKAGE_VERSION = '0.27.3'
 
@@ -20,11 +28,18 @@ function buildEnv(jwtSecret: string, encryptionKey: string): string {
   ].join('\n') + '\n'
 }
 
-function buildPackageJson(name: string): object {
+function buildPackageJson(name: string, packageManager: PackageManagerName): object {
+  const packageManagerVersion = getPackageManagerVersion(packageManager)
+
   return {
     name,
     version: '0.1.0',
     private: true,
+    ...(packageManager === 'pnpm' && packageManagerVersion
+      ? {
+          packageManager: `pnpm@${packageManagerVersion}`,
+        }
+      : {}),
     scripts: {
       start: 'plank start',
       update: 'plank update',
@@ -75,16 +90,22 @@ export async function init(projectName?: string): Promise<void> {
   }
 
   const s = spinner()
+  const packageManager = await detectPackageManager(projectDir)
+  const installCommand = getInstallCommand(packageManager)
+  const startCommand = getStartScriptCommand(packageManager)
+  const updateCommand = getUpdateScriptCommand(packageManager)
 
   s.start('Creating project...')
   await fs.ensureDir(projectDir)
   await fs.writeFile(join(projectDir, '.env'), buildEnv(generateSecret(), generateSecret()))
-  await fs.writeJSON(join(projectDir, 'package.json'), buildPackageJson(name), { spaces: 2 })
+  await fs.writeJSON(join(projectDir, 'package.json'), buildPackageJson(name, packageManager), {
+    spaces: 2,
+  })
   await fs.writeFile(join(projectDir, '.gitignore'), '.env\nnode_modules\n')
   s.stop('Project created')
 
   s.start('Installing dependencies...')
-  await execa('npm', ['install'], { cwd: projectDir })
+  await execa(installCommand.command, installCommand.args, { cwd: projectDir })
   s.stop('Dependencies installed')
 
   note(
@@ -100,11 +121,11 @@ export async function init(projectName?: string): Promise<void> {
       `${chalk.yellow('Important:')} keep ${chalk.cyan('PLANK_JWT_SECRET')} and ${chalk.cyan('PLANK_ENCRYPTION_KEY')} set in production.`,
       '',
       ...(!useCurrentDir ? [`  ${chalk.cyan(`cd ${name}`)}`, ''] : []),
-      `  ${chalk.cyan('npm start')}`,
+      `  ${chalk.cyan(startCommand)}`,
       '',
       `To update Plank later:`,
       '',
-      `  ${chalk.cyan('npm run update')}`,
+      `  ${chalk.cyan(updateCommand)}`,
     ].join('\n'),
     'Next steps'
   )

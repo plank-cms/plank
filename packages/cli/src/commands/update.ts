@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import { execa } from 'execa'
 import fs from 'fs-extra'
 import { join } from 'node:path'
+import { detectPackageManager, getUpdateDependencyCommand } from '../packageManager.js'
 
 const PACKAGE_NAME = '@plank-cms/plank'
 
@@ -28,11 +29,13 @@ export async function update(version = 'latest'): Promise<void> {
 
   const s = spinner()
   const target = `${PACKAGE_NAME}@${version}`
+  const packageManager = await detectPackageManager(process.cwd())
+  const updateCommand = getUpdateDependencyCommand(packageManager, target)
 
   s.start(`Updating ${PACKAGE_NAME} to ${chalk.cyan(version)}...`)
 
   try {
-    await execa('npm', ['install', '--save-exact', target], {
+    await execa(updateCommand.command, updateCommand.args, {
       cwd: process.cwd(),
       stdio: 'inherit',
     })

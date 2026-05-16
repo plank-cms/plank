@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_NAME = '@plank-cms/plank'
 const CHANGELOG_BASE_URL = 'https://github.com/plank-cms/plank/releases'
-const UPDATE_COMMAND = 'npm run update'
 const REGISTRY_URL = `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest`
 const CACHE_TTL_MS = 1000 * 60 * 30
 const packageJsonUrl = new URL('../../package.json', import.meta.url)
@@ -20,6 +20,10 @@ type VersionCheckResult = {
 type CachedVersionCheck = {
   expiresAt: number
   value: VersionCheckResult
+}
+
+type ProjectPackageJson = {
+  packageManager?: string
 }
 
 let cachedVersionCheck: CachedVersionCheck | null = null
@@ -52,6 +56,50 @@ function getChangelogUrl(version: string | null): string {
   return version ? `${CHANGELOG_BASE_URL}/tag/${version}` : CHANGELOG_BASE_URL
 }
 
+function getUpdateCommandForPackageManager(packageManager: string | null): string {
+  return packageManager === 'pnpm' ? 'pnpm run update' : 'npm run update'
+}
+
+async function detectProjectPackageManager(): Promise<string | null> {
+  try {
+    const raw = await readFile(join(process.cwd(), 'package.json'), 'utf8')
+    const parsed = JSON.parse(raw) as ProjectPackageJson
+
+    if (parsed.packageManager?.startsWith('pnpm@') || parsed.packageManager === 'pnpm') {
+      return 'pnpm'
+    }
+
+    if (parsed.packageManager?.startsWith('npm@') || parsed.packageManager === 'npm') {
+      return 'npm'
+    }
+  } catch {
+    return await detectPackageManagerFromLockfiles()
+  }
+
+  return await detectPackageManagerFromLockfiles()
+}
+
+async function hasLockfile(filename: string): Promise<boolean> {
+  try {
+    await readFile(join(process.cwd(), filename), 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function detectPackageManagerFromLockfiles(): Promise<string | null> {
+  if (await hasLockfile('pnpm-lock.yaml')) {
+    return 'pnpm'
+  }
+
+  if (await hasLockfile('package-lock.json')) {
+    return 'npm'
+  }
+
+  return null
+}
+
 async function readCurrentVersion(): Promise<string> {
   const packageJsonPath = fileURLToPath(packageJsonUrl)
   const raw = await readFile(packageJsonPath, 'utf8')
@@ -65,6 +113,7 @@ export async function getVersionCheck(): Promise<VersionCheckResult> {
   }
 
   const currentVersion = await readCurrentVersion()
+  const packageManager = await detectProjectPackageManager()
   let latestVersion: string | null = null
 
   try {
@@ -79,14 +128,16 @@ export async function getVersionCheck(): Promise<VersionCheckResult> {
       const payload = (await response.json()) as { version?: string }
       latestVersion = payload.version ?? null
     }
-  } catch {}
+  } catch {
+    latestVersion = null
+  }
 
   const value: VersionCheckResult = {
     currentVersion,
     latestVersion,
     updateAvailable: latestVersion ? compareVersions(latestVersion, currentVersion) > 0 : false,
     changelogUrl: getChangelogUrl(latestVersion),
-    updateCommand: UPDATE_COMMAND,
+    updateCommand: getUpdateCommandForPackageManager(packageManager),
     checkedAt: new Date().toISOString(),
   }
 
