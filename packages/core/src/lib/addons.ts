@@ -6,7 +6,10 @@ import { z } from 'zod'
 import { getCurrentVersion } from './version.js'
 
 const ADDON_PACKAGE_PREFIX = '@plank-cms/addon-'
-const require = createRequire(import.meta.url)
+
+function getHostRequire() {
+  return createRequire(join(process.cwd(), 'package.json'))
+}
 
 const addonSlotSchema = z.object({
   id: z.string().min(1),
@@ -152,11 +155,13 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 async function resolvePackageJsonPath(packageName: string): Promise<string | null> {
+  const hostRequire = getHostRequire()
+
   try {
-    return require.resolve(`${packageName}/package.json`)
+    return hostRequire.resolve(`${packageName}/package.json`)
   } catch {
     try {
-      const entryPath = require.resolve(packageName)
+      const entryPath = hostRequire.resolve(packageName)
       let currentDir = dirname(entryPath)
 
       for (;;) {
