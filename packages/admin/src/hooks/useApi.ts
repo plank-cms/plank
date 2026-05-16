@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 interface ApiState<T> {
   data: T | null
@@ -11,7 +11,7 @@ type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 export function useApi<T = unknown>() {
   const [state, setState] = useState<ApiState<T>>({ data: null, loading: false, error: null })
 
-  async function request(url: string, method: Method, body?: unknown): Promise<T> {
+  const request = useCallback(async (url: string, method: Method, body?: unknown): Promise<T> => {
     setState({ data: null, loading: true, error: null })
 
     const headers: HeadersInit = {
@@ -61,7 +61,7 @@ export function useApi<T = unknown>() {
       setState({ data: null, loading: false, error: message })
       throw err
     }
-  }
+  }, [])
 
   return { ...state, request }
 }

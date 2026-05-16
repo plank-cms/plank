@@ -7,6 +7,7 @@ import {
   getAddonAdminModule,
   getAddonRow,
   listAddonRows,
+  runAddonServerAction,
   updateAddonEnabled,
 } from '../lib/addons.js'
 
@@ -108,6 +109,39 @@ export async function getAddonAdminEntry(req: Request<{ id: string }>, res: Resp
 
   res.type('application/javascript')
   res.sendFile(entryPath)
+}
+
+export async function runAddonAction(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const parsed = z.object({
+    action: z.string().min(1),
+    input: z.unknown().optional(),
+  }).safeParse(req.body)
+
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Body must include a valid action name' })
+    return
+  }
+
+  try {
+    const result = await runAddonServerAction(
+      req.params.id,
+      parsed.data.action,
+      parsed.data.input,
+    )
+    res.json({ result })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not run add-on action'
+    const status =
+      message === 'Addon not found'
+        ? 404
+        : message === 'Addon is not installed'
+          ? 409
+          : message === 'Addon is disabled' || message === 'Addon is not compatible with this Plank version'
+            ? 409
+            : 400
+
+    res.status(status).json({ error: message })
+  }
 }
 
 export async function updateAddonSettings(req: Request<{ id: string }>, res: Response): Promise<void> {

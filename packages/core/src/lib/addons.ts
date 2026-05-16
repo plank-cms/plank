@@ -3,7 +3,13 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pool } from '@plank-cms/db'
+import {
+  findAllContentTypes,
+  findContentTypeBySlug,
+  quoteIdentifier,
+} from '@plank-cms/schema'
 import { z } from 'zod'
+import { getSettings } from './settings.js'
 import { getCurrentVersion } from './version.js'
 
 const ADDON_PACKAGE_PREFIX = '@plank-cms/addon-'
@@ -147,6 +153,29 @@ const addonAdminModuleSchema = z.object({
 
 export type AddonAdminField = z.infer<typeof addonAdminFieldSchema>
 export type AddonAdminModule = z.infer<typeof addonAdminModuleSchema>
+
+export type AddonServerActionContext = {
+  db: {
+    query: typeof pool.query
+  }
+  getSettings: typeof getSettings
+  findAllContentTypes: typeof findAllContentTypes
+  findContentTypeBySlug: typeof findContentTypeBySlug
+  quoteIdentifier: typeof quoteIdentifier
+}
+
+export type AddonServerModule = {
+  runAction: (args: {
+    action: string
+    input: unknown
+    addon: {
+      id: string
+      packageName: string
+      settingsNamespace: string | null
+    }
+    context: AddonServerActionContext
+  }) => Promise<unknown>
+}
 
 function normalizeSlot(slot: ManifestSlot): ManifestSlot {
   return {
@@ -364,6 +393,17 @@ async function loadAddonAdminModule(packageName: string): Promise<AddonAdminModu
   }
 
   return parsed.data
+}
+
+async function loadAddonServerModule(packageName: string): Promise<AddonServerModule> {
+  const module = await import(`${packageName}/server`)
+  const candidate = module?.serverModule ?? module?.default
+
+  if (!candidate || typeof candidate.runAction !== 'function') {
+    throw new Error(`Invalid server module for ${packageName}`)
+  }
+
+  return candidate as AddonServerModule
 }
 
 async function resolveAddonAdminEntryPath(packageName: string): Promise<string | null> {
@@ -616,6 +656,50 @@ export async function getAddonAdminEntryPath(id: string): Promise<string | null>
     console.warn(`[plank/addons] Failed to resolve admin entry for ${addon.package_name}: ${message}`)
     return null
   }
+}
+
+export async function runAddonServerAction(
+  id: string,
+  action: string,
+  input: unknown,
+): Promise<unknown> {
+  const addon = await getAddonRow(id)
+  if (!addon) {
+    throw new Error('Addon not found')
+  }
+
+  if (!addon.installed) {
+    throw new Error('Addon is not installed')
+  }
+
+  if (!addon.enabled) {
+    throw new Error('Addon is disabled')
+  }
+
+  if (!addon.compatible) {
+    throw new Error('Addon is not compatible with this Plank version')
+  }
+
+  const serverModule = await loadAddonServerModule(addon.package_name)
+
+  return serverModule.runAction({
+    action,
+    input,
+    addon: {
+      id: addon.id,
+      packageName: addon.package_name,
+      settingsNamespace: addon.settings_namespace,
+    },
+    context: {
+      db: {
+        query: pool.query.bind(pool),
+      },
+      getSettings,
+      findAllContentTypes,
+      findContentTypeBySlug,
+      quoteIdentifier,
+    },
+  })
 }
 
 export async function updateAddonEnabled(id: string, enabled: boolean): Promise<AddonRow | null> {

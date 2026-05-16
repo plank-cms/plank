@@ -43,6 +43,7 @@ import {
   getAddonsRegistry,
   getAddonSettings,
   listAddons,
+  runAddonAction,
   updateAddonSettings,
 } from '../controllers/addons.js'
 
@@ -128,6 +129,7 @@ router.post('/addons/:id/enable', authorize('addons:write'), enableAddon)
 router.post('/addons/:id/disable', authorize('addons:write'), disableAddon)
 router.get('/addons/:id/admin-module', authorize('addons:read'), getAddonAdminModuleDefinition)
 router.get('/addons/:id/admin-entry.js', authorize('addons:read'), getAddonAdminEntry)
+router.post('/addons/:id/actions', authorize('addons:read'), runAddonAction)
 router.get('/addons/:id/settings', authorize('addons:read'), getAddonSettings)
 router.put('/addons/:id/settings', authorize('addons:write'), updateAddonSettings)
 

@@ -92,6 +92,7 @@ export type AdminAddonRuntimeProps = {
   definition: AdminAddonModule
   settings: Record<string, string>
   contentTypes: AdminAddonContentType[]
+  runAction: <T = unknown>(action: string, input?: unknown) => Promise<T>
   saveSettings: (values: Record<string, string>) => Promise<Record<string, string>>
 }
 

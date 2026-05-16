@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PuzzleIcon, Settings2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -80,28 +80,44 @@ export function AddonDetail() {
     }
   }, [addon])
 
+  const saveSettings = useCallback(
+    async (values: Record<string, string>): Promise<Record<string, string>> => {
+      try {
+        const updated = await request<Record<string, string>>(
+          `/cms/admin/addons/${addonId}/settings`,
+          'PUT',
+          values,
+        )
+        refetchSettings()
+        toast.success('Add-on settings saved')
+        return updated
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not save add-on settings')
+        throw error
+      }
+    },
+    [addonId, refetchSettings, request],
+  )
+
+  const runAction = useCallback(
+    async <T = unknown>(action: string, input?: unknown): Promise<T> => {
+      const response = await request<{ result: T }>(
+        `/cms/admin/addons/${addonId}/actions`,
+        'POST',
+        { action, input },
+      )
+
+      return response.result
+    },
+    [addonId, request],
+  )
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner className="size-8" />
       </div>
     )
-  }
-
-  async function saveSettings(values: Record<string, string>): Promise<Record<string, string>> {
-    try {
-      const updated = await request<Record<string, string>>(
-        `/cms/admin/addons/${addonId}/settings`,
-        'PUT',
-        values,
-      )
-      refetchSettings()
-      toast.success('Add-on settings saved')
-      return updated
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save add-on settings')
-      throw error
-    }
   }
 
   if (!addon) {
@@ -170,6 +186,7 @@ export function AddonDetail() {
                   definition={adminModule}
                   settings={settings}
                   contentTypes={contentTypes ?? []}
+                  runAction={runAction}
                   saveSettings={saveSettings}
                 />
               ) : (
