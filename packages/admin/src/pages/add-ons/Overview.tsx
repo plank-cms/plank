@@ -39,7 +39,9 @@ function StatusBadge({
 }
 
 export function AddonsOverview() {
-  const { data, loading, error, refetch } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
+  const { data, loading, error, refetch } = useFetch<AdminAddonsRegistryResponse>(
+    '/cms/admin/addons/registry',
+  )
   const { request, loading: saving } = useApi()
   const [pendingId, setPendingId] = useState<string | null>(null)
 
@@ -133,8 +135,8 @@ export function AddonsOverview() {
               </EmptyMedia>
               <EmptyTitle>No add-ons detected</EmptyTitle>
               <EmptyDescription>
-                Install an official `@plank-cms/addon-*` package in the host project and restart
-                the server to populate this registry.
+                Install an official `@plank-cms/addon-*` package in the host project and restart the
+                server to populate this registry.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -223,7 +225,7 @@ export function AddonsOverview() {
           </Card>
         )}
 
-        <Card>
+        <Card className="bg-background">
           <CardHeader>
             <CardTitle>Slots</CardTitle>
           </CardHeader>
@@ -233,7 +235,10 @@ export function AddonsOverview() {
               {data && data.slots.dashboardWidgets.length > 0 ? (
                 <div className="space-y-2">
                   {data.slots.dashboardWidgets.map((slot) => (
-                    <div key={slot.slotId} className="rounded-md border border-dashed px-3 py-2 text-sm">
+                    <div
+                      key={slot.slotId}
+                      className="rounded-md border border-dashed px-3 py-2 text-sm"
+                    >
                       <div className="font-medium">{slot.title}</div>
                       <div className="text-xs text-muted-foreground">
                         {slot.addonId} · {slot.slotId} · order {slot.order}
@@ -253,7 +258,10 @@ export function AddonsOverview() {
               {data && data.slots.addonsSections.length > 0 ? (
                 <div className="space-y-2">
                   {data.slots.addonsSections.map((slot) => (
-                    <div key={slot.slotId} className="rounded-md border border-dashed px-3 py-2 text-sm">
+                    <div
+                      key={slot.slotId}
+                      className="rounded-md border border-dashed px-3 py-2 text-sm"
+                    >
                       <div className="font-medium">{slot.title}</div>
                       <div className="text-xs text-muted-foreground">
                         {slot.addonId} · {slot.slotId} · order {slot.order}
@@ -271,9 +279,7 @@ export function AddonsOverview() {
         </Card>
 
         {error && (
-          <p className="text-sm text-destructive">
-            Could not load add-ons registry: {error}
-          </p>
+          <p className="text-sm text-destructive">Could not load add-ons registry: {error}</p>
         )}
       </section>
     </>
