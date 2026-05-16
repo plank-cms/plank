@@ -64,6 +64,24 @@ export type AdminAddonModule = {
 }
 
 export type AdminAddonContentType = {
+  fields?: Array<{
+    name: string
+    type:
+      | 'string'
+      | 'text'
+      | 'richtext'
+      | 'number'
+      | 'boolean'
+      | 'datetime'
+      | 'media'
+      | 'media-gallery'
+      | 'relation'
+      | 'uid'
+      | 'array'
+      | 'navigation'
+    relatedSlug?: string
+    relationType?: 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
+  }>
   slug: string
   name: string
   kind: 'collection' | 'single'
