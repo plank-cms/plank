@@ -143,86 +143,86 @@ export function AddonsOverview() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <Card className="gap-0 bg-background py-0">
-            <CardHeader className="border-b py-4">
-              <CardTitle>Registry</CardTitle>
-            </CardHeader>
-            <CardContent className="px-0">
-              <Table>
-                <TableHeader className="font-bold uppercase">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Add-on
-                    </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Package
-                    </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Status
-                    </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Settings
-                    </TableHead>
-                    <TableHead className="w-28 px-4 py-3 text-right font-medium text-muted-foreground">
-                      Enabled
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {addons.map((addon) => {
-                    const disabled = saving && pendingId === addon.id
-                    const canToggle = addon.installed && addon.compatible
+          <div className="overflow-hidden rounded-lg border border-border bg-background">
+            <Table className="w-full text-sm">
+              <TableHeader className="border-b border-border font-bold uppercase">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead colSpan={5} className="h-auto px-4 py-3">
+                    <h2 className="text-base font-semibold text-foreground normal-case">Registry</h2>
+                  </TableHead>
+                </TableRow>
+                <TableRow className="border-t border-border hover:bg-transparent">
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Add-on
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Package
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Settings
+                  </TableHead>
+                  <TableHead className="w-28 px-4 py-3 text-right font-medium text-muted-foreground">
+                    Enabled
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {addons.map((addon) => {
+                  const disabled = saving && pendingId === addon.id
+                  const canToggle = addon.installed && addon.compatible
 
-                    return (
-                      <TableRow key={addon.id}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium">{addon.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {addon.version || 'Unknown version'}
-                            </div>
-                            {addon.description && (
-                              <p className="max-w-md text-xs text-muted-foreground">
-                                {addon.description}
-                              </p>
-                            )}
+                  return (
+                    <TableRow key={addon.id}>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium">{addon.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {addon.version || 'Unknown version'}
                           </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{addon.packageName}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <StatusBadge variant={addon.installed ? 'secondary' : 'outline'}>
-                              {addon.installed ? 'Installed' : 'Missing'}
-                            </StatusBadge>
-                            <StatusBadge variant={addon.compatible ? 'secondary' : 'destructive'}>
-                              {addon.compatible ? 'Compatible' : 'Incompatible'}
-                            </StatusBadge>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {addon.settingsNamespace ? (
-                            <Badge variant="outline">{addon.settingsNamespace}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">None</span>
+                          {addon.description && (
+                            <p className="max-w-md text-xs text-muted-foreground">
+                              {addon.description}
+                            </p>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="inline-flex items-center gap-3">
-                            {disabled && <Spinner className="size-4" />}
-                            <Switch
-                              checked={addon.enabled}
-                              disabled={!canToggle || disabled}
-                              onCheckedChange={() => handleToggle(addon.id, addon.enabled)}
-                            />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{addon.packageName}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          <StatusBadge variant={addon.installed ? 'secondary' : 'outline'}>
+                            {addon.installed ? 'Installed' : 'Missing'}
+                          </StatusBadge>
+                          <StatusBadge variant={addon.compatible ? 'secondary' : 'destructive'}>
+                            {addon.compatible ? 'Compatible' : 'Incompatible'}
+                          </StatusBadge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {addon.settingsNamespace ? (
+                          <Badge variant="outline">{addon.settingsNamespace}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-3">
+                          {disabled && <Spinner className="size-4" />}
+                          <Switch
+                            checked={addon.enabled}
+                            disabled={!canToggle || disabled}
+                            onCheckedChange={() => handleToggle(addon.id, addon.enabled)}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
         {error && (
