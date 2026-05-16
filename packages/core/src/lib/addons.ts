@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { pool } from '@plank-cms/db'
 import { z } from 'zod'
 import { getCurrentVersion } from './version.js'
@@ -109,6 +110,44 @@ export type AdminAddonsRegistryResponse = {
   }
 }
 
+const addonAdminFieldSchema = z.discriminatedUnion('type', [
+  z.object({
+    key: z.string().min(1),
+    type: z.literal('contentTypesMultiSelect'),
+    label: z.string().min(1),
+    description: z.string().min(1),
+    defaultValue: z.array(z.string()),
+  }),
+  z.object({
+    key: z.string().min(1),
+    type: z.literal('number'),
+    label: z.string().min(1),
+    description: z.string().min(1),
+    min: z.number(),
+    defaultValue: z.number(),
+  }),
+])
+
+const addonAdminModuleSchema = z.object({
+  addonId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  settingsNamespace: z.string().min(1),
+  checks: z.array(z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    description: z.string().min(1),
+  })),
+  settings: z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    fields: z.array(addonAdminFieldSchema),
+  }),
+})
+
+export type AddonAdminField = z.infer<typeof addonAdminFieldSchema>
+export type AddonAdminModule = z.infer<typeof addonAdminModuleSchema>
+
 function normalizeSlot(slot: ManifestSlot): ManifestSlot {
   return {
     id: slot.id,
@@ -177,6 +216,29 @@ async function resolvePackageJsonPath(packageName: string): Promise<string | nul
     } catch {
       return null
     }
+  }
+}
+
+async function resolvePackageRoot(packageName: string): Promise<string | null> {
+  const packageJsonPath = await resolvePackageJsonPath(packageName)
+  if (packageJsonPath) return dirname(packageJsonPath)
+
+  try {
+    const manifestUrl = import.meta.resolve(`${packageName}/plank`)
+    let currentDir = dirname(fileURLToPath(manifestUrl))
+
+    for (;;) {
+      const candidate = join(currentDir, 'package.json')
+      if (await pathExists(candidate)) {
+        return currentDir
+      }
+
+      const parentDir = dirname(currentDir)
+      if (parentDir === currentDir) return null
+      currentDir = parentDir
+    }
+  } catch {
+    return null
   }
 }
 
@@ -290,6 +352,38 @@ async function loadAddonManifest(packageName: string): Promise<PlankAddonManifes
   }
 
   return parsed.data
+}
+
+async function loadAddonAdminModule(packageName: string): Promise<AddonAdminModule> {
+  const module = await import(`${packageName}/admin`)
+  const candidate = module?.adminModule ?? module?.default
+  const parsed = addonAdminModuleSchema.safeParse(candidate)
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues.map((issue) => issue.message).join(', '))
+  }
+
+  return parsed.data
+}
+
+async function resolveAddonAdminEntryPath(packageName: string): Promise<string | null> {
+  const [manifest, packageRoot] = await Promise.all([
+    loadAddonManifest(packageName),
+    resolvePackageRoot(packageName),
+  ])
+
+  if (!manifest.admin?.entry || !packageRoot) return null
+
+  const entryPath = resolve(packageRoot, manifest.admin.entry)
+  if (!entryPath.startsWith(packageRoot)) {
+    throw new Error(`Invalid admin entry path for ${packageName}`)
+  }
+
+  if (!(await pathExists(entryPath))) {
+    throw new Error(`Admin entry file not found for ${packageName}: ${entryPath}`)
+  }
+
+  return entryPath
 }
 
 async function discoverAddon(packageName: string, coreVersion: string): Promise<DiscoveredAddon | null> {
@@ -496,6 +590,32 @@ export async function getAddonRow(id: string): Promise<AddonRow | null> {
   )
 
   return rows[0] ?? null
+}
+
+export async function getAddonAdminModule(id: string): Promise<AddonAdminModule | null> {
+  const addon = await getAddonRow(id)
+  if (!addon || !addon.installed || !addon.has_admin_ui) return null
+
+  try {
+    return await loadAddonAdminModule(addon.package_name)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown admin module error'
+    console.warn(`[plank/addons] Failed to load admin module for ${addon.package_name}: ${message}`)
+    return null
+  }
+}
+
+export async function getAddonAdminEntryPath(id: string): Promise<string | null> {
+  const addon = await getAddonRow(id)
+  if (!addon || !addon.installed || !addon.has_admin_ui) return null
+
+  try {
+    return await resolveAddonAdminEntryPath(addon.package_name)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown admin entry error'
+    console.warn(`[plank/addons] Failed to resolve admin entry for ${addon.package_name}: ${message}`)
+    return null
+  }
 }
 
 export async function updateAddonEnabled(id: string, enabled: boolean): Promise<AddonRow | null> {

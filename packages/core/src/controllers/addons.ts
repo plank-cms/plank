@@ -2,7 +2,9 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { getSettings, setSettings } from '../lib/settings.js'
 import {
+  getAddonAdminEntryPath,
   buildAdminAddonsRegistry,
+  getAddonAdminModule,
   getAddonRow,
   listAddonRows,
   updateAddonEnabled,
@@ -85,6 +87,27 @@ export async function getAddonSettings(req: Request<{ id: string }>, res: Respon
 
   const settings = await getSettings(result.addon.settings_namespace)
   res.json(settings)
+}
+
+export async function getAddonAdminModuleDefinition(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const addon = await getAddonAdminModule(req.params.id)
+  if (!addon) {
+    res.status(404).json({ error: 'Addon admin module not found' })
+    return
+  }
+
+  res.json(addon)
+}
+
+export async function getAddonAdminEntry(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const entryPath = await getAddonAdminEntryPath(req.params.id)
+  if (!entryPath) {
+    res.status(404).json({ error: 'Addon admin entry not found' })
+    return
+  }
+
+  res.type('application/javascript')
+  res.sendFile(entryPath)
 }
 
 export async function updateAddonSettings(req: Request<{ id: string }>, res: Response): Promise<void> {

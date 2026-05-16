@@ -1,9 +1,11 @@
-import { Link, useParams } from 'react-router-dom'
-import { BoxIcon, ExternalLinkIcon, PuzzleIcon, Settings2Icon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { PuzzleIcon, Settings2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import HeaderFixed from '@/components/Header'
 import { useFetch } from '@/hooks/useFetch.ts'
+import { useApi } from '@/hooks/useApi.ts'
 import { Badge } from '@/components/ui/badge.tsx'
-import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import {
   Empty,
@@ -13,11 +15,70 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { type AdminAddonsRegistryResponse, canOpenAddonAdmin } from '@/lib/addons.ts'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
+import {
+  type AdminAddonContentType,
+  type AdminAddonModule,
+  type AdminAddonRuntimeModule,
+  type AdminAddonsRegistryResponse,
+  canOpenAddonAdmin,
+  loadAddonAdminRuntime,
+} from '@/lib/addons.ts'
 
 export function AddonDetail() {
   const { addonId = '' } = useParams()
   const { data, loading } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
+  const { data: adminModule, loading: loadingModule } = useFetch<AdminAddonModule>(
+    addonId ? `/cms/admin/addons/${addonId}/admin-module` : null,
+  )
+  const { data: settings, loading: loadingSettings, refetch: refetchSettings } = useFetch<Record<string, string>>(
+    addonId ? `/cms/admin/addons/${addonId}/settings` : null,
+  )
+  const { data: contentTypes, loading: loadingContentTypes } = useFetch<AdminAddonContentType[]>(
+    '/cms/admin/content-types',
+  )
+  const { request } = useApi()
+  const [runtimeModule, setRuntimeModule] = useState<AdminAddonRuntimeModule | null>(null)
+  const [loadingRuntime, setLoadingRuntime] = useState(false)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
+  const addon = data?.addons.find((item) => item.id === addonId) ?? null
+  const sections = (data?.slots.addonsSections ?? []).filter((slot) => slot.addonId === addonId)
+  const widgets = (data?.slots.dashboardWidgets ?? []).filter((slot) => slot.addonId === addonId)
+  const hasAdminTab = Boolean(addon?.hasAdminUi)
+
+  useEffect(() => {
+    if (!addon || !canOpenAddonAdmin(addon)) {
+      setRuntimeModule(null)
+      setRuntimeError(null)
+      setLoadingRuntime(false)
+      return
+    }
+
+    let active = true
+    setLoadingRuntime(true)
+    setRuntimeError(null)
+
+    loadAddonAdminRuntime(addon.id)
+      .then((module) => {
+        if (!active) return
+        setRuntimeModule(module)
+        if (!module) {
+          setRuntimeError('This add-on did not register an admin runtime.')
+        }
+      })
+      .catch((error) => {
+        if (!active) return
+        setRuntimeModule(null)
+        setRuntimeError(error instanceof Error ? error.message : 'Could not load add-on admin runtime')
+      })
+      .finally(() => {
+        if (active) setLoadingRuntime(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [addon])
 
   if (loading) {
     return (
@@ -27,9 +88,21 @@ export function AddonDetail() {
     )
   }
 
-  const addon = data?.addons.find((item) => item.id === addonId) ?? null
-  const sections = (data?.slots.addonsSections ?? []).filter((slot) => slot.addonId === addonId)
-  const widgets = (data?.slots.dashboardWidgets ?? []).filter((slot) => slot.addonId === addonId)
+  async function saveSettings(values: Record<string, string>): Promise<Record<string, string>> {
+    try {
+      const updated = await request<Record<string, string>>(
+        `/cms/admin/addons/${addonId}/settings`,
+        'PUT',
+        values,
+      )
+      refetchSettings()
+      toast.success('Add-on settings saved')
+      return updated
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save add-on settings')
+      throw error
+    }
+  }
 
   if (!addon) {
     return (
@@ -66,24 +139,15 @@ export function AddonDetail() {
           </Badge>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Admin Surface</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {canOpenAddonAdmin(addon) ? (
-                <div className="rounded-lg border border-dashed p-4">
-                  <div className="mb-1 flex items-center gap-2 font-medium">
-                    <BoxIcon className="size-4" />
-                    Bundle loader placeholder
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    The registry is already driving this route. The actual add-on bundle mount is
-                    intentionally deferred to the next implementation step.
-                  </p>
-                </div>
-              ) : (
+        <Tabs defaultValue={hasAdminTab ? 'admin' : 'details'}>
+          <TabsList className="mb-6">
+            {hasAdminTab && <TabsTrigger value="admin">Admin</TabsTrigger>}
+            <TabsTrigger value="details">Details</TabsTrigger>
+          </TabsList>
+
+          {hasAdminTab && (
+            <TabsContent value="admin" className="space-y-4">
+              {!canOpenAddonAdmin(addon) ? (
                 <Empty className="border">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -96,77 +160,83 @@ export function AddonDetail() {
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div>
-                <div className="text-muted-foreground">Version</div>
-                <div className="font-medium">{addon.version || 'Unknown version'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Settings Namespace</div>
-                <div className="font-medium">{addon.settingsNamespace ?? 'None'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Slots</div>
-                <div className="font-medium">{sections.length} sections · {widgets.length} widgets</div>
-              </div>
-              <div className="flex gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/add-ons/overview">Back to registry</Link>
-                </Button>
-                {addon.adminUrl && (
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={addon.adminUrl}>
-                      Open route
-                      <ExternalLinkIcon className="ml-2 size-4" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Registered Sections</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {sections.length > 0 ? sections.map((slot) => (
-                <div key={slot.slotId} className="rounded-md border px-3 py-2 text-sm">
-                  <div className="font-medium">{slot.title}</div>
-                  <div className="text-xs text-muted-foreground">{slot.slotId}</div>
+              ) : loadingModule || loadingSettings || loadingContentTypes || loadingRuntime ? (
+                <div className="flex h-40 items-center justify-center rounded-lg border bg-background">
+                  <Spinner className="size-6" />
                 </div>
-              )) : (
-                <p className="text-sm text-muted-foreground">No section slots registered.</p>
+              ) : adminModule && settings && runtimeModule ? (
+                <runtimeModule.AdminPage
+                  addon={addon}
+                  definition={adminModule}
+                  settings={settings}
+                  contentTypes={contentTypes ?? []}
+                  saveSettings={saveSettings}
+                />
+              ) : (
+                <Empty className="border">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Settings2Icon />
+                    </EmptyMedia>
+                    <EmptyTitle>Admin runtime unavailable</EmptyTitle>
+                    <EmptyDescription>
+                      {runtimeError ?? 'This add-on does not expose a mountable admin runtime yet.'}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
+          )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Registered Widgets</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {widgets.length > 0 ? widgets.map((slot) => (
-                <div key={slot.slotId} className="rounded-md border px-3 py-2 text-sm">
-                  <div className="font-medium">{slot.title}</div>
-                  <div className="text-xs text-muted-foreground">{slot.slotId}</div>
-                </div>
-              )) : (
-                <p className="text-sm text-muted-foreground">No dashboard widgets registered.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="details">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="bg-background">
+                <CardHeader>
+                  <CardTitle>{adminModule?.title ?? 'Metadata'}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {adminModule?.description && (
+                    <p className="text-muted-foreground">{adminModule.description}</p>
+                  )}
+                  <div>
+                    <div className="text-muted-foreground">Version</div>
+                    <div className="font-medium">{addon.version || 'Unknown version'}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Settings Namespace</div>
+                    <div className="font-medium">{addon.settingsNamespace ?? 'None'}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">State</div>
+                    <div className="font-medium">
+                      {addon.installed ? 'Installed' : 'Missing'} · {addon.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-background">
+                <CardHeader>
+                  <CardTitle>Slot Registration</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {sections.length > 0 ? sections.map((slot) => (
+                    <div key={slot.slotId} className="rounded-md border bg-background px-3 py-2 text-sm">
+                      <div className="font-medium">Section</div>
+                      <div className="text-xs text-muted-foreground">{slot.slotId}</div>
+                    </div>
+                  )) : <p className="text-sm text-muted-foreground">No section slots registered.</p>}
+                  {widgets.length > 0 ? widgets.map((slot) => (
+                    <div key={slot.slotId} className="rounded-md border bg-background px-3 py-2 text-sm">
+                      <div className="font-medium">Widget</div>
+                      <div className="text-xs text-muted-foreground">{slot.slotId}</div>
+                    </div>
+                  )) : <p className="text-sm text-muted-foreground">No widget slots registered.</p>}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </section>
     </>
   )
