@@ -1,10 +1,24 @@
+import { useEffect } from 'react'
 import { BoxIcon, PackageOpenIcon } from 'lucide-react'
 import { useFetch } from '@/hooks/useFetch.ts'
-import { type AdminAddonsRegistryResponse, canOpenAddonAdmin } from '@/lib/addons.ts'
+import {
+  ADDONS_REGISTRY_UPDATED_EVENT,
+  type AdminAddonsRegistryResponse,
+  canOpenAddonAdmin,
+} from '@/lib/addons.ts'
 import { SidebarNav } from './SidebarNav.tsx'
 
 export function AddonsSidebar() {
-  const { data } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
+  const { data, refetch } = useFetch<AdminAddonsRegistryResponse>('/cms/admin/addons/registry')
+
+  useEffect(() => {
+    function handleRegistryUpdated() {
+      refetch()
+    }
+
+    window.addEventListener(ADDONS_REGISTRY_UPDATED_EVENT, handleRegistryUpdated)
+    return () => window.removeEventListener(ADDONS_REGISTRY_UPDATED_EVENT, handleRegistryUpdated)
+  }, [refetch])
 
   const addons = (data?.addons ?? []).filter(canOpenAddonAdmin)
   const sectionTitles = new Map(

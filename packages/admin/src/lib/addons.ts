@@ -27,6 +27,12 @@ export type AdminAddonsRegistryResponse = {
   }
 }
 
+export const ADDONS_REGISTRY_UPDATED_EVENT = 'plank:addons-registry-updated'
+
 export function canOpenAddonAdmin(addon: AdminAddonRegistryItem): boolean {
   return addon.installed && addon.enabled && addon.compatible && addon.hasAdminUi
+}
+
+export function notifyAddonsRegistryUpdated(): void {
+  window.dispatchEvent(new CustomEvent(ADDONS_REGISTRY_UPDATED_EVENT))
 }

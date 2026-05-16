@@ -294,7 +294,6 @@ async function loadAddonManifest(packageName: string): Promise<PlankAddonManifes
 
 async function discoverAddon(packageName: string, coreVersion: string): Promise<DiscoveredAddon | null> {
   const packageJson = await readInstalledPackageJson(packageName)
-  if (!packageJson) return null
 
   try {
     const manifest = await loadAddonManifest(packageName)
@@ -306,7 +305,7 @@ async function discoverAddon(packageName: string, coreVersion: string): Promise<
       name: manifest.name,
       version: manifest.version,
       plankRange: manifest.plankRange,
-      description: manifest.description ?? packageJson.description ?? null,
+      description: manifest.description ?? packageJson?.description ?? null,
       installed: true,
       enabled: false,
       compatible,
@@ -323,10 +322,10 @@ async function discoverAddon(packageName: string, coreVersion: string): Promise<
     return {
       id: fallbackId,
       packageName,
-      name: packageJson.name ?? fallbackId,
-      version: packageJson.version ?? null,
+      name: packageJson?.name ?? fallbackId,
+      version: packageJson?.version ?? null,
       plankRange: null,
-      description: packageJson.description ?? null,
+      description: packageJson?.description ?? null,
       installed: true,
       enabled: false,
       compatible: false,

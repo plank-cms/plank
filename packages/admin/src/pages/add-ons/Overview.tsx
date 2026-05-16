@@ -26,7 +26,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table.tsx'
-import { type AdminAddonsRegistryResponse, canOpenAddonAdmin } from '@/lib/addons.ts'
+import {
+  notifyAddonsRegistryUpdated,
+  type AdminAddonsRegistryResponse,
+  canOpenAddonAdmin,
+} from '@/lib/addons.ts'
 
 function StatusBadge({
   children,
@@ -62,6 +66,7 @@ export function AddonsOverview() {
     try {
       await request(`/cms/admin/addons/${addonId}/${enabled ? 'disable' : 'enable'}`, 'POST')
       refetch()
+      notifyAddonsRegistryUpdated()
       toast.success(enabled ? 'Add-on disabled' : 'Add-on enabled')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not update add-on')
@@ -141,7 +146,7 @@ export function AddonsOverview() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <Card className="gap-0 py-0">
+          <Card className="gap-0 bg-background py-0">
             <CardHeader className="border-b py-4">
               <CardTitle>Registry</CardTitle>
             </CardHeader>
