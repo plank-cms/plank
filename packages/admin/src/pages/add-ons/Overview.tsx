@@ -148,7 +148,7 @@ export function AddonsOverview() {
               <TableHeader className="border-b border-border font-bold uppercase">
                 <TableRow className="hover:bg-transparent">
                   <TableHead colSpan={5} className="h-auto px-4 py-3">
-                    <h2 className="text-base font-semibold text-foreground normal-case">Registry</h2>
+                    <h2 className="text-base font-semibold text-foreground">Registry</h2>
                   </TableHead>
                 </TableRow>
                 <TableRow className="border-t border-border hover:bg-transparent">
