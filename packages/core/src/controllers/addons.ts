@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { getSettings, setSettings } from '../lib/settings.js'
 import {
@@ -107,8 +108,13 @@ export async function getAddonAdminEntry(req: Request<{ id: string }>, res: Resp
     return
   }
 
-  res.type('application/javascript')
-  res.sendFile(entryPath)
+  try {
+    const source = await readFile(entryPath, 'utf8')
+    res.type('application/javascript')
+    res.send(source)
+  } catch {
+    res.status(404).json({ error: 'Addon admin entry not found' })
+  }
 }
 
 export async function runAddonAction(req: Request<{ id: string }>, res: Response): Promise<void> {
