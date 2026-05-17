@@ -5,6 +5,7 @@ import { getSettings, setSettings } from '../lib/settings.js'
 import {
   getAddonAdminEntryPath,
   buildAdminAddonsRegistry,
+  deleteAddonRow,
   getAddonAdminModule,
   getAddonRow,
   listAddonRows,
@@ -78,6 +79,22 @@ export async function disableAddon(req: Request<{ id: string }>, res: Response):
 
   const updated = await updateAddonEnabled(req.params.id, false)
   res.json(mapAddon(updated!))
+}
+
+export async function deleteAddon(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const addon = await getAddonRow(req.params.id)
+  if (!addon) {
+    res.status(404).json({ error: 'Addon not found' })
+    return
+  }
+
+  if (addon.installed && addon.compatible) {
+    res.status(409).json({ error: 'Only missing or incompatible add-ons can be removed' })
+    return
+  }
+
+  const deleted = await deleteAddonRow(req.params.id)
+  res.json(mapAddon(deleted!))
 }
 
 export async function getAddonSettings(req: Request<{ id: string }>, res: Response): Promise<void> {

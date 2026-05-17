@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { BoxIcon, PackageCheckIcon, PuzzleIcon, Settings2Icon } from 'lucide-react'
+import { BoxIcon, PackageCheckIcon, PuzzleIcon, Settings2Icon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import HeaderFixed from '@/components/Header'
 import { useFetch } from '@/hooks/useFetch.ts'
 import { useApi } from '@/hooks/useApi.ts'
 import { Badge } from '@/components/ui/badge.tsx'
+import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import {
   Empty,
@@ -67,6 +68,21 @@ export function AddonsOverview() {
       toast.success(enabled ? 'Add-on disabled' : 'Add-on enabled')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not update add-on')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  async function handleDelete(addonId: string) {
+    setPendingId(addonId)
+
+    try {
+      await request(`/cms/admin/addons/${addonId}`, 'DELETE')
+      refetch()
+      notifyAddonsRegistryUpdated()
+      toast.success('Add-on registry entry removed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not remove add-on registry entry')
     } finally {
       setPendingId(null)
     }
@@ -185,6 +201,7 @@ export function AddonsOverview() {
                 {addons.map((addon) => {
                   const disabled = saving && pendingId === addon.id
                   const canToggle = addon.installed && addon.compatible
+                  const canDelete = !addon.installed || !addon.compatible
 
                   return (
                     <TableRow key={addon.id}>
@@ -222,11 +239,24 @@ export function AddonsOverview() {
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-3">
                           {disabled && <Spinner className="size-4" />}
-                          <Switch
-                            checked={addon.enabled}
-                            disabled={!canToggle || disabled}
-                            onCheckedChange={() => handleToggle(addon.id, addon.enabled)}
-                          />
+                          {canDelete ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2 text-destructive hover:text-destructive"
+                              disabled={disabled}
+                              onClick={() => handleDelete(addon.id)}
+                            >
+                              <Trash2Icon className="size-3.5" />
+                              Remove
+                            </Button>
+                          ) : (
+                            <Switch
+                              checked={addon.enabled}
+                              disabled={!canToggle || disabled}
+                              onCheckedChange={() => handleToggle(addon.id, addon.enabled)}
+                            />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

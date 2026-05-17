@@ -734,6 +734,29 @@ export async function updateAddonEnabled(id: string, enabled: boolean): Promise<
   return rows[0] ?? null
 }
 
+export async function deleteAddonRow(id: string): Promise<AddonRow | null> {
+  const { rows } = await pool.query<AddonRow>(
+    `DELETE FROM plank_addons
+     WHERE id = $1
+     RETURNING
+       id,
+       package_name,
+       name,
+       version,
+       plank_range,
+       description,
+       installed,
+       enabled,
+       compatible,
+       has_admin_ui,
+       settings_namespace,
+       slots_json`,
+    [id],
+  )
+
+  return rows[0] ?? null
+}
+
 export async function buildAdminAddonsRegistry(): Promise<AdminAddonsRegistryResponse> {
   const rows = await listAddonRows()
   const enabledRows = rows.filter((row) => row.installed && row.enabled && row.compatible)

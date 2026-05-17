@@ -38,6 +38,7 @@ import { listWebhooks, createWebhook, deleteWebhook } from '../controllers/webho
 import {
   getAddonAdminEntry,
   disableAddon,
+  deleteAddon,
   enableAddon,
   getAddonAdminModuleDefinition,
   getAddonsRegistry,
@@ -127,6 +128,7 @@ router.get('/addons/registry', authorize('addons:read'), getAddonsRegistry)
 router.get('/addons', authorize('addons:read'), listAddons)
 router.post('/addons/:id/enable', authorize('addons:write'), enableAddon)
 router.post('/addons/:id/disable', authorize('addons:write'), disableAddon)
+router.delete('/addons/:id', authorize('addons:write'), deleteAddon)
 router.get('/addons/:id/admin-module', authorize('addons:read'), getAddonAdminModuleDefinition)
 router.get('/addons/:id/admin-entry.js', authorize('addons:read'), getAddonAdminEntry)
 router.post('/addons/:id/actions', authorize('addons:read'), runAddonAction)
