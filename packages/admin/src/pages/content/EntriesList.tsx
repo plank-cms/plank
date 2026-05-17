@@ -127,6 +127,8 @@ type ContentHealthSettings = {
     slug: string
     enabled: boolean
     checkStaleDrafts: boolean
+    requiredTextFields?: string[]
+    requiredMediaFields?: string[]
   }>
   staleDraftDays: number
 }
@@ -180,6 +182,12 @@ function parseContentHealthSettings(settings: Record<string, string> | null): Co
           slug: typeof value.slug === 'string' ? value.slug : '',
           enabled: value.enabled !== false,
           checkStaleDrafts: value.checkStaleDrafts !== false,
+          requiredTextFields: Array.isArray(value.requiredTextFields)
+            ? value.requiredTextFields.filter((field): field is string => typeof field === 'string')
+            : [],
+          requiredMediaFields: Array.isArray(value.requiredMediaFields)
+            ? value.requiredMediaFields.filter((field): field is string => typeof field === 'string')
+            : [],
         }))
         .filter((value) => value.slug.length > 0)
     } catch {
@@ -198,6 +206,55 @@ function getStaleDraftAgeDays(updatedAt: string): number {
   if (Number.isNaN(updated.getTime())) return 0
   const diff = Date.now() - updated.getTime()
   return Math.max(0, Math.floor(diff / 86400000))
+}
+
+function isMissingTextValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim().length === 0
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
+function isMissingMediaValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim().length === 0
+  if (Array.isArray(value)) {
+    return value.filter((item) => String(item ?? '').trim().length > 0).length === 0
+  }
+  return false
+}
+
+function EntryHealthIndicator({
+  hasIssues,
+  title,
+}: {
+  hasIssues: boolean
+  title: string
+}) {
+  const variant = hasIssues
+    ? {
+        border: 'border-amber-500/40',
+        dots: ['bg-amber-400', 'bg-amber-400'],
+      }
+    : {
+        border: 'border-emerald-500/40',
+        dots: ['bg-emerald-500', 'bg-emerald-500'],
+      }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-flex h-6 w-4 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border ${variant.border}`}
+        >
+          {variant.dots.map((dotClassName, index) => (
+            <span key={index} className={`block size-1.5 rounded-full ${dotClassName}`} />
+          ))}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 type RelationCTField = { name: string; type: string }
@@ -540,7 +597,15 @@ function AuthorAvatar({ entry }: { entry: Entry }) {
 
 // StatusBadge
 
-function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
+function StatusBadge({
+  entry,
+  fields,
+  isStaleDraft = false,
+}: {
+  entry: Entry
+  fields: FieldDef[]
+  isStaleDraft?: boolean
+}) {
   const { timezone } = useSettings()
 
   if (entry.status === 'scheduled') {
@@ -552,7 +617,17 @@ function StatusBadge({ entry, fields }: { entry: Entry; fields: FieldDef[] }) {
     )
   }
 
-  if (entry.status === 'draft') return <Badge variant="outline">Draft</Badge>
+  if (entry.status === 'draft') {
+    if (isStaleDraft) {
+      return (
+        <Badge variant="outline" className="border-amber-500 text-amber-500">
+          Stale Draft
+        </Badge>
+      )
+    }
+
+    return <Badge variant="outline">Draft</Badge>
+  }
   if (entry.status === 'pending') {
     if (entry.review_rejected) return <Badge variant="destructive">Pending</Badge>
     return <Badge className="bg-amber-500 text-black hover:bg-amber-500">Pending</Badge>
@@ -942,10 +1017,9 @@ export function EntriesList() {
   }
   const { sort } = config
   const parsedContentHealthSettings = parseContentHealthSettings(contentHealthSettings)
-  const staleDraftConfig = slug
+  const contentHealthConfig = slug
     ? parsedContentHealthSettings?.contentTypes.find(
-        (contentType) =>
-          contentType.slug === slug && contentType.enabled && contentType.checkStaleDrafts,
+        (contentType) => contentType.slug === slug && contentType.enabled,
       ) ?? null
     : null
 
@@ -1270,10 +1344,8 @@ export function EntriesList() {
                     <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Status
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Author
-                    </TableHead>
-                    <TableHead className="px-4 py-3" />
+                    <TableHead className="w-10 px-4 py-3" />
+                    <TableHead className="w-28 px-4 py-3" />
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border">
@@ -1341,37 +1413,57 @@ export function EntriesList() {
                         {(() => {
                           const staleDays =
                             contentHealthActive &&
-                            staleDraftConfig &&
+                            contentHealthConfig?.checkStaleDrafts &&
                             entry.status === 'draft'
                               ? getStaleDraftAgeDays(entry.updated_at)
                               : 0
                           const isStaleDraft =
-                            Boolean(staleDraftConfig)
+                            Boolean(contentHealthConfig?.checkStaleDrafts)
                             && entry.status === 'draft'
                             && staleDays >= (parsedContentHealthSettings?.staleDraftDays ?? 30)
 
                           return (
-                            <div className="flex items-center gap-2">
-                              <StatusBadge entry={entry} fields={ct.fields} />
-                              {isStaleDraft && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="size-2 shrink-0 rounded-full bg-yellow-400 animate-pulse" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Draft stale for {staleDays} {staleDays === 1 ? 'day' : 'days'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </div>
+                            <StatusBadge entry={entry} fields={ct.fields} isStaleDraft={isStaleDraft} />
                           )
                         })()}
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <AuthorAvatar entry={entry} />
+                        {(() => {
+                          const missingTextFields =
+                            contentHealthConfig?.requiredTextFields?.filter((fieldName) =>
+                              isMissingTextValue(entry[fieldName]),
+                            ) ?? []
+                          const missingMediaFields =
+                            contentHealthConfig?.requiredMediaFields?.filter((fieldName) =>
+                              isMissingMediaValue(entry[fieldName]),
+                            ) ?? []
+                          const issueMessages = [
+                            ...(missingTextFields.length > 0
+                              ? [`Missing text: ${missingTextFields.map(humanize).join(', ')}`]
+                              : []),
+                            ...(missingMediaFields.length > 0
+                              ? [`Missing media: ${missingMediaFields.map(humanize).join(', ')}`]
+                              : []),
+                          ]
+                          const hasContentHealthIssues = issueMessages.length > 0
+
+                          if (!contentHealthActive || !contentHealthConfig) return null
+
+                          return (
+                            <EntryHealthIndicator
+                              hasIssues={hasContentHealthIssues}
+                              title={
+                                issueMessages.length > 0
+                                  ? `Content health indicator · ${issueMessages.join(' · ')}`
+                                  : 'Content health indicator · All configured text and media checks passed'
+                              }
+                            />
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2">
+                          <AuthorAvatar entry={entry} />
                           {isViewerRole ? (
                             <Button
                               size="icon"
