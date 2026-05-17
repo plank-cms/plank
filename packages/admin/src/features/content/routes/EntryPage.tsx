@@ -1,14 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useBlocker } from 'react-router-dom'
-import { format } from 'date-fns'
-import {
-  Trash2Icon,
-  CalendarClockIcon,
-  ChevronDownIcon,
-  PencilIcon,
-  XIcon,
-  SaveIcon,
-} from 'lucide-react'
 import { toast } from 'sonner'
 import { useFetch } from '@/shared/hooks/useFetch.ts'
 import { useApi } from '@/shared/hooks/useApi.ts'
@@ -16,21 +7,7 @@ import { useKeyboardShortcut } from '@/shared/hooks/useKeyboardShortcut.ts'
 import { useSettings } from '@/shared/context/settings.tsx'
 import { useAuth } from '@/shared/context/auth.tsx'
 import { Button } from '@/shared/ui/button.tsx'
-import { Input } from '@/shared/ui/input.tsx'
-import { Tabs, TabsList, TabsTrigger } from '@/shared/ui/tabs.tsx'
-import { Switch } from '@/shared/ui/switch.tsx'
-import { Label } from '@/shared/ui/label.tsx'
 import { Spinner } from '@/shared/ui/spinner.tsx'
-import { Badge } from '@/shared/ui/badge.tsx'
-import { Calendar } from '@/shared/ui/calendar.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover.tsx'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/ui/select.tsx'
 import {
   Dialog,
   DialogContent,
@@ -38,11 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/shared/ui/dialog.tsx'
-import { FieldInput } from '@/shared/components/content/FieldInput.tsx'
-import type { FieldDef } from '@/shared/components/content/FieldInput.tsx'
-import { FIELD_WIDTH_SPAN } from '@/shared/components/content-types/FieldCard.tsx'
-import type { FieldWidth } from '@/shared/components/content-types/FieldCard.tsx'
-import { formatDatetime, getTimeInTimezone, combineDateAndTime } from '@/shared/lib/formatDate.ts'
+import { getTimeInTimezone, combineDateAndTime } from '@/shared/lib/formatDate.ts'
 import {
   PREVIEW_WINDOW_NAME,
   getPreviewSetupError,
@@ -50,63 +23,15 @@ import {
   resolvePreviewUrl,
 } from '@/shared/lib/preview.ts'
 import HeaderFixed from '@/shared/components/Header'
-import { UserAvatar } from '@/shared/ui/custom/UserAvatar.tsx'
-
-type ContentType = {
-  name: string
-  slug: string
-  kind: 'collection' | 'single'
-  previewEnabled?: boolean
-  fields: FieldDef[]
-}
-
-type Entry = Record<string, unknown> & {
-  id?: string
-  created_by?: string | null
-  status?: 'draft' | 'scheduled' | 'published' | 'pending' | 'in_review'
-  published_data?: Record<string, unknown> | null
-  scheduled_for?: string | null
-  editor_id?: string | null
-  review_locked_by_editor?: boolean
-  review_rejected?: boolean
-  _editor_first_name?: string | null
-  _editor_last_name?: string | null
-  _editor_avatar_url?: string | null
-}
-
-type UserOption = {
-  id: string
-  role_name?: string
-  first_name?: string | null
-  last_name?: string | null
-}
-
-type LocalizedMeta = { enabled?: boolean; primary?: string }
-type LocalizedData = Record<string, unknown> & { _meta?: LocalizedMeta }
+import { EntryFieldsGrid } from './components/EntryFieldsGrid.tsx'
+import { EntryHeaderActions } from './components/EntryHeaderActions.tsx'
+import { EntryStatusBadge } from './components/EntryStatusBadge.tsx'
+import { LocalizationControls } from './components/LocalizationControls.tsx'
+import { SchedulerPanel } from './components/SchedulerPanel.tsx'
+import { parseDuplicatedFieldName, stableStringify } from './lib/entryPage.ts'
+import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes.ts'
 
 let previewWindowRef: Window | null = null
-
-function stableValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stableValue)
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => [k, stableValue(v)]),
-    )
-  }
-  return value
-}
-
-function stableStringify(value: unknown): string {
-  return JSON.stringify(stableValue(value))
-}
-
-function parseDuplicatedFieldName(errorMessage: string): string | null {
-  const match = errorMessage.match(/Field "([^"]+)" already exists\.?/)
-  if (!match) return null
-  return match[1] ?? null
-}
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
@@ -751,34 +676,6 @@ export function EntryForm() {
 
   if (!ct) return null
 
-  // Status badge
-
-  let statusBadge: React.ReactNode
-  if (status === 'scheduled') {
-    statusBadge = (
-      <Badge variant="outline" className="border-blue-500 text-blue-600">
-        <CalendarClockIcon className="size-3 mr-1" />
-        {scheduledFor ? `Scheduled · ${formatDatetime(scheduledFor, timezone)}` : 'Scheduled'}
-      </Badge>
-    )
-  } else if (status === 'pending') {
-    statusBadge = reviewRejected ? (
-      <Badge variant="destructive">Pending</Badge>
-    ) : (
-      <Badge className="bg-amber-500 text-black hover:bg-amber-500">Pending</Badge>
-    )
-  } else if (status === 'in_review') {
-    statusBadge = <Badge variant="outline">In Review</Badge>
-  } else if (status === 'published') {
-    statusBadge = (
-      <Badge variant={isPublishedStale ? 'secondary' : 'default'}>
-        {isPublishedStale ? 'Published (pending changes)' : 'Published'}
-      </Badge>
-    )
-  } else {
-    statusBadge = <Badge variant="secondary">Draft</Badge>
-  }
-
   const reviewerCandidates = (users ?? []).filter((u) => {
     if (isEditorRole) return u.id === user?.id
     if (isAdminOrSuper) return u.id === user?.id || (u.role_name ?? '').toLowerCase() === 'editor'
@@ -803,281 +700,102 @@ export function EntryForm() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold -mt-2">{isNew ? 'New entry' : 'Edit entry'}</h1>
-              {statusBadge}
+              <EntryStatusBadge
+                status={status}
+                scheduledFor={scheduledFor}
+                timezone={timezone}
+                reviewRejected={reviewRejected}
+                isPublishedStale={isPublishedStale}
+              />
             </div>
             <p className="text-muted-foreground text-xs mt-1">{ct.name}</p>
             {supportsPreviewUI && previewConfig.enabled && previewSetupError && (
               <p className="mt-1 text-xs text-amber-600">{previewSetupError}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {!isNew && canDeleteCurrentEntry && !isReadOnlySingle && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => setDeleteConfirmOpen(true)}
-                disabled={deleting}
-              >
-                <Trash2Icon className="size-4" />
-              </Button>
-            )}
-            {!isNew && status === 'published' && !readOnly && (
-              <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
-                {patching ? <Spinner className="size-4" /> : null}
-                Revert to draft
-              </Button>
-            )}
-            {!isNew && status === 'scheduled' && !readOnly && (
-              <Button variant="outline" onClick={handleRevertToDraft} disabled={busy}>
-                {patching ? <Spinner className="size-4" /> : null}
-                Cancel schedule
-              </Button>
-            )}
-            {showReviewerControl && (
-              <Select
-                value={assignedEditorId ?? 'none'}
-                onValueChange={handleAssignEditor}
-                disabled={!canManageReviewer || busy}
-              >
-                <SelectTrigger className="h-10 min-h-10 max-h-10 w-42 py-0">
-                  <div className="flex items-center gap-2">
-                    <UserAvatar
-                      avatarUrl={assignedEditorAvatarUrl ?? null}
-                      firstName={assignedEditorFirstName ?? null}
-                      lastName={assignedEditorLastName ?? null}
-                      className="size-5"
-                      fallbackClassName="text-[9px]"
-                    />
-                    <SelectValue placeholder={reviewerLabel ? reviewerLabel : 'Assign editor'} />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {!isEditorRole && <SelectItem value="none">Unassign</SelectItem>}
-                  {reviewerCandidates.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.first_name || u.last_name || u.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {!canManageReviewer && showReviewerInfo && (
-              <div className="inline-flex h-10 items-center gap-2 rounded-md border border-input px-3 text-sm">
-                <UserAvatar
-                  avatarUrl={assignedEditorAvatarUrl ?? null}
-                  firstName={assignedEditorFirstName ?? null}
-                  lastName={assignedEditorLastName ?? null}
-                  className="size-5"
-                  fallbackClassName="text-[9px]"
-                />
-                <span>{reviewerLabel || 'Assigned editor'}</span>
-              </div>
-            )}
-            {showReviewEditButton && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleToggleReviewLock}
-                disabled={busy}
-              >
-                <PencilIcon className="size-4" />
-              </Button>
-            )}
-            {showRejectButton && (
-              <Button variant="outline" size="icon" onClick={handleReject} disabled={busy}>
-                <XIcon className="size-4" />
-              </Button>
-            )}
-            {supportsPreviewUI && previewConfig.enabled && canOpenPreview && (
-              <Button
-                variant="outline"
-                onClick={handleOpenPreview}
-                disabled={readOnly || busy || Boolean(previewSetupError)}
-                title={previewHint ?? undefined}
-              >
-                Open preview
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={handleSaveDraft}
-              size={editorialMode ? 'icon' : 'default'}
-              disabled={readOnly || (status === 'scheduled' ? busy : !isDirty || busy)}
-            >
-              {saving ? (
-                <Spinner className="size-4" />
-              ) : editorialMode ? (
-                <SaveIcon className="size-4" />
-              ) : null}
-              {!editorialMode &&
-                (status === 'scheduled' ? 'Save draft (cancel schedule)' : 'Save draft')}
-            </Button>
-            {status !== 'scheduled' && !(editorialMode && isContributorRole) && (
-              <Button
-                variant="outline"
-                onClick={openScheduler}
-                size={editorialMode ? 'icon' : 'default'}
-                disabled={readOnly || busy}
-              >
-                <CalendarClockIcon className="size-4" />
-                {!editorialMode && 'Schedule'}
-              </Button>
-            )}
-            <Button onClick={handlePublish} disabled={readOnly || !canPublish || busy}>
-              {patching ? <Spinner className="size-4" /> : null}
-              {status === 'scheduled'
-                ? editorialMode && isContributorRole
-                  ? 'Review'
-                  : 'Publish now'
-                : status === 'published' && !isPublishedStale
-                  ? 'Republish'
-                  : publishLabel}
-            </Button>
-          </div>
+          <EntryHeaderActions
+            isNew={isNew}
+            canDeleteCurrentEntry={canDeleteCurrentEntry}
+            isReadOnlySingle={isReadOnlySingle}
+            deleting={deleting}
+            onDeleteClick={() => setDeleteConfirmOpen(true)}
+            status={status}
+            readOnly={readOnly}
+            onRevertToDraft={handleRevertToDraft}
+            busy={busy}
+            patching={patching}
+            showReviewerControl={showReviewerControl}
+            assignedEditorId={assignedEditorId}
+            assignedEditorAvatarUrl={assignedEditorAvatarUrl}
+            assignedEditorFirstName={assignedEditorFirstName}
+            assignedEditorLastName={assignedEditorLastName}
+            reviewerLabel={reviewerLabel}
+            handleAssignEditor={handleAssignEditor}
+            canManageReviewer={canManageReviewer}
+            isEditorRole={isEditorRole}
+            reviewerCandidates={reviewerCandidates}
+            showReviewerInfo={showReviewerInfo}
+            showReviewEditButton={showReviewEditButton}
+            onToggleReviewLock={handleToggleReviewLock}
+            showRejectButton={showRejectButton}
+            onReject={handleReject}
+            supportsPreviewUI={supportsPreviewUI}
+            previewEnabled={previewConfig.enabled}
+            canOpenPreview={canOpenPreview}
+            onOpenPreview={handleOpenPreview}
+            previewSetupError={previewSetupError}
+            previewHint={previewHint}
+            onSaveDraft={handleSaveDraft}
+            editorialMode={editorialMode}
+            saveDraftEnabled={saveDraftEnabled}
+            onOpenScheduler={openScheduler}
+            isContributorRole={isContributorRole}
+            canPublish={canPublish}
+            onPublish={handlePublish}
+            publishLabel={publishLabel}
+            isPublishedStale={isPublishedStale}
+          />
         </div>
       </HeaderFixed>
 
       <section className="mt-24">
-        {/* Inline scheduler panel */}
-        {showScheduler && !readOnly && (
-          <div className="mb-6 flex items-end gap-2 rounded-lg border p-4 bg-muted/30">
-            <div className="flex flex-col gap-1.5">
-              <Label>Date</Label>
-              <Popover open={calOpen} onOpenChange={setCalOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-40 justify-between font-normal">
-                    {schedDate ? format(schedDate, 'MMM d, yyyy') : 'Select date'}
-                    <ChevronDownIcon className="size-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={schedDate}
-                    captionLayout="dropdown"
-                    defaultMonth={schedDate ?? new Date()}
-                    disabled={{ before: new Date() }}
-                    onSelect={(d) => {
-                      setSchedDate(d)
-                      setCalOpen(false)
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Time <span className="text-muted-foreground font-normal">(24h)</span>
-              </Label>
-              <Input
-                type="time"
-                className="w-32 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                value={schedTime}
-                onChange={(e) => setSchedTime(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleSchedule} disabled={!canSchedule || busy}>
-              {patching ? <Spinner className="size-4" /> : null}
-              Confirm
-            </Button>
-            <Button variant="ghost" onClick={() => setShowScheduler(false)}>
-              Cancel
-            </Button>
-          </div>
-        )}
+        <SchedulerPanel
+          visible={showScheduler}
+          readOnly={readOnly}
+          calOpen={calOpen}
+          onCalOpenChange={setCalOpen}
+          schedDate={schedDate}
+          onSchedDateChange={setSchedDate}
+          schedTime={schedTime}
+          onSchedTimeChange={setSchedTime}
+          onConfirm={handleSchedule}
+          onCancel={() => setShowScheduler(false)}
+          canSchedule={canSchedule}
+          busy={busy}
+        />
 
         {/* Fields grid */}
-        {/* Localization controls */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={localizationEnabled}
-                onCheckedChange={toggleLocalization}
-                disabled={readOnly}
-              />
-              <div>
-                <p className="text-sm font-medium">Localization</p>
-                <p className="text-xs text-muted-foreground">Enable per-entry localization</p>
-              </div>
-            </div>
-            <div />
-          </div>
-          <div>
-            {localizationEnabled && (
-              <Tabs value={activeLocale} onValueChange={(v) => setActiveLocale(v)}>
-                <TabsList>
-                  {locales.map((l) => (
-                    <TabsTrigger key={l} value={l} disabled={readOnly}>
-                      {l.toUpperCase()}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-6 gap-4">
-          {ct.fields.map((field) => {
-            const isLocalizable = ['string', 'text', 'richtext'].includes(field.type)
-            const localizedValue =
-              values.localized && (values.localized as LocalizedData)[activeLocale]
-                ? ((values.localized as LocalizedData)[activeLocale] as Record<string, unknown>)[
-                    field.name
-                  ]
-                : undefined
-            const renderValue =
-              isLocalizable && localizationEnabled ? localizedValue : values[field.name]
-            // Disable UID when it derives from a localized target field
-            const uidDisabled =
-              field.type === 'uid' &&
-              field.targetField &&
-              localizationEnabled &&
-              ['string', 'text', 'richtext'].includes(
-                ct.fields.find((f) => f.name === field.targetField)?.type ?? '',
-              )
-
-            return (
-              <div
-                key={field.name}
-                className={FIELD_WIDTH_SPAN[(field.width as FieldWidth) ?? 'full']}
-              >
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={`entry-${field.name}`} className="capitalize">
-                    {field.name.replace(/_/g, ' ')}
-                    {field.required && <span className="ml-1 text-destructive">*</span>}
-                  </Label>
-                  <FieldInput
-                    field={field}
-                    value={renderValue}
-                    onChange={(v) => {
-                      if (field.type === 'uid' && uidErrorField === field.name) {
-                        setUidErrorField(null)
-                      }
-                      if (isLocalizable && localizationEnabled)
-                        handleLocalizedChange(activeLocale, field.name, v)
-                      else handleChange(field.name, v)
-                    }}
-                    allValues={{
-                      ...values,
-                      id,
-                      __activeLocale: activeLocale,
-                      __localizationEnabled: localizationEnabled,
-                      __defaultLocale: defaultLocale,
-                    }}
-                    disabled={Boolean(uidDisabled) || readOnly}
-                    errorMessage={
-                      field.type === 'uid' && uidErrorField === field.name
-                        ? `${field.name} already exists.`
-                        : undefined
-                    }
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <LocalizationControls
+          localizationEnabled={localizationEnabled}
+          onToggleLocalization={toggleLocalization}
+          readOnly={readOnly}
+          activeLocale={activeLocale}
+          onActiveLocaleChange={setActiveLocale}
+          locales={locales}
+        />
+        <EntryFieldsGrid
+          ct={ct}
+          values={values}
+          id={id}
+          activeLocale={activeLocale}
+          localizationEnabled={localizationEnabled}
+          defaultLocale={defaultLocale}
+          readOnly={readOnly}
+          uidErrorField={uidErrorField}
+          setUidErrorField={setUidErrorField}
+          handleLocalizedChange={handleLocalizedChange}
+          handleChange={handleChange}
+        />
 
         {/* Delete confirmation */}
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

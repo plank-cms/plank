@@ -2,20 +2,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   UploadIcon,
-  FileIcon,
   Trash2Icon,
-  DownloadIcon,
-  FileAudioIcon,
-  FileVideoIcon,
-  FileTextIcon,
-  FolderIcon,
   FolderPlusIcon,
   HomeIcon,
-  PencilIcon,
-  EllipsisIcon,
   SearchIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
 } from 'lucide-react'
 import {
   Breadcrumb,
@@ -30,17 +20,9 @@ import { useAuth } from '@/shared/context/auth.tsx'
 import { uploadMediaFile } from '@/shared/lib/uploadMedia.ts'
 import { useApi } from '@/shared/hooks/useApi.ts'
 import { Button } from '@/shared/ui/button.tsx'
-import { Spinner } from '@/shared/ui/spinner.tsx'
 import { Checkbox } from '@/shared/ui/checkbox.tsx'
+import { Spinner } from '@/shared/ui/spinner.tsx'
 import { Input } from '@/shared/ui/input.tsx'
-import { Label } from '@/shared/ui/label.tsx'
-import { Textarea } from '@/shared/ui/textarea.tsx'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from '@/shared/ui/dropdown-menu.tsx'
 import {
   Dialog,
   DialogContent,
@@ -56,368 +38,12 @@ import {
   PaginationPrevious,
 } from '@/shared/ui/pagination.tsx'
 import HeaderFixed from '@/shared/components/Header'
-import { formatDatetime } from '@/shared/lib/formatDate.ts'
 import { useSettings } from '@/shared/context/settings.tsx'
-
-function handleCardKeyboard(
-  event: React.KeyboardEvent<HTMLElement>,
-  action: () => void,
-) {
-  if (event.key !== 'Enter' && event.key !== ' ') return
-  event.preventDefault()
-  action()
-}
-
-// Types
-
-type Folder = {
-  id: string
-  name: string
-  parent_id: string | null
-  created_at: string
-  item_count: number
-}
-
-type MediaItem = {
-  id: string
-  filename: string
-  url: string
-  mime_type: string | null
-  size: number | null
-  alt: string | null
-  caption: string | null
-  width: number | null
-  height: number | null
-  folder_id: string | null
-  created_at: string
-}
-
-type MediaList = { items: MediaItem[]; total: number; page: number; limit: number; pages: number }
-type FolderList = { folders: Folder[] }
-type BreadcrumbEntry = { id: string | null; name: string }
-
-// Helpers
-
-function formatBytes(bytes: number | null): string {
-  if (!bytes) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function buildDefaultAlt(filename: string): string {
-  const baseName = filename.split('/').pop() ?? filename
-  const withoutExtension = baseName.replace(/\.[^.]+$/, '').trim()
-  return withoutExtension || baseName.trim()
-}
-
-function isImage(mime: string | null) {
-  return !!mime?.startsWith('image/')
-}
-function isVideo(mime: string | null) {
-  return !!mime?.startsWith('video/')
-}
-function isAudio(mime: string | null) {
-  return !!mime?.startsWith('audio/')
-}
-function isPDF(mime: string | null) {
-  return mime === 'application/pdf'
-}
-function isHLS(url: string, mime: string | null) {
-  return (
-    url.split('?')[0].endsWith('.m3u8') ||
-    mime === 'application/x-mpegurl' ||
-    mime === 'application/vnd.apple.mpegurl'
-  )
-}
-
-async function readFSEntry(
-  entry: FileSystemEntry,
-): Promise<{ file: File; relativePath: string }[]> {
-  if (entry.isFile) {
-    return new Promise((resolve) => {
-      ;(entry as FileSystemFileEntry).file((f) =>
-        resolve([{ file: f, relativePath: entry.fullPath.replace(/^\//, '') }]),
-      )
-    })
-  }
-  if (entry.isDirectory) {
-    const reader = (entry as FileSystemDirectoryEntry).createReader()
-    const results: { file: File; relativePath: string }[] = []
-    await new Promise<void>((resolve) => {
-      const readBatch = () => {
-        reader.readEntries(async (entries) => {
-          if (entries.length === 0) {
-            resolve()
-            return
-          }
-          const nested = await Promise.all(entries.map(readFSEntry))
-          results.push(...nested.flat())
-          readBatch()
-        })
-      }
-      readBatch()
-    })
-    return results
-  }
-  return []
-}
-
-// HLS Video Player
-
-function HLSVideoPlayer({ url }: { url: string }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url
-      return
-    }
-    let hlsInstance: { destroy(): void } | null = null
-    import('hls.js').then(({ default: Hls }) => {
-      if (!Hls.isSupported()) return
-      const hls = new Hls()
-      hlsInstance = hls
-      hls.loadSource(url)
-      hls.attachMedia(video)
-    })
-    return () => {
-      hlsInstance?.destroy()
-    }
-  }, [url])
-
-  return (
-    <video ref={videoRef} controls className="max-h-[70vh] w-full rounded-md bg-zinc-950" />
-  )
-}
-
-// Media Preview
-
-function MediaPreviewContent({ item }: { item: MediaItem }) {
-  const mime = item.mime_type?.toLowerCase() ?? null
-
-  if (isImage(mime))
-    return (
-      <img
-        src={item.url}
-        alt={item.alt ?? item.filename}
-        className="max-h-full max-w-full rounded-md object-contain"
-      />
-    )
-  if (isHLS(item.url, mime)) return <HLSVideoPlayer url={item.url} />
-  if (isVideo(mime))
-    return (
-      <video
-        src={item.url}
-        controls
-        preload="none"
-        className="max-h-[70vh] w-full rounded-md bg-zinc-950"
-      />
-    )
-  if (isAudio(mime))
-    return (
-      <div className="flex flex-col items-center gap-4 py-6">
-        <FileAudioIcon className="size-14 text-muted-foreground" />
-        <audio src={item.url} controls className="w-full" />
-      </div>
-    )
-  if (isPDF(mime))
-    return (
-      <iframe src={item.url} title={item.filename} className="h-[70vh] w-full rounded-md border" />
-    )
-
-  return (
-    <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <FileTextIcon className="size-14 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">{item.mime_type ?? 'Unknown type'}</p>
-      <a href={item.url} target="_blank" rel="noreferrer" download={item.filename}>
-        <Button variant="outline" size="sm">
-          <DownloadIcon className="size-4" />
-          Download
-        </Button>
-      </a>
-    </div>
-  )
-}
-
-// Folder Card
-
-function FolderCard({
-  folder,
-  onOpen,
-  onDelete,
-  onRename,
-  canDelete,
-  canRename,
-  selected,
-  onToggle,
-}: {
-  folder: Folder
-  onOpen: (folder: Folder) => void
-  onDelete: (folder: Folder) => void
-  onRename: (folder: Folder) => void
-  canDelete: boolean
-  canRename: boolean
-  selected: boolean
-  onToggle: (id: string) => void
-}) {
-  return (
-    <div
-      className={`group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors cursor-pointer hover:bg-muted/50 ${selected ? 'ring-2 ring-primary' : ''}`}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={() => {
-        if (!selected) onOpen(folder)
-      }}
-      onKeyDown={(event) => {
-        handleCardKeyboard(event, () => {
-          if (!selected) onOpen(folder)
-        })
-      }}
-    >
-      <div className="relative shrink-0 size-7 flex items-center justify-center">
-        <FolderIcon
-          className={`size-7 text-muted-foreground transition-opacity ${selected ? 'opacity-0' : 'group-hover:opacity-0'}`}
-        />
-        <div
-          className={`absolute inset-0 flex items-center justify-center transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => onToggle(`folder:${folder.id}`)}
-            aria-label="Select folder"
-          />
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold truncate" title={folder.name}>
-          {folder.name}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {folder.item_count} {folder.item_count === 1 ? 'item' : 'items'}
-        </p>
-      </div>
-      {!selected && (canRename || canDelete) && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <EllipsisIcon className="size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            {canRename && (
-              <DropdownMenuItem onSelect={() => onRename(folder)}>
-                <PencilIcon className="size-4" />
-                Rename
-              </DropdownMenuItem>
-            )}
-            {canDelete && (
-              <DropdownMenuItem
-                onSelect={() => onDelete(folder)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2Icon className="size-4" />
-                Delete
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
-  )
-}
-
-// Media Card
-
-function MediaCard({
-  item,
-  onDelete,
-  onPreview,
-  canDelete,
-  selected,
-  onToggle,
-}: {
-  item: MediaItem
-  onDelete: (item: MediaItem) => void
-  onPreview: (item: MediaItem) => void
-  canDelete: boolean
-  selected: boolean
-  onToggle: (id: string) => void
-}) {
-  const mime = item.mime_type?.toLowerCase() ?? null
-
-  return (
-    <div
-      className={`group relative rounded-lg border bg-card overflow-hidden transition-colors ${selected ? 'ring-2 ring-primary' : ''}`}
-    >
-      <div
-        className="aspect-square bg-muted flex items-center justify-center cursor-pointer"
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-        onClick={() => {
-          if (!selected) onPreview(item)
-        }}
-        onKeyDown={(event) => {
-          handleCardKeyboard(event, () => {
-            if (!selected) onPreview(item)
-          })
-        }}
-      >
-        {isImage(mime) ? (
-          <img
-            src={item.url}
-            alt={item.alt ?? item.filename}
-            className="h-full w-full object-cover"
-          />
-        ) : isVideo(mime) || isHLS(item.url, mime) ? (
-          <FileVideoIcon className="size-10 text-muted-foreground" />
-        ) : isAudio(mime) ? (
-          <FileAudioIcon className="size-10 text-muted-foreground" />
-        ) : isPDF(mime) ? (
-          <FileTextIcon className="size-10 text-muted-foreground" />
-        ) : (
-          <FileIcon className="size-10 text-muted-foreground" />
-        )}
-      </div>
-      <div
-        className={`absolute top-1.5 left-1.5 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-      >
-        <Checkbox
-          checked={selected}
-          onCheckedChange={() => onToggle(item.id)}
-          aria-label="Select file"
-          className="bg-background/80 backdrop-blur-sm"
-        />
-      </div>
-      {!selected && canDelete && (
-        <button
-          type="button"
-          onClick={() => onDelete(item)}
-          className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:text-destructive group-hover:opacity-100"
-        >
-          <Trash2Icon className="size-3.5" />
-        </button>
-      )}
-      <div className="p-2">
-        <p className="text-xs font-medium truncate" title={item.filename}>
-          {item.filename}
-        </p>
-        <p className="text-xs text-muted-foreground">{formatBytes(item.size)}</p>
-      </div>
-    </div>
-  )
-}
-
-// Media Library
+import { FolderCard } from './components/FolderCard.tsx'
+import { MediaCard } from './components/MediaCard.tsx'
+import { MediaPreviewDialog } from './components/MediaPreviewDialog.tsx'
+import { buildDefaultAlt, readFSEntry } from './lib/media.ts'
+import type { BreadcrumbEntry, Folder, FolderList, MediaItem, MediaList } from './types.ts'
 
 export function MediaLibrary() {
   const { timezone } = useSettings()
@@ -980,136 +606,29 @@ export function MediaLibrary() {
         )}
 
         {/* Preview */}
-        <Dialog
-          open={!!preview}
-          onOpenChange={(o) => {
-            if (!o) {
-              setPreview(null)
-              setEditError(null)
-              setEditCaption('')
-            }
+        <MediaPreviewDialog
+          preview={preview}
+          onOpenChange={(open) => {
+            if (open) return
+            setPreview(null)
+            setEditError(null)
+            setEditCaption('')
           }}
-        >
-          <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden p-0">
-            <DialogHeader>
-              <DialogTitle className="truncate px-6 pt-6 pr-12" title={preview?.filename}>
-                {preview?.filename}
-              </DialogTitle>
-            </DialogHeader>
-            {preview && (
-              <div className="grid max-h-[calc(90vh-4rem)] min-h-0 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="relative flex min-h-0 items-center justify-center overflow-hidden bg-muted/30 px-6 py-4">
-                  <div className="flex h-full w-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl border bg-background/70 p-4">
-                    <MediaPreviewContent item={preview} />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="absolute left-8 top-1/2 size-10 -translate-y-1/2 rounded-full shadow-sm"
-                    onClick={() => stepPreview(-1)}
-                    disabled={!hasPreviousPreview}
-                    aria-label="Previous file"
-                  >
-                    <ChevronLeftIcon className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="absolute right-8 top-1/2 size-10 -translate-y-1/2 rounded-full shadow-sm"
-                    onClick={() => stepPreview(1)}
-                    disabled={!hasNextPreview}
-                    aria-label="Next file"
-                  >
-                    <ChevronRightIcon className="size-4" />
-                  </Button>
-                </div>
-                <div className="flex min-h-0 flex-col border-t lg:border-l lg:border-t-0">
-                  <div className="grid grid-cols-2 gap-3 border-b px-6 py-4 text-xs text-muted-foreground">
-                    <div>
-                      <p className="mb-1 font-medium text-foreground">Type</p>
-                      <p className="break-all">{preview.mime_type ?? '—'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 font-medium text-foreground">Size</p>
-                      <p>{formatBytes(preview.size ?? null)}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 font-medium text-foreground">Dimensions</p>
-                      <p>
-                        {preview.width && preview.height
-                          ? `${preview.width} × ${preview.height}`
-                          : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="mb-1 font-medium text-foreground">Created</p>
-                      <p>{formatDatetime(preview.created_at, timezone)}</p>
-                    </div>
-                  </div>
-                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs">Filename</Label>
-                      <Input
-                        value={editFilename}
-                        onChange={(e) => handleFilenameChange(e.target.value)}
-                        placeholder={preview.filename}
-                        className="text-sm"
-                        disabled={!canWriteMedia}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs">Alt text</Label>
-                      <Input
-                        value={editAlt}
-                        onChange={(e) => setEditAlt(e.target.value)}
-                        placeholder={buildDefaultAlt(editFilename || preview.filename)}
-                        className="text-sm"
-                        disabled={!canWriteMedia}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Defaulted from the filename without extension. You can override it.
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs">Subtitle</Label>
-                      <Textarea
-                        value={editCaption}
-                        onChange={(e) => setEditCaption(e.target.value)}
-                        placeholder="Used as figcaption in the frontend…"
-                        className="min-h-28 resize-none text-sm"
-                        disabled={!canWriteMedia}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-3 pt-2">
-                      <a
-                        href={preview.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={preview.filename}
-                      >
-                        <Button variant="outline" size="sm" type="button">
-                          <DownloadIcon className="size-3.5" />
-                          Download
-                        </Button>
-                      </a>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleSavePreview}
-                        disabled={editSaving || !canWriteMedia}
-                      >
-                        {editSaving ? 'Saving…' : 'Save'}
-                      </Button>
-                    </div>
-                    {editError && <p className="text-xs text-destructive">{editError}</p>}
-                  </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+          hasPreviousPreview={hasPreviousPreview}
+          hasNextPreview={hasNextPreview}
+          stepPreview={stepPreview}
+          timezone={timezone}
+          editFilename={editFilename}
+          onFilenameChange={handleFilenameChange}
+          editAlt={editAlt}
+          onAltChange={setEditAlt}
+          editCaption={editCaption}
+          onCaptionChange={setEditCaption}
+          editSaving={editSaving}
+          editError={editError}
+          canWriteMedia={canWriteMedia}
+          onSave={handleSavePreview}
+        />
 
         {/* New folder */}
         <Dialog
