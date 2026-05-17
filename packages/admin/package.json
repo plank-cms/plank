@@ -1,6 +1,6 @@
 {
   "name": "@plank-cms/admin",
-  "version": "0.28.3",
+  "version": "0.28.4",
   "type": "module",
   "scripts": {
     "build": "vite build",
