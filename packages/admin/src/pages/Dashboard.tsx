@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Columns3CogIcon, PlusIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import HeaderFixed from '@/components/Header'
@@ -45,8 +45,9 @@ type ContentType = {
 }
 type Entry = Record<string, unknown> & {
   id: string
-  status: 'draft' | 'scheduled' | 'published'
+  status: 'draft' | 'scheduled' | 'published' | 'pending' | 'in_review'
   published_at: string | null
+  updated_at: string
   created_by: string | null
   _author_first_name: string | null
   _author_last_name: string | null
@@ -91,13 +92,132 @@ function AuthorCell({ entry }: { entry: RecentEntry }) {
   )
 }
 
+function EntriesTable({
+  title,
+  dateLabel,
+  emptyMessage,
+  entries,
+  loading,
+  timezone,
+  navigate,
+  collectionTypes,
+  entryFieldMap,
+  guessDefaultField,
+  toEntryLabel,
+  getDateValue,
+  action,
+}: {
+  title: string
+  dateLabel: string
+  emptyMessage: string
+  entries: RecentEntry[]
+  loading: boolean
+  timezone: string
+  navigate: (to: string) => void
+  collectionTypes: ContentType[]
+  entryFieldMap: EntryFieldMap
+  guessDefaultField: (ct: ContentType) => string
+  toEntryLabel: (value: unknown) => string
+  getDateValue: (entry: RecentEntry) => string | null
+  action?: ReactNode
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <Table className="w-full text-sm">
+        <TableHeader className="border-b border-border font-bold uppercase">
+          <TableRow className="hover:bg-transparent">
+            <TableHead colSpan={4} className="h-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-foreground">{title}</h2>
+                {action}
+              </div>
+            </TableHead>
+          </TableRow>
+          <TableRow className="border-t border-border hover:bg-transparent">
+            <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+              Entry
+            </TableHead>
+            <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+              Collection Type
+            </TableHead>
+            <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+              Author
+            </TableHead>
+            <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+              {dateLabel}
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableRow className="border-b">
+              <TableCell colSpan={4} className="h-24">
+                <Spinner className="mx-auto size-5" />
+              </TableCell>
+            </TableRow>
+          ) : entries.length === 0 ? (
+            <TableRow className="border-b">
+              <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          ) : (
+            entries.map((entry) => (
+              <TableRow
+                key={`${entry.slug}-${entry.id}`}
+                className="border-b last:border-b-0 transition-colors hover:bg-muted/50"
+              >
+                <TableCell className="px-4 py-3 align-middle">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/content/${entry.slug}/${entry.id}`)}
+                    className="text-left hover:underline"
+                  >
+                    <div className="font-medium">
+                      {toEntryLabel(
+                        entry[
+                          entryFieldMap[entry.slug] ??
+                            guessDefaultField(
+                              collectionTypes.find((ct) => ct.slug === entry.slug) ?? {
+                                slug: entry.slug,
+                                name: entry.contentTypeName,
+                                kind: 'collection',
+                                isDefault: false,
+                                fields: [],
+                              },
+                            )
+                        ],
+                      )}
+                    </div>
+                  </button>
+                </TableCell>
+                <TableCell className="px-4 py-3 align-middle">
+                  <Badge variant="outline">{entry.contentTypeName}</Badge>
+                </TableCell>
+                <TableCell className="px-4 py-3 align-middle">
+                  <AuthorCell entry={entry} />
+                </TableCell>
+                <TableCell className="px-4 py-3 align-middle">
+                  {getDateValue(entry) ? formatDate(getDateValue(entry), timezone) : '—'}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const { timezone } = useSettings()
   const { user } = useAuth()
   const { data: contentTypes } = useFetch<ContentType[]>('/cms/admin/content-types')
   const [recent, setRecent] = useState<RecentEntry[]>([])
+  const [myDrafts, setMyDrafts] = useState<RecentEntry[]>([])
   const [loadingRecent, setLoadingRecent] = useState(false)
+  const [loadingMyDrafts, setLoadingMyDrafts] = useState(false)
   const [configureOpen, setConfigureOpen] = useState(false)
   const [entryFieldMap, setEntryFieldMap] = useState<EntryFieldMap>({})
 
@@ -268,17 +388,102 @@ export function Dashboard() {
     return () => controller.abort()
   }, [canReadEntries, collectionTypes])
 
+  useEffect(() => {
+    if (!canReadEntries || collectionTypes.length === 0 || !user?.id) {
+      setMyDrafts([])
+      return
+    }
+
+    const controller = new AbortController()
+
+    setLoadingMyDrafts(true)
+    Promise.all(
+      collectionTypes.map(async (ct) => {
+        const res = await fetch(
+          `/cms/admin/content-types/${ct.slug}/entries?page=1&limit=50&status=draft&sort=updated_at&order=desc`,
+          { credentials: 'include', signal: controller.signal },
+        )
+        if (!res.ok) return [] as RecentEntry[]
+        const json = (await res.json()) as EntriesResponse
+        const draftEntries: RecentEntry[] = []
+        for (const entry of json.data ?? []) {
+          if (entry.status !== 'draft' || entry.created_by !== user.id) continue
+          draftEntries.push({
+            ...entry,
+            slug: ct.slug,
+            contentTypeName: ct.name,
+          })
+        }
+        return draftEntries
+      }),
+    )
+      .then((all) => {
+        const merged = all
+          .flat()
+          .sort(
+            (a, b) =>
+              new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime(),
+          )
+          .slice(0, 7)
+        setMyDrafts(merged)
+      })
+      .catch(() => {
+        setMyDrafts([])
+      })
+      .finally(() => setLoadingMyDrafts(false))
+
+    return () => controller.abort()
+  }, [canReadEntries, collectionTypes, user?.id])
+
   return (
     <div>
       <HeaderFixed>
         <div className="flex items-start justify-between gap-4">
           <h1 className="text-2xl font-bold -mt-2">Plank Forge</h1>
-          {canWriteEntries && (
-            <Button onClick={handleNewEntry} disabled={!contentTypes || contentTypes.length === 0}>
-              <PlusIcon className="size-4" />
-              New entry
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <Dialog open={configureOpen} onOpenChange={setConfigureOpen}>
+              <Button size="icon" variant="outline" onClick={() => setConfigureOpen(true)}>
+                <Columns3CogIcon className="size-4" />
+              </Button>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Dashboard entry fields</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {collectionTypes.map((ct) => (
+                    <div key={ct.slug} className="space-y-1.5">
+                      <Label htmlFor={`recent-field-${ct.slug}`}>{ct.name}</Label>
+                      <Select
+                        value={entryFieldMap[ct.slug] ?? guessDefaultField(ct)}
+                        onValueChange={(value) =>
+                          setEntryFieldMap((prev) => ({ ...prev, [ct.slug]: value }))
+                        }
+                      >
+                        <SelectTrigger id={`recent-field-${ct.slug}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="id">id</SelectItem>
+                          {ct.fields.map((field) => (
+                            <SelectItem key={field.name} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {canWriteEntries && (
+              <Button onClick={handleNewEntry} disabled={!contentTypes || contentTypes.length === 0}>
+                <PlusIcon className="size-4" />
+                New entry
+              </Button>
+            )}
+          </div>
         </div>
       </HeaderFixed>
 
@@ -319,127 +524,36 @@ export function Dashboard() {
 
       <section className="mt-4">
         <TooltipProvider>
-          <div className="overflow-hidden rounded-lg border border-border bg-background">
-            <Table className="w-full text-sm">
-              <TableHeader className="border-b border-border font-bold uppercase">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead colSpan={4} className="px-4 py-3 h-auto">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-base font-semibold text-foreground">Recent content</h2>
-                      <Dialog open={configureOpen} onOpenChange={setConfigureOpen}>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => setConfigureOpen(true)}
-                        >
-                          <Columns3CogIcon className="size-4" />
-                        </Button>
-                        <DialogContent className="max-w-lg">
-                          <DialogHeader>
-                            <DialogTitle>Recent content fields</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {collectionTypes.map((ct) => (
-                              <div key={ct.slug} className="space-y-1.5">
-                                <Label htmlFor={`recent-field-${ct.slug}`}>{ct.name}</Label>
-                                <Select
-                                  value={entryFieldMap[ct.slug] ?? guessDefaultField(ct)}
-                                  onValueChange={(value) =>
-                                    setEntryFieldMap((prev) => ({ ...prev, [ct.slug]: value }))
-                                  }
-                                >
-                                  <SelectTrigger id={`recent-field-${ct.slug}`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="id">id</SelectItem>
-                                    {ct.fields.map((field) => (
-                                      <SelectItem key={field.name} value={field.name}>
-                                        {field.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            ))}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </TableHead>
-                </TableRow>
-                <TableRow className="border-t border-border hover:bg-transparent">
-                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Entry
-                  </TableHead>
-                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Collection Type
-                  </TableHead>
-                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Author
-                  </TableHead>
-                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Published
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingRecent ? (
-                  <TableRow className="border-b">
-                    <TableCell colSpan={4} className="h-24">
-                      <Spinner className="mx-auto size-5" />
-                    </TableCell>
-                  </TableRow>
-                ) : recent.length === 0 ? (
-                  <TableRow className="border-b">
-                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                      No recent entries found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  recent.map((entry) => (
-                    <TableRow
-                      key={`${entry.slug}-${entry.id}`}
-                      className="border-b last:border-b-0 transition-colors hover:bg-muted/50"
-                    >
-                      <TableCell className="px-4 py-3 align-middle">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/content/${entry.slug}/${entry.id}`)}
-                          className="text-left hover:underline"
-                        >
-                          <div className="font-medium">
-                            {toEntryLabel(
-                              entry[
-                                entryFieldMap[entry.slug] ??
-                                  guessDefaultField(
-                                    collectionTypes.find((ct) => ct.slug === entry.slug) ?? {
-                                      slug: entry.slug,
-                                      name: entry.contentTypeName,
-                                      kind: 'collection',
-                                      isDefault: false,
-                                      fields: [],
-                                    },
-                                  )
-                              ],
-                            )}
-                          </div>
-                        </button>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 align-middle">
-                        <Badge variant="outline">{entry.contentTypeName}</Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 align-middle">
-                        <AuthorCell entry={entry} />
-                      </TableCell>
-                      <TableCell className="px-4 py-3 align-middle">
-                        {entry.published_at ? formatDate(entry.published_at, timezone) : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          <div className="space-y-4">
+            <EntriesTable
+              title="My drafts"
+              dateLabel="Updated"
+              emptyMessage="You have no drafts."
+              entries={myDrafts}
+              loading={loadingMyDrafts}
+              timezone={timezone}
+              navigate={navigate}
+              collectionTypes={collectionTypes}
+              entryFieldMap={entryFieldMap}
+              guessDefaultField={guessDefaultField}
+              toEntryLabel={toEntryLabel}
+              getDateValue={(entry) => entry.updated_at}
+            />
+
+            <EntriesTable
+              title="Recent content"
+              dateLabel="Published"
+              emptyMessage="No recent entries found."
+              entries={recent}
+              loading={loadingRecent}
+              timezone={timezone}
+              navigate={navigate}
+              collectionTypes={collectionTypes}
+              entryFieldMap={entryFieldMap}
+              guessDefaultField={guessDefaultField}
+              toEntryLabel={toEntryLabel}
+              getDateValue={(entry) => entry.published_at}
+            />
           </div>
         </TooltipProvider>
       </section>
