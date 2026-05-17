@@ -8,6 +8,7 @@ import {
   findContentTypeBySlug,
   quoteIdentifier,
 } from '@plank-cms/schema'
+import { getProvider } from '../media/index.js'
 import { z } from 'zod'
 import { getSettings } from './settings.js'
 import { getCurrentVersion } from './version.js'
@@ -157,6 +158,9 @@ export type AddonAdminModule = z.infer<typeof addonAdminModuleSchema>
 export type AddonServerActionContext = {
   db: {
     query: typeof pool.query
+  }
+  media: {
+    getUrl: (key: string) => Promise<string>
   }
   getSettings: typeof getSettings
   findAllContentTypes: typeof findAllContentTypes
@@ -681,6 +685,7 @@ export async function runAddonServerAction(
   }
 
   const serverModule = await loadAddonServerModule(addon.package_name)
+  const mediaProvider = await getProvider()
 
   return serverModule.runAction({
     action,
@@ -693,6 +698,9 @@ export async function runAddonServerAction(
     context: {
       db: {
         query: pool.query.bind(pool),
+      },
+      media: {
+        getUrl: mediaProvider.getUrl.bind(mediaProvider),
       },
       getSettings,
       findAllContentTypes,
