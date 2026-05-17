@@ -1,6 +1,7 @@
 import express, { type Express } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import { readFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import authRouter from './routes/auth.js'
@@ -70,7 +71,15 @@ if (isDev) {
     process.env.PLANK_ADMIN_DIST ??
     join(dirname(fileURLToPath(import.meta.url)), '../public/admin')
   app.use('/admin', express.static(adminDist))
-  app.get('/admin/*path', (_req, res) => res.sendFile(join(adminDist, 'index.html')))
+  app.get('/admin/*path', async (_req, res) => {
+    try {
+      const source = await readFile(join(adminDist, 'index.html'), 'utf8')
+      res.type('text/html')
+      res.send(source)
+    } catch {
+      res.status(404).send('Admin entry not found')
+    }
+  })
 }
 
 app.use(errorHandler)
