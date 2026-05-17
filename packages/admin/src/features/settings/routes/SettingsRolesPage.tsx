@@ -1,0 +1,315 @@
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { RotateCcwIcon, SaveIcon } from 'lucide-react'
+import { useFetch } from '@/shared/hooks/useFetch.ts'
+import { useApi } from '@/shared/hooks/useApi.ts'
+import { useAuth } from '@/shared/context/auth.tsx'
+import { useSettings } from '@/shared/context/settings.tsx'
+import { Spinner } from '@/shared/ui/spinner.tsx'
+import { Checkbox } from '@/shared/ui/checkbox.tsx'
+import { Button } from '@/shared/ui/button.tsx'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/shared/ui/table.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/shared/ui/dialog.tsx'
+import HeaderFixed from '@/shared/components/Header'
+
+type Role = { id: string; name: string; permissions: string[] }
+
+const RESOURCES = [
+  { key: 'content-types', label: 'Content Types', actions: ['read', 'write', 'delete'] as const },
+  { key: 'entries', label: 'Entries', actions: ['read', 'write', 'delete'] as const },
+  { key: 'media', label: 'Media', actions: ['read', 'write', 'delete'] as const },
+  { key: 'addons', label: 'Add-ons', actions: ['read', 'write'] as const },
+  { key: 'settings:overview', label: 'Settings / Overview', actions: ['read', 'write'] as const },
+  {
+    key: 'settings:users',
+    label: 'Settings / Users',
+    actions: ['read', 'write', 'delete'] as const,
+  },
+  { key: 'settings:roles', label: 'Settings / Roles', actions: ['read', 'write'] as const },
+  {
+    key: 'settings:api-tokens',
+    label: 'Settings / API Tokens',
+    actions: ['read', 'write', 'delete'] as const,
+  },
+  {
+    key: 'settings:webhooks',
+    label: 'Settings / Webhooks',
+    actions: ['read', 'write', 'delete'] as const,
+  },
+] as const
+
+const ACTIONS = [
+  { key: 'read', label: 'R' },
+  { key: 'write', label: 'W' },
+  { key: 'delete', label: 'D' },
+] as const
+
+type PermissionMap = Record<string, Set<string>>
+const ROLE_DISPLAY_ORDER = ['Super Admin', 'Admin', 'Editor', 'Contributor'] as const
+const ROLE_GROUP_WIDTH_CLASS = 'w-44 min-w-44 max-w-44'
+
+function toMap(roles: Role[]): PermissionMap {
+  return Object.fromEntries(roles.map((r) => [r.id, new Set(r.permissions)]))
+}
+
+function supportsAction(actions: readonly string[], action: string): boolean {
+  return actions.includes(action)
+}
+
+export function SettingsRoles() {
+  const { user } = useAuth()
+  const { editorialMode } = useSettings()
+  const { data: roles, loading, refetch } = useFetch<Role[]>('/cms/admin/roles')
+  const { request, loading: submitting } = useApi()
+
+  const [perms, setPerms] = useState<PermissionMap>({})
+  const [dirty, setDirty] = useState<Set<string>>(new Set())
+  const [resetOpen, setResetOpen] = useState(false)
+
+  useEffect(() => {
+    if (roles) setPerms(toMap(roles))
+  }, [roles])
+
+  function toggle(roleId: string, permission: string) {
+    setPerms((prev) => {
+      const next = new Set(prev[roleId])
+      if (next.has(permission)) next.delete(permission)
+      else next.add(permission)
+      return { ...prev, [roleId]: next }
+    })
+    setDirty((prev) => new Set(prev).add(roleId))
+  }
+
+  async function save(role: Role) {
+    try {
+      await request(`/cms/admin/roles/${role.id}`, 'PUT', {
+        permissions: Array.from(perms[role.id] ?? []),
+      })
+      setDirty((prev) => {
+        const next = new Set(prev)
+        next.delete(role.id)
+        return next
+      })
+      toast.success('Permissions saved')
+    } catch {
+      toast.error('Could not save permissions')
+    }
+  }
+
+  async function handleReset() {
+    try {
+      await request('/cms/admin/roles/reset', 'POST')
+      setResetOpen(false)
+      setDirty(new Set())
+      refetch()
+      toast.success('Permissions reset to defaults')
+    } catch {
+      toast.error('Could not reset permissions')
+    }
+  }
+
+  const isSuperAdmin = user?.role === 'Super Admin'
+  const editableRoles = (roles ?? [])
+    .filter((r) => r.name !== 'Super Admin')
+    .filter((r) => r.name !== 'Viewer')
+    .filter((r) => editorialMode || !['Editor', 'Viewer'].includes(r.name))
+    .sort((a, b) => {
+      const ai = ROLE_DISPLAY_ORDER.indexOf(a.name as (typeof ROLE_DISPLAY_ORDER)[number])
+      const bi = ROLE_DISPLAY_ORDER.indexOf(b.name as (typeof ROLE_DISPLAY_ORDER)[number])
+      const aPos = ai === -1 ? Number.MAX_SAFE_INTEGER : ai
+      const bPos = bi === -1 ? Number.MAX_SAFE_INTEGER : bi
+      if (aPos !== bPos) return aPos - bPos
+      return a.name.localeCompare(b.name)
+    })
+  const superAdminRole = (roles ?? []).find((r) => r.name === 'Super Admin')
+
+  return (
+    <>
+      <HeaderFixed>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold -mt-2">Roles</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure what each role can do across the CMS.
+            </p>
+          </div>
+          {isSuperAdmin && (
+            <Button variant="outline" onClick={() => setResetOpen(true)}>
+              <RotateCcwIcon className="size-4" />
+              Reset defaults
+            </Button>
+          )}
+        </div>
+      </HeaderFixed>
+
+      <section className="mt-24">
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {/* Row 1: role names + save buttons */}
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-40" rowSpan={2} />
+
+                {superAdminRole && (
+                  <TableHead
+                    colSpan={3}
+                    className={`border-l text-center ${ROLE_GROUP_WIDTH_CLASS}`}
+                  >
+                    {superAdminRole.name}
+                  </TableHead>
+                )}
+
+                {editableRoles.map((role) => (
+                  <TableHead
+                    key={role.id}
+                    colSpan={3}
+                    className={`border-l ${ROLE_GROUP_WIDTH_CLASS}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{role.name}</span>
+                      <Button
+                        size="sm"
+                        variant={dirty.has(role.id) ? 'default' : 'ghost'}
+                        className="h-6 px-2 text-xs"
+                        disabled={!dirty.has(role.id) || submitting}
+                        onClick={() => save(role)}
+                      >
+                        <SaveIcon className="size-3" />
+                        Save
+                      </Button>
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+
+              {/* Row 2: R / W / D labels */}
+              <TableRow className="hover:bg-transparent">
+                {superAdminRole &&
+                  ACTIONS.map((a, i) => (
+                    <TableHead
+                      key={a.key}
+                      className={`w-12 text-center font-normal ${i === 0 ? 'border-l' : ''}`}
+                    >
+                      {a.label}
+                    </TableHead>
+                  ))}
+                {editableRoles.map((role) =>
+                  ACTIONS.map((a, i) => (
+                    <TableHead
+                      key={`${role.id}-${a.key}`}
+                      className={`w-12 text-center font-normal ${i === 0 ? 'border-l' : ''}`}
+                    >
+                      {a.label}
+                    </TableHead>
+                  )),
+                )}
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={99} className="h-24">
+                    <Spinner className="mx-auto size-5" />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                RESOURCES.map(({ key: resource, label, actions }) => (
+                  <TableRow key={resource}>
+                    <TableCell className="font-medium">{label}</TableCell>
+
+                    {superAdminRole &&
+                      ACTIONS.map((action, i) => (
+                        <TableCell
+                          key={action.key}
+                          className={`text-center ${i === 0 ? 'border-l' : ''}`}
+                        >
+                          {supportsAction(actions, action.key) ? (
+                            <Checkbox checked disabled />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      ))}
+
+                    {editableRoles.map((role) =>
+                      ACTIONS.map((action, i) => {
+                        const supported = supportsAction(actions, action.key)
+                        const permission = `${resource}:${action.key}`
+                        return (
+                          <TableCell
+                            key={`${role.id}-${action.key}`}
+                            className={`text-center ${i === 0 ? 'border-l' : ''}`}
+                          >
+                            {supported ? (
+                              <Checkbox
+                                checked={perms[role.id]?.has(permission) ?? false}
+                                onCheckedChange={() => toggle(role.id, permission)}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        )
+                      }),
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {editorialMode && (
+          <div className="mt-3 rounded-md border bg-muted/30 p-3">
+            <p className="text-sm font-medium">Viewer</p>
+            <p className="text-sm text-muted-foreground">
+              Read-only role intended for external reviewers (for example, clients validating
+              content before approval).
+            </p>
+          </div>
+        )}
+        {editorialMode && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Note: Editor and Contributor can share the same base permissions, but their effective
+            scope is different in the content layer. Contributors are restricted to their own
+            entries for certain actions, while Editors can operate on entries more broadly
+            depending on the configured rules.
+          </p>
+        )}
+
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Reset to defaults</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This will restore all role permissions to their original configuration. Any custom
+              changes will be lost.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleReset} disabled={submitting}>
+                {submitting ? 'Resetting…' : 'Reset'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </section>
+    </>
+  )
+}

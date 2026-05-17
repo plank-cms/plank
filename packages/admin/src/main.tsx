@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from 'next-themes'
 import './styles/globals.css'
 import App from './App.tsx'
-import { ToasterWrap } from '@/components/ui/custom/ToasterWrap'
+import { ToasterWrap } from '@/shared/ui/custom/ToasterWrap'
 
 window.React = React
 window.PlankAddonAdminModules = window.PlankAddonAdminModules ?? {}

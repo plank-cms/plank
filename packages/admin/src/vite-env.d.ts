@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 import type * as ReactNamespace from 'react'
-import type { AdminAddonRuntimeModule } from '@/lib/addons.ts'
+import type { AdminAddonRuntimeModule } from '@/shared/lib/addons.ts'
 
 declare global {
   interface Window {

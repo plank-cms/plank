@@ -1,0 +1,1098 @@
+import { useState, useEffect } from 'react'
+import {
+  TypeIcon,
+  AlignLeftIcon,
+  FileTextIcon,
+  HashIcon,
+  ToggleLeftIcon,
+  CalendarIcon,
+  ImageIcon,
+  LayoutGridIcon,
+  LinkIcon,
+  FingerprintIcon,
+  ArrowLeftIcon,
+  LayoutListIcon,
+  PlusIcon,
+  PencilIcon,
+  Trash2Icon,
+  ListTreeIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog.tsx'
+import { Input } from '@/shared/ui/input.tsx'
+import { Label } from '@/shared/ui/label.tsx'
+import { Button } from '@/shared/ui/button.tsx'
+import { Checkbox } from '@/shared/ui/checkbox.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui/select.tsx'
+import type {
+  FieldCardData,
+  MediaAllowedType,
+  RelationType,
+  ArraySubField,
+  ArraySubFieldType,
+  FieldWidth,
+} from './FieldCard.tsx'
+import { DEFAULT_FIELD_WIDTH, FIELD_WIDTH_SPAN } from './FieldCard.tsx'
+
+type FieldType = FieldCardData['type']
+type StringField = { name: string }
+
+type ArraySubFieldDraft = {
+  type: ArraySubFieldType
+  subtype?: 'integer' | 'float'
+  name: string
+  required: boolean
+  allowedTypes: MediaAllowedType[]
+  width: FieldWidth
+}
+
+type ArraySubTypeOption = {
+  type: ArraySubFieldType
+  subtype?: 'integer' | 'float'
+  icon: LucideIcon
+  label: string
+  color: string
+  bg: string
+}
+
+const ARRAY_SUBFIELD_OPTIONS: ArraySubTypeOption[] = [
+  { type: 'string', icon: TypeIcon, label: 'Text', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { type: 'text', icon: AlignLeftIcon, label: 'Long Text', color: 'text-sky-600', bg: 'bg-sky-50' },
+  {
+    type: 'richtext',
+    icon: FileTextIcon,
+    label: 'Rich Text',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+  },
+  {
+    type: 'number',
+    subtype: 'integer',
+    icon: HashIcon,
+    label: 'Integer',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'number',
+    subtype: 'float',
+    icon: HashIcon,
+    label: 'Decimal',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'boolean',
+    icon: ToggleLeftIcon,
+    label: 'Boolean',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+  },
+  {
+    type: 'datetime',
+    icon: CalendarIcon,
+    label: 'Date & Time',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+  },
+  { type: 'media', icon: ImageIcon, label: 'Media', color: 'text-rose-600', bg: 'bg-rose-50' },
+  {
+    type: 'mixed',
+    icon: LayoutListIcon,
+    label: 'Mixed Value',
+    color: 'text-fuchsia-600',
+    bg: 'bg-fuchsia-50',
+  },
+]
+
+const SUBFIELD_DEFAULT_WIDTH: Record<ArraySubFieldType, FieldWidth> = {
+  string: 'half',
+  text: 'full',
+  richtext: 'full',
+  number: 'third',
+  boolean: 'third',
+  datetime: 'half',
+  media: 'half',
+  mixed: 'half',
+}
+
+const EMPTY_SUBFIELD_DRAFT: ArraySubFieldDraft = {
+  type: 'string',
+  subtype: undefined,
+  name: '',
+  required: false,
+  allowedTypes: [],
+  width: 'half',
+}
+
+type TypeOption = {
+  type: FieldType
+  subtype?: 'integer' | 'float'
+  icon: LucideIcon
+  label: string
+  description: string
+  color: string
+  bg: string
+  disabled?: boolean
+}
+
+const TYPE_OPTIONS: TypeOption[] = [
+  {
+    type: 'string',
+    icon: TypeIcon,
+    label: 'Text (string)',
+    description: 'Titles, names, labels',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+  },
+  {
+    type: 'text',
+    icon: AlignLeftIcon,
+    label: 'Long text (string)',
+    description: 'Plain text, paragraphs',
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+  },
+  {
+    type: 'richtext',
+    icon: FileTextIcon,
+    label: 'Rich text (blocks)',
+    description: 'Formatted HTML content',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+  },
+  {
+    type: 'uid',
+    icon: FingerprintIcon,
+    label: 'UID',
+    description: 'Unique slug from a field',
+    color: 'text-teal-600',
+    bg: 'bg-teal-50',
+  },
+  {
+    type: 'boolean',
+    icon: ToggleLeftIcon,
+    label: 'Boolean',
+    description: 'True or false',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+  },
+  {
+    type: 'datetime',
+    icon: CalendarIcon,
+    label: 'Date & time',
+    description: 'Timestamps and dates',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+  },
+  {
+    type: 'media',
+    icon: ImageIcon,
+    label: 'Media',
+    description: 'Images, videos or files',
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+  },
+  {
+    type: 'media-gallery',
+    icon: LayoutGridIcon,
+    label: 'Media Gallery',
+    description: 'Multiple images for galleries',
+    color: 'text-pink-600',
+    bg: 'bg-pink-50',
+  },
+  {
+    type: 'array',
+    icon: LayoutListIcon,
+    label: 'Array',
+    description: 'Repeatable list of items',
+    color: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+  },
+  {
+    type: 'navigation',
+    icon: ListTreeIcon,
+    label: 'Navigation',
+    description: 'Nested navigation items',
+    color: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+  },
+  {
+    type: 'number',
+    subtype: 'integer',
+    icon: HashIcon,
+    label: 'Integer (number)',
+    description: 'Whole numbers',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'number',
+    subtype: 'float',
+    icon: HashIcon,
+    label: 'Decimal (number)',
+    description: 'Numbers with decimals',
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+  },
+  {
+    type: 'relation',
+    icon: LinkIcon,
+    label: 'Relation',
+    description: 'Link to another content type',
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+  },
+]
+
+const MEDIA_TYPE_OPTIONS: { value: MediaAllowedType; label: string }[] = [
+  { value: 'image', label: 'Images' },
+  { value: 'video', label: 'Videos' },
+  { value: 'audio', label: 'Audio' },
+  { value: 'document', label: 'Documents' },
+]
+
+const RELATION_TYPE_OPTIONS: { value: RelationType; label: string; description: string }[] = [
+  { value: 'many-to-one', label: 'Many-to-One', description: 'Many of these → one of the other' },
+  { value: 'one-to-one', label: 'One-to-One', description: 'One of these ↔ one of the other' },
+  {
+    value: 'many-to-many',
+    label: 'Many-to-Many',
+    description: 'Many of these ↔ many of the other',
+  },
+]
+
+const RESERVED_SQL_IDENTIFIERS = new Set([
+  'all',
+  'analyse',
+  'analyze',
+  'and',
+  'any',
+  'array',
+  'as',
+  'asc',
+  'asymmetric',
+  'authorization',
+  'between',
+  'binary',
+  'both',
+  'case',
+  'cast',
+  'check',
+  'collate',
+  'column',
+  'constraint',
+  'create',
+  'cross',
+  'current_catalog',
+  'current_date',
+  'current_role',
+  'current_schema',
+  'current_time',
+  'current_timestamp',
+  'current_user',
+  'default',
+  'deferrable',
+  'desc',
+  'distinct',
+  'do',
+  'else',
+  'end',
+  'except',
+  'false',
+  'fetch',
+  'for',
+  'foreign',
+  'from',
+  'grant',
+  'group',
+  'having',
+  'in',
+  'initially',
+  'intersect',
+  'into',
+  'lateral',
+  'leading',
+  'limit',
+  'localtime',
+  'localtimestamp',
+  'not',
+  'null',
+  'offset',
+  'on',
+  'only',
+  'or',
+  'order',
+  'placing',
+  'primary',
+  'references',
+  'returning',
+  'select',
+  'session_user',
+  'some',
+  'symmetric',
+  'table',
+  'then',
+  'to',
+  'trailing',
+  'true',
+  'union',
+  'unique',
+  'user',
+  'using',
+  'variadic',
+  'when',
+  'where',
+  'window',
+  'with',
+])
+
+function isReservedSqlIdentifier(name: string) {
+  return RESERVED_SQL_IDENTIFIERS.has(name.toLowerCase())
+}
+
+type ConfigState = {
+  name: string
+  required: boolean
+  relationType: RelationType
+  relatedTable: string
+  relatedSlug: string
+  targetField: string
+  allowedTypes: MediaAllowedType[]
+  arrayFields: ArraySubField[]
+}
+
+const EMPTY_CONFIG: ConfigState = {
+  name: '',
+  required: false,
+  relationType: 'many-to-one',
+  relatedTable: '',
+  relatedSlug: '',
+  targetField: '',
+  allowedTypes: [],
+  arrayFields: [],
+}
+
+type AvailableCT = { tableName: string; slug: string; name: string }
+
+type Props = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  existingNames: string[]
+  availableContentTypes: AvailableCT[]
+  stringFields: StringField[]
+  initialField?: FieldCardData
+  onConfirm: (field: FieldCardData) => void
+}
+
+export function AddFieldDialog({
+  open,
+  onOpenChange,
+  existingNames,
+  availableContentTypes,
+  stringFields,
+  initialField,
+  onConfirm,
+}: Props) {
+  const [selected, setSelected] = useState<TypeOption | null>(null)
+  const [config, setConfig] = useState<ConfigState>(EMPTY_CONFIG)
+  const [nameError, setNameError] = useState('')
+  const [subFieldDraft, setSubFieldDraft] = useState<ArraySubFieldDraft | null>(null)
+  const [editingSubFieldIndex, setEditingSubFieldIndex] = useState<number | null>(null)
+  const [subFieldNameError, setSubFieldNameError] = useState('')
+  const [arrayFieldsError, setArrayFieldsError] = useState('')
+
+  const isEditing = Boolean(initialField)
+
+  useEffect(() => {
+    if (!open) {
+      setSelected(null)
+      setConfig(EMPTY_CONFIG)
+      setNameError('')
+      setSubFieldDraft(null)
+      setEditingSubFieldIndex(null)
+      setSubFieldNameError('')
+      setArrayFieldsError('')
+    } else if (initialField) {
+      const match = TYPE_OPTIONS.find(
+        (o) =>
+          o.type === initialField.type &&
+          (o.subtype ?? undefined) === (initialField.subtype ?? undefined),
+      )
+      setSelected(match ?? null)
+      setConfig({
+        name: initialField.name,
+        required: initialField.required ?? false,
+        relationType: initialField.relationType ?? 'many-to-one',
+        relatedTable: initialField.relatedTable ?? '',
+        relatedSlug: initialField.relatedSlug ?? '',
+        targetField: initialField.targetField ?? '',
+        allowedTypes: initialField.allowedTypes ?? [],
+        arrayFields: initialField.arrayFields ?? [],
+      })
+    }
+  }, [open, initialField])
+
+  function handleOpenChange(val: boolean) {
+    onOpenChange(val)
+  }
+
+  function handleSelectType(option: TypeOption) {
+    setSelected(option)
+    setConfig(EMPTY_CONFIG)
+    setNameError('')
+    setSubFieldDraft(null)
+    setSubFieldNameError('')
+    setArrayFieldsError('')
+  }
+
+  function handleBack() {
+    if (!isEditing) {
+      setSelected(null)
+      setConfig(EMPTY_CONFIG)
+      setNameError('')
+      setSubFieldDraft(null)
+      setEditingSubFieldIndex(null)
+      setSubFieldNameError('')
+      setArrayFieldsError('')
+    }
+  }
+
+  function handleStartAddSubField() {
+    setSubFieldDraft({ ...EMPTY_SUBFIELD_DRAFT })
+    setEditingSubFieldIndex(null)
+    setSubFieldNameError('')
+  }
+
+  function handleSubFieldPickType(option: ArraySubTypeOption) {
+    setSubFieldDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            type: option.type,
+            subtype: option.subtype,
+            width: SUBFIELD_DEFAULT_WIDTH[option.type],
+          }
+        : {
+            ...EMPTY_SUBFIELD_DRAFT,
+            type: option.type,
+            subtype: option.subtype,
+            width: SUBFIELD_DEFAULT_WIDTH[option.type],
+          },
+    )
+  }
+
+  function handleConfirmSubField() {
+    if (!subFieldDraft) return
+    const trimmed = subFieldDraft.name.trim()
+    if (!trimmed) {
+      setSubFieldNameError('Name is required')
+      return
+    }
+    if (!/^[a-z][a-z0-9_]*$/.test(trimmed)) {
+      setSubFieldNameError('Lowercase letters, digits and underscores only')
+      return
+    }
+    if (isReservedSqlIdentifier(trimmed)) {
+      setSubFieldNameError('This name is reserved by SQL. Choose another one.')
+      return
+    }
+    if (config.arrayFields.some((f, index) => f.name === trimmed && index !== editingSubFieldIndex)) {
+      setSubFieldNameError('A sub-field with this name already exists')
+      return
+    }
+    const newSubField: ArraySubField = {
+      name: trimmed,
+      type: subFieldDraft.type,
+      subtype: subFieldDraft.subtype,
+      required: subFieldDraft.required || undefined,
+      allowedTypes:
+        subFieldDraft.type === 'media' && subFieldDraft.allowedTypes.length > 0
+          ? subFieldDraft.allowedTypes
+          : undefined,
+      width: subFieldDraft.width,
+    }
+    setConfig((prev) => ({
+      ...prev,
+      arrayFields:
+        editingSubFieldIndex === null
+          ? [...prev.arrayFields, newSubField]
+          : prev.arrayFields.map((field, index) =>
+              index === editingSubFieldIndex ? newSubField : field,
+            ),
+    }))
+    setSubFieldDraft(null)
+    setEditingSubFieldIndex(null)
+    setSubFieldNameError('')
+  }
+
+  function handleRemoveSubField(name: string) {
+    if (subFieldDraft) return
+    setConfig((prev) => ({ ...prev, arrayFields: prev.arrayFields.filter((f) => f.name !== name) }))
+  }
+
+  function handleEditSubField(index: number) {
+    if (subFieldDraft) return
+    const subField = config.arrayFields[index]
+    if (!subField) return
+    setSubFieldDraft({
+      type: subField.type,
+      subtype: subField.subtype,
+      name: subField.name,
+      required: Boolean(subField.required),
+      allowedTypes: subField.allowedTypes ?? [],
+      width: subField.width ?? SUBFIELD_DEFAULT_WIDTH[subField.type],
+    })
+    setEditingSubFieldIndex(index)
+    setSubFieldNameError('')
+  }
+
+  function handleMoveSubField(index: number, dir: -1 | 1) {
+    if (subFieldDraft) return
+    const swapIndex = index + dir
+    if (swapIndex < 0 || swapIndex >= config.arrayFields.length) return
+    setConfig((prev) => {
+      const next = [...prev.arrayFields]
+      ;[next[index], next[swapIndex]] = [next[swapIndex], next[index]]
+      return { ...prev, arrayFields: next }
+    })
+    setArrayFieldsError('')
+  }
+
+  function validateArraySubFields() {
+    const trimmedNames = config.arrayFields.map((f) => f.name.trim())
+    if (trimmedNames.some((name) => !name)) {
+      setArrayFieldsError('All sub-fields must have a name.')
+      return false
+    }
+    if (trimmedNames.some((name) => !/^[a-z][a-z0-9_]*$/.test(name))) {
+      setArrayFieldsError('Sub-field names must use lowercase letters, digits and underscores.')
+      return false
+    }
+    if (trimmedNames.some((name) => isReservedSqlIdentifier(name))) {
+      setArrayFieldsError('One or more sub-field names are reserved by SQL.')
+      return false
+    }
+    const unique = new Set(trimmedNames)
+    if (unique.size !== trimmedNames.length) {
+      setArrayFieldsError('Sub-field names must be unique.')
+      return false
+    }
+    return true
+  }
+
+  function validate() {
+    const trimmed = config.name.trim()
+    if (!trimmed) {
+      setNameError('Name is required')
+      return false
+    }
+    if (!/^[a-z][a-z0-9_]*$/.test(trimmed)) {
+      setNameError('Lowercase letters, digits and underscores only')
+      return false
+    }
+    if (isReservedSqlIdentifier(trimmed)) {
+      setNameError('This name is reserved by SQL. Choose another one.')
+      return false
+    }
+    if (existingNames.includes(trimmed) && trimmed !== initialField?.name) {
+      setNameError('A field with this name already exists')
+      return false
+    }
+    return true
+  }
+
+  function handleConfirm() {
+    if (!selected || !validate()) return
+    if (selected.type === 'array' && !validateArraySubFields()) return
+    onConfirm({
+      name: config.name.trim(),
+      type: selected.type,
+      subtype: selected.subtype,
+      required: config.required || undefined,
+      relationType: selected.type === 'relation' ? config.relationType : undefined,
+      relatedTable: selected.type === 'relation' ? config.relatedTable : undefined,
+      relatedSlug: selected.type === 'relation' ? config.relatedSlug : undefined,
+      targetField: selected.type === 'uid' ? config.targetField : undefined,
+      allowedTypes:
+        selected.type === 'media' && config.allowedTypes.length > 0
+          ? config.allowedTypes
+          : selected.type === 'media-gallery'
+            ? ['image']
+            : undefined,
+      arrayFields:
+        selected.type === 'array'
+          ? config.arrayFields.map((f) => ({ ...f, name: f.name.trim() }))
+          : undefined,
+      width: initialField?.width ?? DEFAULT_FIELD_WIDTH[selected.type],
+    })
+    handleOpenChange(false)
+  }
+
+  const showStep2 = Boolean(selected)
+  const baseLabel = selected?.label.replace(/\s*\(.*?\)/, '') ?? ''
+  const title = isEditing ? 'Edit field' : showStep2 ? `${baseLabel} field` : 'Add a field'
+  const dialogWidth = !showStep2
+    ? 'max-w-3xl'
+    : selected?.type === 'array'
+      ? 'max-w-lg'
+      : 'max-w-md'
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className={dialogWidth}>
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            {showStep2 && !isEditing && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                <ArrowLeftIcon className="size-4" />
+              </button>
+            )}
+            <DialogTitle>{title}</DialogTitle>
+          </div>
+        </DialogHeader>
+
+        {/* Step 1 — type picker */}
+        {!showStep2 && (
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            {TYPE_OPTIONS.map((option) => {
+              const Icon = option.icon
+              const key = `${option.type}${option.subtype ?? ''}`
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={option.disabled}
+                  onClick={() => !option.disabled && handleSelectType(option)}
+                  className="flex flex-col items-start gap-2 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <div
+                    className={`flex size-8 items-center justify-center rounded-md ${option.bg}`}
+                  >
+                    <Icon className={`size-4 ${option.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{option.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {option.disabled ? 'Coming soon' : option.description}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Step 2 — configure */}
+        {showStep2 && (
+          <div className="flex flex-col gap-4 pt-1">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="field-name">Field name</Label>
+              <Input
+                id="field-name"
+                placeholder="e.g. article_title"
+                value={config.name}
+                onChange={(e) => {
+                  setConfig((prev) => ({ ...prev, name: e.target.value }))
+                  setNameError('')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirm()
+                }}
+              />
+              {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+              <p className="text-xs text-muted-foreground">
+                Lowercase letters, digits and underscores. Must start with a letter.
+              </p>
+            </div>
+
+            {selected?.type === 'media' && (
+              <div className="flex flex-col gap-2">
+                <Label>Allowed file types</Label>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Leave all unchecked to allow any file type.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MEDIA_TYPE_OPTIONS.map(({ value, label }) => (
+                    <div key={value} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`media-type-${value}`}
+                        checked={config.allowedTypes.includes(value)}
+                        onCheckedChange={(checked) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            allowedTypes: checked
+                              ? [...prev.allowedTypes, value]
+                              : prev.allowedTypes.filter((t) => t !== value),
+                          }))
+                        }
+                      />
+                      <Label htmlFor={`media-type-${value}`} className="cursor-pointer font-normal">
+                        {label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selected?.type === 'array' && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Sub-fields</Label>
+                  {!subFieldDraft && (
+                    <button
+                      type="button"
+                      onClick={handleStartAddSubField}
+                      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <PlusIcon className="size-3" />
+                      Add sub-field
+                    </button>
+                  )}
+                </div>
+
+                {config.arrayFields.length === 0 && !subFieldDraft && (
+                  <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    No sub-fields yet. Add at least one to make this field useful.
+                  </p>
+                )}
+
+                {config.arrayFields.length > 0 && (
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {config.arrayFields.map((sf, index) => {
+                      const opt = ARRAY_SUBFIELD_OPTIONS.find(
+                        (o) =>
+                          o.type === sf.type &&
+                          (o.subtype ?? undefined) === (sf.subtype ?? undefined),
+                      )
+                      const SfIcon = opt?.icon ?? TypeIcon
+                      return (
+                        <div
+                          key={sf.name}
+                          className={`${FIELD_WIDTH_SPAN[sf.width ?? 'full']} rounded-md border border-dashed border-border p-2`}
+                        >
+                          <div className="flex items-start gap-1.5">
+                            <div
+                              className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded ${opt?.bg ?? 'bg-muted'}`}
+                            >
+                              <SfIcon
+                                className={`size-3 ${opt?.color ?? 'text-muted-foreground'}`}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">
+                                {sf.name}
+                                {sf.required && <span className="ml-0.5 text-destructive">*</span>}
+                              </p>
+                              <p className="truncate text-[10px] text-muted-foreground">
+                                {opt?.label}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
+                            <button
+                              type="button"
+                              title="Move up"
+                              onClick={() => handleMoveSubField(index, -1)}
+                              disabled={Boolean(subFieldDraft) || index === 0}
+                              className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent disabled:opacity-30"
+                            >
+                              <ChevronUpIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Move down"
+                              onClick={() => handleMoveSubField(index, 1)}
+                              disabled={
+                                Boolean(subFieldDraft) || index === config.arrayFields.length - 1
+                              }
+                              className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent disabled:opacity-30"
+                            >
+                              <ChevronDownIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Edit sub-field"
+                              onClick={() => handleEditSubField(index)}
+                              disabled={Boolean(subFieldDraft)}
+                              className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent disabled:opacity-30"
+                            >
+                              <PencilIcon className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete sub-field"
+                              onClick={() => handleRemoveSubField(sf.name)}
+                              disabled={Boolean(subFieldDraft)}
+                              className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:text-destructive disabled:opacity-30"
+                            >
+                              <Trash2Icon className="size-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {arrayFieldsError && <p className="text-xs text-destructive">{arrayFieldsError}</p>}
+
+                {subFieldDraft && (
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {ARRAY_SUBFIELD_OPTIONS.map((opt) => {
+                        const SfIcon = opt.icon
+                        const key = `${opt.type}${opt.subtype ?? ''}`
+                        const isSelected =
+                          subFieldDraft.type === opt.type &&
+                          (subFieldDraft.subtype ?? undefined) === (opt.subtype ?? undefined)
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleSubFieldPickType(opt)}
+                            className={[
+                              'flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-left transition-colors',
+                              isSelected
+                                ? 'border-primary bg-accent'
+                                : 'border-border hover:border-primary hover:bg-accent',
+                            ].join(' ')}
+                          >
+                            <div
+                              className={`flex size-5 shrink-0 items-center justify-center rounded ${opt.bg}`}
+                            >
+                              <SfIcon className={`size-3 ${opt.color}`} />
+                            </div>
+                            <span className="truncate text-xs font-medium">{opt.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <Input
+                        placeholder="sub_field_name"
+                        value={subFieldDraft.name}
+                        onChange={(e) => {
+                          setSubFieldDraft((prev) =>
+                            prev ? { ...prev, name: e.target.value } : prev,
+                          )
+                          setSubFieldNameError('')
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleConfirmSubField()
+                        }}
+                      />
+                      {subFieldNameError && (
+                        <p className="text-xs text-destructive">{subFieldNameError}</p>
+                      )}
+                    </div>
+
+                    {subFieldDraft.type === 'media' && (
+                      <div className="flex flex-col gap-2">
+                        <Label>Allowed file types</Label>
+                        <p className="text-xs text-muted-foreground -mt-1">
+                          Leave all unchecked to allow any file type.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {MEDIA_TYPE_OPTIONS.map(({ value, label }) => (
+                            <div key={value} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`array-media-type-${value}`}
+                                checked={subFieldDraft.allowedTypes.includes(value)}
+                                onCheckedChange={(checked) =>
+                                  setSubFieldDraft((prev) =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          allowedTypes: checked
+                                            ? [...prev.allowedTypes, value]
+                                            : prev.allowedTypes.filter((type) => type !== value),
+                                        }
+                                      : prev,
+                                  )
+                                }
+                              />
+                              <Label
+                                htmlFor={`array-media-type-${value}`}
+                                className="cursor-pointer font-normal"
+                              >
+                                {label}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox
+                          id="subfield-required"
+                          checked={subFieldDraft.required}
+                          onCheckedChange={(v) =>
+                            setSubFieldDraft((prev) =>
+                              prev ? { ...prev, required: Boolean(v) } : prev,
+                            )
+                          }
+                        />
+                        <Label
+                          htmlFor="subfield-required"
+                          className="cursor-pointer font-normal text-sm"
+                        >
+                          Required
+                        </Label>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSubFieldDraft(null)
+                            setEditingSubFieldIndex(null)
+                            setSubFieldNameError('')
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleConfirmSubField}>
+                          {editingSubFieldIndex === null ? 'Add' : 'Save'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selected?.type === 'uid' && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Source field</Label>
+                <p className="text-xs text-muted-foreground">
+                  The slug will be auto-generated from this field's value.
+                </p>
+                {stringFields.length > 0 ? (
+                  <Select
+                    value={config.targetField}
+                    onValueChange={(v) => setConfig((prev) => ({ ...prev, targetField: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a text field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stringFields.map((f) => (
+                        <SelectItem key={f.name} value={f.name}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    No short text fields available. Add a string field first.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {selected?.type === 'relation' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label>Relation type</Label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {RELATION_TYPE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setConfig((prev) => ({ ...prev, relationType: opt.value }))}
+                        className={`flex items-start gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:border-primary ${
+                          config.relationType === opt.value
+                            ? 'border-primary bg-accent'
+                            : 'border-border'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium leading-none">{opt.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{opt.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label>Related content type</Label>
+                  {availableContentTypes.length > 0 ? (
+                    <Select
+                      value={config.relatedTable}
+                      onValueChange={(v) => {
+                        const ct = availableContentTypes.find((c) => c.tableName === v)
+                        setConfig((prev) => ({
+                          ...prev,
+                          relatedTable: v,
+                          relatedSlug: ct?.slug ?? '',
+                        }))
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a content type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableContentTypes.map((ct) => (
+                          <SelectItem key={ct.tableName} value={ct.tableName}>
+                            {ct.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="table_name"
+                      value={config.relatedTable}
+                      onChange={(e) =>
+                        setConfig((prev) => ({ ...prev, relatedTable: e.target.value }))
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="field-required"
+                checked={config.required}
+                onCheckedChange={(val) =>
+                  setConfig((prev) => ({ ...prev, required: Boolean(val) }))
+                }
+              />
+              <Label htmlFor="field-required" className="cursor-pointer font-normal">
+                Required field
+              </Label>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-border pt-3">
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirm}>{isEditing ? 'Save changes' : 'Add field'}</Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
