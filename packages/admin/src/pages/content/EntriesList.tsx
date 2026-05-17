@@ -1175,6 +1175,11 @@ export function EntriesList() {
   if (!ct) return null
 
   const totalPages = Math.ceil((entries?.total ?? 0) / (entries?.limit ?? 20))
+  const publicationColumnLabel =
+    (entries?.data ?? []).length > 0 &&
+    (entries?.data ?? []).every((entry) => entry.status === 'scheduled')
+      ? 'Scheduled'
+      : 'Published'
 
   return (
     <>
@@ -1338,7 +1343,7 @@ export function EntriesList() {
                     )}
                     {config.visibleSystemCols.includes('pub_sch') && (
                       <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                        Pub / Sch
+                        {publicationColumnLabel}
                       </TableHead>
                     )}
                     <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">

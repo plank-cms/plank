@@ -305,7 +305,7 @@ export function Dashboard() {
             context: stats ? `${stats.myScheduled} owned by you` : '—',
           },
         ].map(({ label, value, context }) => (
-          <Card key={label}>
+          <Card key={label} className="bg-background">
             <CardHeader>
               <CardTitle className="text-base font-bold uppercase">{label}</CardTitle>
               <div className="text-3xl font-bold">{value}</div>

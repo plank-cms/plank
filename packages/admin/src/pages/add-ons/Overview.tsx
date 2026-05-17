@@ -91,40 +91,52 @@ export function AddonsOverview() {
 
       <section className="mt-24 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-medium">Detected</CardTitle>
-              <PuzzleIcon className="size-4 text-muted-foreground" />
+          <Card className="bg-background">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base font-bold uppercase">Detected</CardTitle>
+                <PuzzleIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div className="text-3xl font-bold">{stats.total}</div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground">Official add-ons detected by the host</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-medium">Enabled</CardTitle>
-              <PackageCheckIcon className="size-4 text-muted-foreground" />
+          <Card className="bg-background">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base font-bold uppercase">Enabled</CardTitle>
+                <PackageCheckIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div className="text-3xl font-bold">{stats.enabled}</div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stats.enabled}</div>
+              <p className="text-xs text-muted-foreground">Add-ons currently active in this instance</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-medium">Compatible</CardTitle>
-              <BoxIcon className="size-4 text-muted-foreground" />
+          <Card className="bg-background">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base font-bold uppercase">Compatible</CardTitle>
+                <BoxIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div className="text-3xl font-bold">{stats.compatible}</div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stats.compatible}</div>
+              <p className="text-xs text-muted-foreground">Packages matching the current Plank version</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-medium">Admin UI</CardTitle>
-              <Settings2Icon className="size-4 text-muted-foreground" />
+          <Card className="bg-background">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base font-bold uppercase">Admin UI</CardTitle>
+                <Settings2Icon className="size-4 text-muted-foreground" />
+              </div>
+              <div className="text-3xl font-bold">{stats.visibleAdmin}</div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stats.visibleAdmin}</div>
+              <p className="text-xs text-muted-foreground">Add-ons exposing admin surfaces</p>
             </CardContent>
           </Card>
         </div>
