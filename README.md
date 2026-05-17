@@ -5,6 +5,13 @@ A self-hosted headless CMS you can deploy in minutes. Built on Node.js and Postg
 ## Quick start
 
 ```bash
+pnpm dlx @plank-cms/plank init .
+pnpm start
+```
+
+Or with npm:
+
+```bash
 npx @plank-cms/plank init .
 npm start
 ```
