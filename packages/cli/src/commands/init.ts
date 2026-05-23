@@ -41,6 +41,7 @@ function buildPackageJson(name: string, packageManager: PackageManagerName): obj
         }
       : {}),
     scripts: {
+      plank: 'plank',
       start: 'plank start',
       update: 'plank update',
     },

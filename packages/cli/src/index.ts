@@ -9,6 +9,7 @@ switch (command) {
   case 'init':
     await init(args[0])
     break
+  case undefined:
   case 'start':
     await start()
     break
@@ -23,7 +24,7 @@ switch (command) {
     if (command && !command.startsWith('-')) {
       await init(command)
     } else {
-      console.error('Usage: plank <init|start|publish-scheduled|update> [project-name|version]')
+      console.error('Usage: plank [start|init|publish-scheduled|update] [project-name|version]')
       process.exit(1)
     }
 }

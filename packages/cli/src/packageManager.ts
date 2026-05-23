@@ -116,9 +116,9 @@ export function getUpdateDependencyCommand(
 }
 
 export function getStartScriptCommand(name: PackageManagerName): string {
-  return name === 'pnpm' ? 'pnpm start' : 'npm start'
+  return name === 'pnpm' ? 'pnpm plank' : 'npm run plank'
 }
 
 export function getUpdateScriptCommand(name: PackageManagerName): string {
-  return name === 'pnpm' ? 'pnpm run update' : 'npm run update'
+  return name === 'pnpm' ? 'pnpm plank update' : 'npm run plank -- update'
 }
