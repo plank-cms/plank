@@ -5,7 +5,7 @@ import { z, flattenError } from 'zod'
 
 const CreateTokenSchema = z.object({
   name: z.string().min(1),
-  accessType: z.enum(['read-only', 'full-access']),
+  accessType: z.enum(['read-only', 'full-access', 'mcp-server']),
 })
 
 type TokenRow = { id: string; name: string; access_type: string; created_at: Date }

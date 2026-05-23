@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import authRouter from './routes/auth.js'
 import adminRouter from './routes/admin.js'
 import publicRouter from './routes/public.js'
+import mcpRouter from './routes/mcp.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 
 function assertSecurityEnv(): void {
@@ -50,6 +51,7 @@ app.use('/cms/admin', cmsCorOptions, adminRouter)
 
 // /api/* is public — any origin can consume it (headless CMS)
 app.use('/api', cors(), publicRouter)
+app.use('/mcp', mcpRouter)
 
 app.get('/', (_req, res) => {
   if (isDev) {

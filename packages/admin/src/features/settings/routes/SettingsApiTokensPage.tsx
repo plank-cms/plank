@@ -37,20 +37,22 @@ import HeaderFixed from '@/shared/components/Header'
 type ApiToken = {
   id: string
   name: string
-  access_type: 'read-only' | 'full-access'
+  access_type: 'read-only' | 'full-access' | 'mcp-server'
   created_at: string
 }
 
-type CreateForm = { name: string; accessType: 'read-only' | 'full-access' | '' }
+type CreateForm = { name: string; accessType: 'read-only' | 'full-access' | 'mcp-server' | '' }
 type CreatedToken = { id: string; name: string; accessType: string; token: string }
 
-const ACCESS_VARIANT: Record<string, 'default' | 'secondary'> = {
+const ACCESS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   'full-access': 'default',
+  'mcp-server': 'outline',
   'read-only': 'secondary',
 }
 
 const ACCESS_LABEL: Record<string, string> = {
   'full-access': 'Full access',
+  'mcp-server': 'MCP Server',
   'read-only': 'Read only',
 }
 
@@ -167,7 +169,7 @@ export function SettingsApiTokens() {
           <div>
             <h1 className="text-2xl font-bold -mt-2">API Tokens</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage tokens for consuming the public API.
+              Manage tokens for consuming the public API and the instance MCP endpoint.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} disabled={!canWrite}>
@@ -267,6 +269,7 @@ export function SettingsApiTokens() {
                       <SelectContent>
                         <SelectItem value="read-only">Read only</SelectItem>
                         <SelectItem value="full-access">Full access</SelectItem>
+                        <SelectItem value="mcp-server">MCP Server</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -323,7 +326,7 @@ export function SettingsApiTokens() {
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
               Are you sure you want to revoke{' '}
-              <span className="font-medium text-foreground">{deleteToken?.name}</span>? Any frontend
+              <span className="font-medium text-foreground">{deleteToken?.name}</span>? Any client
               using it will immediately lose access.
             </p>
             <DialogFooter>
