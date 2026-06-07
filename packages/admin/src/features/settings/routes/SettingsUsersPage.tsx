@@ -1,7 +1,14 @@
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from '@tanstack/react-table'
-import { PlusIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import {
+  CopyIcon,
+  KeyRoundIcon,
+  PlusIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { useAuth } from '@/shared/context/auth.tsx'
 import { useSettings } from '@/shared/context/settings.tsx'
 import { Spinner } from '@/shared/ui/spinner.tsx'
@@ -73,6 +80,14 @@ const ROLE_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   viewer: 'outline',
 }
 
+const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+
+function generatePassword(length = 8): string {
+  const bytes = new Uint32Array(length)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (byte) => PASSWORD_CHARS[byte % PASSWORD_CHARS.length]).join('')
+}
+
 function RoleBadge({
   roleId,
   roleName,
@@ -93,18 +108,22 @@ function UserActions({
   currentUserId,
   currentUserRole,
   onEdit,
+  onResetPassword,
   onDelete,
 }: {
   user: User
   currentUserId: string
   currentUserRole: string
   onEdit: (user: User) => void
+  onResetPassword: (user: User) => void
   onDelete: (user: User) => void
 }) {
   const isSelf = user.id === currentUserId
   const isSuperAdmin = (user.role_name ?? '').toLowerCase() === 'super admin'
   const currentIsSuperAdmin = currentUserRole.toLowerCase() === 'super admin'
   const disableEdit = isSuperAdmin && !isSelf && !currentIsSuperAdmin
+  const disableResetPassword = isSelf || !currentIsSuperAdmin
+  const disableDelete = isSelf || (isSuperAdmin && !currentIsSuperAdmin)
   return (
     <div className="flex items-center justify-end gap-1">
       <Button
@@ -113,15 +132,27 @@ function UserActions({
         className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         disabled={disableEdit}
         onClick={() => onEdit(user)}
+        aria-label="Edit user"
       >
         <PencilIcon className="size-3.5" />
       </Button>
       <Button
         size="icon"
         variant="ghost"
+        className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        disabled={disableResetPassword}
+        onClick={() => onResetPassword(user)}
+        aria-label="Reset password"
+      >
+        <KeyRoundIcon className="size-3.5" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
         className="flex size-8 items-center justify-center rounded text-destructive hover:bg-destructive/10 hover:text-destructive"
-        disabled={isSelf || isSuperAdmin}
+        disabled={disableDelete}
         onClick={() => onDelete(user)}
+        aria-label="Delete user"
       >
         <Trash2Icon className="size-3.5" />
       </Button>
@@ -159,6 +190,8 @@ export function SettingsUsers() {
   })
 
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
 
   const roleList = roles ?? []
   const currentIsSuperAdmin = currentUser?.role?.toLowerCase() === 'super admin'
@@ -234,6 +267,10 @@ export function SettingsUsers() {
                 enabled: u.enabled ?? true,
               })
             }}
+            onResetPassword={(u) => {
+              setResetPasswordUser(u)
+              setResetPassword(generatePassword())
+            }}
             onDelete={setDeleteUser}
           />
         ),
@@ -292,6 +329,29 @@ export function SettingsUsers() {
       toast.success('User deleted')
     } catch {
       toast.error('Could not delete user')
+    }
+  }
+
+  async function handleResetPassword(e: React.SyntheticEvent) {
+    e.preventDefault()
+    try {
+      await request(`/cms/admin/users/${resetPasswordUser!.id}/password/reset`, 'POST', {
+        password: resetPassword,
+      })
+      setResetPasswordUser(null)
+      setResetPassword('')
+      toast.success('Password reset')
+    } catch {
+      toast.error('Could not reset password')
+    }
+  }
+
+  async function handleCopyResetPassword() {
+    try {
+      await navigator.clipboard.writeText(resetPassword)
+      toast.success('Password copied')
+    } catch {
+      toast.error('Could not copy password')
     }
   }
 
@@ -518,6 +578,79 @@ export function SettingsUsers() {
               </Button>
               <Button type="submit" form="edit-user-form" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset password dialog */}
+        <Dialog
+          open={!!resetPasswordUser}
+          onOpenChange={(o) => {
+            if (!o) {
+              setResetPasswordUser(null)
+              setResetPassword('')
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Reset password</DialogTitle>
+            </DialogHeader>
+            <form
+              id="reset-password-form"
+              onSubmit={handleResetPassword}
+              className="flex flex-col gap-4"
+            >
+              <p className="text-sm text-muted-foreground">
+                Set a new password for{' '}
+                <span className="font-medium text-foreground">{resetPasswordUser?.email}</span>.
+                This will disable 2FA and sign out existing sessions.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="reset-password">Generated password</Label>
+                <div className="flex items-center gap-2">
+                  <div
+                    id="reset-password"
+                    className="flex min-h-10 flex-1 items-center rounded-md border bg-muted px-3 py-2 font-mono text-sm break-all"
+                  >
+                    {resetPassword}
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={handleCopyResetPassword}
+                    aria-label="Copy password"
+                  >
+                    <CopyIcon className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setResetPassword(generatePassword())}
+                    aria-label="Generate new password"
+                  >
+                    <RefreshCwIcon className="size-4" />
+                  </Button>
+                </div>
+              </div>
+              {apiError && <p className="text-sm text-destructive">{apiError}</p>}
+            </form>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  setResetPasswordUser(null)
+                  setResetPassword('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" form="reset-password-form" disabled={submitting}>
+                {submitting ? 'Resetting…' : 'Reset password'}
               </Button>
             </DialogFooter>
           </DialogContent>

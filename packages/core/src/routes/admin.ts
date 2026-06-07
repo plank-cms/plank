@@ -19,11 +19,37 @@ import {
   deleteEntry,
   patchEntryStatus,
 } from '../controllers/entries.js'
-import { listUsers, createUser, updateUser, deleteUser, getMe, updateMe, changePassword, uploadAvatar, deleteAvatar, presignAvatar, confirmAvatar, getTwoFactorStatus, startTwoFactorSetup, verifyTwoFactorSetup, disableTwoFactor, regenerateBackupCodes } from '../controllers/users.js'
+import {
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  resetUserPassword,
+  getMe,
+  updateMe,
+  changePassword,
+  uploadAvatar,
+  deleteAvatar,
+  presignAvatar,
+  confirmAvatar,
+  getTwoFactorStatus,
+  startTwoFactorSetup,
+  verifyTwoFactorSetup,
+  disableTwoFactor,
+  regenerateBackupCodes,
+} from '../controllers/users.js'
 import { getUserPref, setUserPref } from '../controllers/userPrefs.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
 import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
-import { uploadMedia, listMedia, deleteMedia, getMediaUrl, presignMedia, confirmMedia, updateMedia } from '../controllers/media.js'
+import {
+  uploadMedia,
+  listMedia,
+  deleteMedia,
+  getMediaUrl,
+  presignMedia,
+  confirmMedia,
+  updateMedia,
+} from '../controllers/media.js'
 import { listFolders, createFolder, renameFolder, deleteFolder } from '../controllers/folders.js'
 import { upload } from '../media/index.js'
 import {
@@ -95,6 +121,7 @@ router.post('/roles/reset', authorize('settings:roles:write'), resetRoles)
 router.get('/users', authorize('settings:users:read'), listUsers)
 router.post('/users', authorize('settings:users:write'), createUser)
 router.put('/users/:id', authorize('settings:users:write'), updateUser)
+router.post('/users/:id/password/reset', authorize('settings:users:write'), resetUserPassword)
 router.delete('/users/:id', authorize('settings:users:delete'), deleteUser)
 
 // API tokens

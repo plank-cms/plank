@@ -31,6 +31,10 @@ const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8),
 })
 
+const ResetUserPasswordSchema = z.object({
+  password: z.string().min(8),
+})
+
 const UpdateMeSchema = z.object({
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
@@ -468,6 +472,58 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   res.status(204).end()
 }
 
+export async function resetUserPassword(req: Request, res: Response): Promise<void> {
+  const parsed = ResetUserPasswordSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ errors: flattenError(parsed.error, (i) => i.message) })
+    return
+  }
+
+  if (req.params.id === req.user!.id) {
+    res.status(403).json({ error: 'You cannot reset your own password here' })
+    return
+  }
+
+  const requesterRoleName = await roleNameById(req.user!.roleId)
+  if (requesterRoleName !== 'Super Admin') {
+    res.status(403).json({ error: 'Only Super Admin can reset user passwords' })
+    return
+  }
+
+  const { rows } = await pool.query<{ id: string }>('SELECT id FROM plank_users WHERE id = $1', [
+    req.params.id,
+  ])
+  if (!rows[0]) {
+    res.status(404).json({ error: 'User not found' })
+    return
+  }
+
+  const hashed = await bcrypt.hash(parsed.data.password, 12)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE plank_users
+       SET password = $1,
+           two_factor_enabled = FALSE,
+           two_factor_secret = NULL,
+           two_factor_temp_secret = NULL,
+           session_version = session_version + 1
+       WHERE id = $2`,
+      [hashed, req.params.id],
+    )
+    await client.query('DELETE FROM plank_user_backup_codes WHERE user_id = $1', [req.params.id])
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+
+  res.status(204).end()
+}
+
 export async function createUser(req: Request, res: Response): Promise<void> {
   const parsed = CreateUserSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -611,8 +667,11 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     'SELECT name FROM plank_roles WHERE id = $1',
     [rows[0].role_id],
   )
-  if (roleRows[0]?.name === 'Super Admin') {
-    res.status(403).json({ error: 'Super Admin users cannot be deleted' })
+  if (
+    roleRows[0]?.name === 'Super Admin' &&
+    (await roleNameById(req.user!.roleId)) !== 'Super Admin'
+  ) {
+    res.status(403).json({ error: 'Only Super Admin can delete Super Admin users' })
     return
   }
 
