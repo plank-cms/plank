@@ -1,12 +1,21 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import handlebars, { type TemplateDelegate } from 'handlebars'
 
 const templates = new Map<string, TemplateDelegate>()
 let partialsLoaded = false
 
 function templatesRoot(): string {
-  return join(process.cwd(), 'templates')
+  const moduleDir = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(process.cwd(), 'templates'),
+    join(process.cwd(), 'packages/core/templates'),
+    join(moduleDir, '../../templates'),
+  ]
+  const root = candidates.find((candidate) => existsSync(candidate))
+  if (!root) return candidates[0]
+  return root
 }
 
 function loadPartials(): void {
