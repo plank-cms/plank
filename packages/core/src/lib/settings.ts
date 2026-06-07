@@ -4,6 +4,7 @@ import { encrypt, decrypt } from './encrypt.js'
 // Fields that are encrypted at rest per namespace
 const SENSITIVE_FIELDS: Record<string, Set<string>> = {
   media: new Set(['s3.secret_access_key', 'r2.secret_access_key']),
+  mailing: new Set(['smtp.password']),
 }
 
 function isSensitive(namespace: string, key: string): boolean {
@@ -30,7 +31,10 @@ export async function getSetting(namespace: string, key: string): Promise<string
   return isSensitive(namespace, key) ? decrypt(rows[0].value) : rows[0].value
 }
 
-export async function setSettings(namespace: string, values: Record<string, string>): Promise<void> {
+export async function setSettings(
+  namespace: string,
+  values: Record<string, string>,
+): Promise<void> {
   if (Object.keys(values).length === 0) return
 
   const entries = Object.entries(values).map(([key, value]) => ({
@@ -39,9 +43,7 @@ export async function setSettings(namespace: string, values: Record<string, stri
   }))
 
   // Upsert all entries in a single query
-  const placeholders = entries
-    .map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`)
-    .join(', ')
+  const placeholders = entries.map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`).join(', ')
 
   const params: unknown[] = [namespace]
   for (const { key, value } of entries) {

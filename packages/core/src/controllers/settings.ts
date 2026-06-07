@@ -6,6 +6,7 @@ import { resolveAppModes } from '../lib/appModes.js'
 // Sensitive fields are masked in GET responses — never returned to the client
 const SENSITIVE_FIELDS: Record<string, Set<string>> = {
   media: new Set(['s3.secret_access_key', 'r2.secret_access_key']),
+  mailing: new Set(['smtp.password']),
 }
 
 const MASKED = '••••••••'
@@ -19,7 +20,10 @@ function maskSettings(namespace: string, settings: Record<string, string>): Reco
   )
 }
 
-export async function getNamespaceSettings(req: Request<{ namespace: string }>, res: Response): Promise<void> {
+export async function getNamespaceSettings(
+  req: Request<{ namespace: string }>,
+  res: Response,
+): Promise<void> {
   const { namespace } = req.params
   if (namespace.startsWith('addon:')) {
     res.status(403).json({ error: 'Addon settings must be accessed through the add-ons API' })
@@ -55,7 +59,10 @@ export async function getEditorialMode(_req: Request, res: Response): Promise<vo
   res.json({ enabled })
 }
 
-export async function updateNamespaceSettings(req: Request<{ namespace: string }>, res: Response): Promise<void> {
+export async function updateNamespaceSettings(
+  req: Request<{ namespace: string }>,
+  res: Response,
+): Promise<void> {
   const { namespace } = req.params
   if (namespace.startsWith('addon:')) {
     res.status(403).json({ error: 'Addon settings must be accessed through the add-ons API' })

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/ui/tabs.tsx'
 import { MediaSettings } from './MediaSettingsPage.tsx'
+import { MailingSettings } from './MailingSettingsPage.tsx'
 import { useFetch } from '@/shared/hooks/useFetch.ts'
 import { useApi } from '@/shared/hooks/useApi.ts'
 import { Input } from '@/shared/ui/input.tsx'
@@ -364,8 +365,8 @@ function PreviewSettings() {
             disabled={!canWriteOverview}
           />
           <p className="text-xs text-muted-foreground">
-            Supported placeholders: {'{contentType}'}, {'{entryId}'}, {'{slug}'}, {'{status}'}.
-            The final result must be an absolute URL.
+            Supported placeholders: {'{contentType}'}, {'{entryId}'}, {'{slug}'}, {'{status}'}. The
+            final result must be an absolute URL.
           </p>
         </div>
 
@@ -384,7 +385,10 @@ function PreviewSettings() {
         </div>
 
         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          Example: <code>https://frontend.example.com/draft/{'{contentType}'}/{'{slug}'}</code>
+          Example:{' '}
+          <code>
+            https://frontend.example.com/draft/{'{contentType}'}/{'{slug}'}
+          </code>
         </div>
 
         <div className="flex justify-end">
@@ -412,6 +416,7 @@ export function SettingsOverview() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
           <TabsTrigger value="media">Media Library</TabsTrigger>
+          <TabsTrigger value="mailing">Mailing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -424,6 +429,10 @@ export function SettingsOverview() {
 
         <TabsContent value="media">
           <MediaSettings />
+        </TabsContent>
+
+        <TabsContent value="mailing">
+          <MailingSettings />
         </TabsContent>
       </Tabs>
     </>
