@@ -32,6 +32,7 @@ import { parseDuplicatedFieldName, stableStringify } from './lib/entryPage.ts'
 import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes.ts'
 
 let previewWindowRef: Window | null = null
+const TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
@@ -316,6 +317,8 @@ export function EntryForm() {
       }
       if (f.type === 'media' && v === null) {
         body[f.name] = null
+      } else if (v === '' && TEXT_FIELD_TYPES.has(f.type)) {
+        body[f.name] = v
       } else if (v !== '' && v !== null && v !== undefined) {
         body[f.name] = v
       }
