@@ -13,7 +13,7 @@ import {
   type PackageManagerName,
 } from '../packageManager.js'
 
-const PACKAGE_VERSION = '0.30.1'
+const PACKAGE_VERSION = '0.31.0'
 
 function generateSecret(): string {
   return randomBytes(32).toString('hex')
