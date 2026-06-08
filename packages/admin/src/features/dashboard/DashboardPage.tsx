@@ -256,7 +256,7 @@ export function Dashboard() {
       </HeaderFixed>
 
       <DashboardStats
-        contentTypes={contentTypes}
+        contentTypes={contentTypes ?? []}
         collectionCount={collectionCount}
         singleCount={singleCount}
         stats={stats}

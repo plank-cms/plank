@@ -37,7 +37,8 @@ export function AddonDetail() {
   const { data: contentTypes, loading: loadingContentTypes } = useFetch<AdminAddonContentType[]>(
     '/cms/admin/content-types',
   )
-  const { request } = useApi()
+  const { request: requestSettings } = useApi<Record<string, string>>()
+  const { request: requestAction } = useApi<{ result: unknown }>()
   const [runtimeModule, setRuntimeModule] = useState<AdminAddonRuntimeModule | null>(null)
   const [loadingRuntime, setLoadingRuntime] = useState(false)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
@@ -82,11 +83,7 @@ export function AddonDetail() {
   const saveSettings = useCallback(
     async (values: Record<string, string>): Promise<Record<string, string>> => {
       try {
-        const updated = await request<Record<string, string>>(
-          `/cms/admin/addons/${addonId}/settings`,
-          'PUT',
-          values,
-        )
+        const updated = await requestSettings(`/cms/admin/addons/${addonId}/settings`, 'PUT', values)
         refetchSettings()
         toast.success('Add-on settings saved')
         return updated
@@ -95,20 +92,19 @@ export function AddonDetail() {
         throw error
       }
     },
-    [addonId, refetchSettings, request],
+    [addonId, refetchSettings, requestSettings],
   )
 
   const runAction = useCallback(
     async <T = unknown>(action: string, input?: unknown): Promise<T> => {
-      const response = await request<{ result: T }>(
-        `/cms/admin/addons/${addonId}/actions`,
-        'POST',
-        { action, input },
-      )
+      const response = await requestAction(`/cms/admin/addons/${addonId}/actions`, 'POST', {
+        action,
+        input,
+      })
 
-      return response.result
+      return response.result as T
     },
-    [addonId, request],
+    [addonId, requestAction],
   )
 
   if (loading) {

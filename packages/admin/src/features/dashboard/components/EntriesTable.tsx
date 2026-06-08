@@ -121,7 +121,10 @@ export function EntriesTable({
                   <AuthorCell entry={entry} />
                 </TableCell>
                 <TableCell className="px-4 py-3 align-middle">
-                  {getDateValue(entry) ? formatDate(getDateValue(entry), timezone) : '—'}
+                  {(() => {
+                    const dateValue = getDateValue(entry)
+                    return dateValue ? formatDate(dateValue, timezone) : '—'
+                  })()}
                 </TableCell>
               </TableRow>
             ))

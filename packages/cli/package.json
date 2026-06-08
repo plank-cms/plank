@@ -64,6 +64,7 @@
     "@plank-cms/db": "workspace:*",
     "@plank-cms/schema": "workspace:*",
     "@types/fs-extra": "11.0.4",
+    "@types/pg": "8.20.0",
     "tsup": "8.5.1"
   }
 }

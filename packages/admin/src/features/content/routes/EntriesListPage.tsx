@@ -57,6 +57,7 @@ import {
   DEFAULT_SORT,
   DEFAULT_VISIBLE,
   fetchViewConfig,
+  defaultViewConfig,
   getStaleDraftAgeDays,
   humanize,
   isMissingMediaValue,
@@ -179,6 +180,7 @@ export function EntriesList() {
   }
   const { sort } = config
   const parsedContentHealthSettings = parseContentHealthSettings(contentHealthSettings)
+  const selectedStatusLabel = statusFilter ? STATUS_LABELS[statusFilter] : null
   const contentHealthConfig = slug
     ? parsedContentHealthSettings?.contentTypes.find(
         (contentType) => contentType.slug === slug && contentType.enabled,
@@ -428,10 +430,10 @@ export function EntriesList() {
               <EmptyTitle>No results</EmptyTitle>
               <EmptyDescription>
                 {debouncedSearch && statusFilter
-                  ? `No entries match "${debouncedSearch}" with status "${STATUS_LABELS[statusFilter]}".`
+                  ? `No entries match "${debouncedSearch}" with status "${selectedStatusLabel}".`
                   : debouncedSearch
                     ? `No entries match "${debouncedSearch}".`
-                    : `No entries with status "${STATUS_LABELS[statusFilter]}".`}
+                    : `No entries with status "${selectedStatusLabel}".`}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

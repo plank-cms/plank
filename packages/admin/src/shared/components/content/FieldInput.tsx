@@ -879,8 +879,14 @@ function MediaGalleryInput({
             nextUrl[item.id] = item.url
             nextName[item.id] = item.filename
           }
-          if (Object.keys(nextUrl).length > 0) setUrlCache((prev) => ({ ...prev, ...nextUrl }))
-          if (Object.keys(nextName).length > 0) setNameCache((prev) => ({ ...prev, ...nextName }))
+          if (Object.keys(nextUrl).length > 0) {
+            urlCacheRef.current = { ...urlCacheRef.current, ...nextUrl }
+            setCacheVersion((version) => version + 1)
+          }
+          if (Object.keys(nextName).length > 0) {
+            nameCacheRef.current = { ...nameCacheRef.current, ...nextName }
+            setCacheVersion((version) => version + 1)
+          }
           if (nextIds.length !== ids.length) onChange(nextIds)
         }}
       />
