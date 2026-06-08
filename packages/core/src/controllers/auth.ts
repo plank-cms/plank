@@ -169,24 +169,11 @@ function hashToken(token: string): string {
 }
 
 function adminBaseUrl(req: Request): string {
-  const referer = req.get('referer')
-  if (referer) {
-    try {
-      const url = new URL(referer)
-      if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
-        return `${url.origin}/admin`
-      }
-      return url.origin
-    } catch {
-      // fall through to origin/host
-    }
-  }
-
   const origin = req.get('origin')
-  if (origin) return origin
+  const baseOrigin = origin ?? `${req.protocol}://${req.get('host')}`
 
-  const protocol = req.protocol
-  return `${protocol}://${req.get('host')}`
+  if (process.env.PLANK_ADMIN_DIST) return `${baseOrigin}/admin`
+  return baseOrigin
 }
 
 async function buildAuthPayload(user: UserRow): Promise<{
