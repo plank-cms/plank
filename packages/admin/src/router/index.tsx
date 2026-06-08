@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Dashboard } from '@/features/dashboard/DashboardPage.tsx'
 import { Login } from '@/features/login/LoginPage.tsx'
+import { ResetPassword } from '@/features/login/ResetPasswordPage.tsx'
 import { MediaLibrary } from '@/features/media/MediaLibraryPage.tsx'
 import { Profile } from '@/features/profile/ProfilePage.tsx'
 import { AddonDetail } from '@/features/addons/routes/AddonDetailPage.tsx'
@@ -27,6 +28,7 @@ const NON_VIEWER_ROLES = ['Super Admin', 'Admin', 'Editor', 'Contributor']
 export const router = createBrowserRouter(
   [
     { path: '/login', element: <Login /> },
+    { path: '/reset-password', element: <ResetPassword /> },
     {
       element: (
         <ProtectedRoute>

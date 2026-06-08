@@ -2,11 +2,14 @@ import type { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool, createId } from '@plank-cms/db'
+import { createHash, randomBytes } from 'node:crypto'
 import { verifySync } from 'otplib'
 import { z, flattenError } from 'zod'
 import { getProvider } from '../media/index.js'
 import { decrypt } from '../lib/encrypt.js'
 import { resolveUniquePublicAuthorSlug } from '../lib/publicAuthorSlug.js'
+import { getMailingSettings, sendMail } from '../lib/mailer.js'
+import { renderMailTemplate } from '../lib/mailTemplates.js'
 
 const LoginSchema = z.object({
   email: z.email(),
@@ -22,6 +25,15 @@ const RegisterSchema = z.object({
   email: z.email(),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
+  password: z.string().min(8),
+})
+
+const RequestPasswordResetSchema = z.object({
+  email: z.email(),
+})
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(32),
   password: z.string().min(8),
 })
 
@@ -48,6 +60,8 @@ type BackupCodeRow = { id: string; code_hash: string }
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 const LOGIN_RATE_LIMIT_MAX = 10
 const LOGIN_2FA_RATE_LIMIT_MAX = 5
+const PASSWORD_RESET_RATE_LIMIT_MAX = 5
+const PASSWORD_RESET_EXPIRES_MS = 30 * 60 * 1000
 
 const ACCESS_TOKEN_COOKIE = 'plank_session'
 const ACCESS_TOKEN_EXPIRES_SECONDS = 60 * 60 * 24 * 30
@@ -144,8 +158,35 @@ function buildRefreshToken(payload: SessionJwtPayload): string {
   return jwt.sign(refreshPayload, process.env.PLANK_JWT_SECRET!, { expiresIn: '30d' })
 }
 
-function buildChallengeToken(payload: SessionJwtPayload & { twoFactor: true; jti: string }): string {
+function buildChallengeToken(
+  payload: SessionJwtPayload & { twoFactor: true; jti: string },
+): string {
   return jwt.sign(payload, process.env.PLANK_JWT_SECRET!, { expiresIn: '5m' })
+}
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function adminBaseUrl(req: Request): string {
+  const referer = req.get('referer')
+  if (referer) {
+    try {
+      const url = new URL(referer)
+      if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+        return `${url.origin}/admin`
+      }
+      return url.origin
+    } catch {
+      // fall through to origin/host
+    }
+  }
+
+  const origin = req.get('origin')
+  if (origin) return origin
+
+  const protocol = req.protocol
+  return `${protocol}://${req.get('host')}`
 }
 
 async function buildAuthPayload(user: UserRow): Promise<{
@@ -193,6 +234,15 @@ async function buildAuthPayload(user: UserRow): Promise<{
       twoFactorEnabled: user.two_factor_enabled,
     },
   }
+}
+
+export async function getAuthFeatures(_req: Request, res: Response): Promise<void> {
+  const mailing = await getMailingSettings()
+  res.json({
+    passwordRecovery:
+      mailing.enabled &&
+      Boolean(mailing.host && mailing.user && mailing.password && mailing.fromEmail),
+  })
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -252,6 +302,139 @@ export async function login(req: Request, res: Response): Promise<void> {
     requiresTwoFactor: false,
     user: auth.user,
   })
+}
+
+export async function requestPasswordReset(req: Request, res: Response): Promise<void> {
+  const ip = req.ip ?? 'unknown'
+  const parsed = RequestPasswordResetSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ errors: flattenError(parsed.error, (i) => i.message) })
+    return
+  }
+
+  const email = parsed.data.email.toLowerCase()
+  const rateKey = `${ip}:${email}`
+  if (!(await consumeRateLimit('password-reset', rateKey, PASSWORD_RESET_RATE_LIMIT_MAX))) {
+    res.status(429).json({ error: 'Too many password reset attempts. Try again in 15 minutes.' })
+    return
+  }
+
+  const mailing = await getMailingSettings()
+  if (
+    !mailing.enabled ||
+    !mailing.host ||
+    !mailing.user ||
+    !mailing.password ||
+    !mailing.fromEmail
+  ) {
+    res.status(204).end()
+    return
+  }
+
+  const { rows } = await pool.query<{
+    id: string
+    email: string
+    first_name: string | null
+    last_name: string | null
+    enabled: boolean
+  }>(
+    `SELECT id, email, first_name, last_name, enabled
+     FROM plank_users
+     WHERE email = $1`,
+    [email],
+  )
+  const user = rows[0]
+  if (!user || !user.enabled) {
+    res.status(204).end()
+    return
+  }
+
+  const token = randomBytes(32).toString('base64url')
+  const resetUrl = `${adminBaseUrl(req)}/reset-password?token=${encodeURIComponent(token)}`
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_MS)
+
+  await pool.query(
+    `INSERT INTO plank_password_reset_tokens (id, user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [createId(), user.id, hashToken(token), expiresAt],
+  )
+
+  const html = renderMailTemplate('password-reset', {
+    subject: 'Reset your password',
+    resetUrl,
+    expiresIn: '30 minutes',
+    userName: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email,
+  })
+
+  await sendMail({
+    to: user.email,
+    subject: 'Reset your Plank CMS password',
+    html,
+  })
+
+  await clearRateLimit('password-reset', rateKey)
+  res.status(204).end()
+}
+
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const parsed = ResetPasswordSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ errors: flattenError(parsed.error, (i) => i.message) })
+    return
+  }
+
+  const tokenHash = hashToken(parsed.data.token)
+  const { rows } = await pool.query<{
+    id: string
+    user_id: string
+    enabled: boolean
+  }>(
+    `SELECT t.id, t.user_id, u.enabled
+     FROM plank_password_reset_tokens t
+     JOIN plank_users u ON u.id = t.user_id
+     WHERE t.token_hash = $1
+       AND t.used_at IS NULL
+       AND t.expires_at > NOW()`,
+    [tokenHash],
+  )
+  const resetToken = rows[0]
+  if (!resetToken || !resetToken.enabled) {
+    res.status(400).json({ error: 'Invalid or expired password reset link' })
+    return
+  }
+
+  const hashed = await bcrypt.hash(parsed.data.password, 12)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE plank_users
+       SET password = $1,
+           two_factor_enabled = FALSE,
+           two_factor_secret = NULL,
+           two_factor_temp_secret = NULL,
+           session_version = session_version + 1
+       WHERE id = $2`,
+      [hashed, resetToken.user_id],
+    )
+    await client.query('DELETE FROM plank_user_backup_codes WHERE user_id = $1', [
+      resetToken.user_id,
+    ])
+    await client.query(
+      `UPDATE plank_password_reset_tokens
+       SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [resetToken.user_id],
+    )
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+
+  res.status(204).end()
 }
 
 export async function loginWithTwoFactor(req: Request, res: Response): Promise<void> {
@@ -388,7 +571,9 @@ export async function setup(_req: Request, res: Response): Promise<void> {
 }
 
 export async function register(req: Request, res: Response): Promise<void> {
-  const { rows: countRows } = await pool.query<CountRow>('SELECT COUNT(*) as count FROM plank_users')
+  const { rows: countRows } = await pool.query<CountRow>(
+    'SELECT COUNT(*) as count FROM plank_users',
+  )
   if (parseInt(countRows[0].count) > 0) {
     res.status(403).json({ error: 'Registration is closed. Use the admin panel to manage users.' })
     return

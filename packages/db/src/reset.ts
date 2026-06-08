@@ -5,6 +5,7 @@ async function reset(): Promise<void> {
   await pool.query(`
     DROP TABLE IF EXISTS
       plank_migrations,
+      plank_password_reset_tokens,
       plank_settings,
       plank_media,
       plank_api_tokens,

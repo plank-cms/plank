@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '@/shared/hooks/useApi.ts'
+import { useFetch } from '@/shared/hooks/useFetch.ts'
 import { useAuth } from '@/shared/context/auth.tsx'
 import { Button } from '@/shared/ui/button.tsx'
 import { Input } from '@/shared/ui/input.tsx'
@@ -24,6 +25,8 @@ export function SecurityCard() {
   const { user, updateUser, logout } = useAuth()
   const { loading: changingPw, error: pwError, request } = useApi()
   const { loading: loading2FA, error: twoFaError, request: request2FA } = useApi()
+  const { loading: requestingReset, request: requestReset } = useApi()
+  const { data: authFeatures } = useFetch<{ passwordRecovery?: boolean }>('/cms/auth/features')
 
   const [activeTab, setActiveTab] = useState<'' | 'password' | 'two-factor'>('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -80,13 +83,18 @@ export function SecurityCard() {
   }
 
   async function handleStart2FA() {
-    const data = await request2FA('/cms/admin/users/me/2fa/setup', 'POST') as TwoFactorSetupResponse
+    const data = (await request2FA(
+      '/cms/admin/users/me/2fa/setup',
+      'POST',
+    )) as TwoFactorSetupResponse
     setSetupData(data)
   }
 
   async function handleEnable2FA() {
     try {
-      const data = await request2FA('/cms/admin/users/me/2fa/verify', 'POST', { code: otpCode }) as VerifyTwoFactorResponse
+      const data = (await request2FA('/cms/admin/users/me/2fa/verify', 'POST', {
+        code: otpCode,
+      })) as VerifyTwoFactorResponse
       setTwoFactorEnabled(true)
       updateUser({ twoFactorEnabled: true })
       setSetupData(null)
@@ -114,6 +122,16 @@ export function SecurityCard() {
       toast.success('Two-factor authentication disabled')
     } catch {
       toast.error('Could not disable 2FA')
+    }
+  }
+
+  async function handleRequestPasswordReset() {
+    if (!user?.email) return
+    try {
+      await requestReset('/cms/auth/password-reset', 'POST', { email: user.email })
+      toast.success('Password reset link sent')
+    } catch {
+      toast.error('Could not request password reset')
     }
   }
 
@@ -189,6 +207,18 @@ export function SecurityCard() {
                   {changingPw ? 'Saving…' : 'Update password'}
                 </Button>
               </form>
+              {authFeatures?.passwordRecovery && (
+                <div className="border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRequestPasswordReset}
+                    disabled={requestingReset}
+                  >
+                    {requestingReset ? 'Sending…' : 'Send password reset link'}
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -243,7 +273,8 @@ export function SecurityCard() {
                     <div className="space-y-3 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3">
                       <p className="text-sm font-medium text-emerald-300">2FA is now enabled.</p>
                       <p className="text-xs text-emerald-200/90">
-                        For security, re-login is recommended now. This prevents accidental changes and confirms your new security state.
+                        For security, re-login is recommended now. This prevents accidental changes
+                        and confirms your new security state.
                       </p>
                       <Button
                         variant="default"
@@ -256,7 +287,8 @@ export function SecurityCard() {
                       {backupCodes.length > 0 && (
                         <div className="space-y-2 rounded-md border border-emerald-400/30 bg-background/40 p-3">
                           <p className="text-xs font-medium text-emerald-200">
-                            Save these backup codes now. Each code can be used once if you lose access to your authenticator.
+                            Save these backup codes now. Each code can be used once if you lose
+                            access to your authenticator.
                           </p>
                           <div className="grid grid-cols-2 gap-2">
                             {backupCodes.map((code) => (
@@ -330,7 +362,9 @@ export function SecurityCard() {
                   <Button
                     variant="destructive"
                     onClick={handleDisable2FA}
-                    disabled={justEnabled2FA || loading2FA || otpCode.length !== 6 || !disablePassword}
+                    disabled={
+                      justEnabled2FA || loading2FA || otpCode.length !== 6 || !disablePassword
+                    }
                   >
                     Disable 2FA
                   </Button>
