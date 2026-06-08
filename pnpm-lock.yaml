@@ -204,6 +204,9 @@ importers:
       fs-extra:
         specifier: ^11.3.0
         version: 11.3.4
+      handlebars:
+        specifier: 4.7.9
+        version: 4.7.9
       helmet:
         specifier: 8.1.0
         version: 8.1.0
@@ -213,6 +216,9 @@ importers:
       multer:
         specifier: 2.1.1
         version: 2.1.1
+      nodemailer:
+        specifier: 8.0.10
+        version: 8.0.10
       pg:
         specifier: 8.20.0
         version: 8.20.0

@@ -51,9 +51,11 @@
     "execa": "^9.6.0",
     "express": "5.2.1",
     "fs-extra": "^11.3.0",
+    "handlebars": "4.7.9",
     "helmet": "8.1.0",
     "jsonwebtoken": "9.0.3",
     "multer": "2.1.1",
+    "nodemailer": "8.0.10",
     "pg": "8.20.0",
     "zod": "4.3.6"
   },

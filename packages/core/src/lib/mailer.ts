@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer'
 import { getSettings } from './settings.js'
 
 type MailingSettings = {
@@ -58,6 +57,7 @@ export async function sendMail(input: SendMailInput): Promise<void> {
     throw new Error('Mailing is not configured.')
   }
 
+  const nodemailer = await import('nodemailer')
   const transporter = nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
