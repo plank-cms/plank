@@ -641,7 +641,11 @@ export const updateEntry: SlugIdParam = async (req, res) => {
   res.json(normalizeNavigationFields(rows[0], ct.fields))
   triggerWebhooks('entry.updated', { content_type: req.params.slug, entry_id: req.params.id })
   if ((ct as { previewEnabled?: boolean }).previewEnabled !== false) {
-    triggerPreviewSyncWebhook({ contentType: req.params.slug, entry: rows[0] })
+    triggerPreviewSyncWebhook({
+      contentType: req.params.slug,
+      entry: rows[0],
+      status: rows[0].status === 'published' ? 'preview' : undefined,
+    })
   }
 }
 

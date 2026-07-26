@@ -15,6 +15,13 @@ export type PreviewEntryLike = Record<string, unknown> & {
 export const PREVIEW_WINDOW_NAME = 'plank-preview'
 
 type PreviewPlaceholder = 'contentType' | 'entryId' | 'slug' | 'status'
+export type PreviewStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'published'
+  | 'pending'
+  | 'in_review'
+  | 'preview'
 
 function replacePlaceholders(
   template: string,
@@ -96,7 +103,7 @@ export function resolvePreviewUrl(params: {
   config: PreviewConfig
   contentType: string
   entry: PreviewEntryLike
-  status?: string
+  status?: PreviewStatus
 }): string | null {
   const { config, contentType, entry, status } = params
 

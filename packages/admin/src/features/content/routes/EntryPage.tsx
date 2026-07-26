@@ -21,6 +21,7 @@ import {
   getPreviewSetupError,
   parsePreviewClientSettings,
   resolvePreviewUrl,
+  type PreviewStatus,
 } from '@/shared/lib/preview.ts'
 import HeaderFixed from '@/shared/components/Header'
 import { EntryFieldsGrid } from './components/EntryFieldsGrid.tsx'
@@ -33,6 +34,11 @@ import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes
 
 let previewWindowRef: Window | null = null
 const TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
+
+function getPreviewStatus(status: Entry['status'], stale: boolean): PreviewStatus {
+  if (status === 'published' && stale) return 'preview'
+  return status ?? 'draft'
+}
 
 export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
@@ -84,6 +90,7 @@ export function EntryForm() {
 
   const original = useRef<string>('{}')
   const skipBlocker = useRef(false)
+  const lastSaved = useRef<Entry | null>(null)
 
   const previewConfig = parsePreviewClientSettings(previewSettings)
   const previewAllowedForType = ct?.kind === 'collection' && ct.previewEnabled !== false
@@ -124,6 +131,7 @@ export function EntryForm() {
       setAssignedEditorAvatarUrl(null)
       setReviewEditEnabled(false)
       setUidErrorField(null)
+      lastSaved.current = null
       original.current = stableStringify(empty)
       return
     }
@@ -160,6 +168,7 @@ export function EntryForm() {
     setAssignedEditorAvatarUrl(existing._editor_avatar_url ?? null)
     setReviewEditEnabled(false)
     setUidErrorField(null)
+    lastSaved.current = existing
     original.current = stableStringify(initial)
 
     if (existing.scheduled_for) {
@@ -340,6 +349,7 @@ export function EntryForm() {
         body,
       )
       original.current = stableStringify(values)
+      lastSaved.current = saved
       return saved
     } catch (err) {
       const message = err instanceof Error ? err.message : ''
@@ -364,12 +374,13 @@ export function EntryForm() {
 
   async function saveDraftAndMaybeSync(
     syncPreview: boolean,
-  ): Promise<{ entry: Entry; status: Entry['status'] } | null> {
+  ): Promise<{ entry: Entry; status: PreviewStatus } | null> {
     const saved = await saveFields()
     if (!saved) return null
 
     let nextEntry: Entry = saved
-    let nextStatus: Entry['status'] = status
+    let nextPreviewStatus: PreviewStatus =
+      status === 'published' ? 'preview' : getPreviewStatus(status, false)
 
     if (status === 'scheduled') {
       const entryId = isNew ? (saved.id as string) : id!
@@ -378,7 +389,7 @@ export function EntryForm() {
           status: 'draft',
         })
         nextEntry = patched
-        nextStatus = 'draft'
+        nextPreviewStatus = 'draft'
         setStatus('draft')
         setScheduledFor('')
         setShowScheduler(false)
@@ -387,7 +398,7 @@ export function EntryForm() {
         return null
       }
     } else if (status === 'published') {
-      nextStatus = 'published'
+      nextPreviewStatus = 'preview'
       setIsPublishedStale(true)
     }
 
@@ -396,7 +407,7 @@ export function EntryForm() {
         config: previewConfig,
         contentType: slug,
         entry: nextEntry,
-        status: nextStatus,
+        status: nextPreviewStatus,
       })
 
       if (previewUrl) syncPreviewWindow(previewUrl)
@@ -409,7 +420,7 @@ export function EntryForm() {
       navigate(`/content/${slug}/${nextEntry.id}`, { replace: true })
     }
 
-    return { entry: nextEntry, status: nextStatus }
+    return { entry: nextEntry, status: nextPreviewStatus }
   }
 
   async function handleSaveDraft() {
@@ -424,8 +435,8 @@ export function EntryForm() {
       return
     }
 
-    let previewEntry: Entry | null = existing ?? null
-    let previewStatus: Entry['status'] = status
+    let previewEntry: Entry | null = lastSaved.current ?? existing ?? null
+    let previewStatus = getPreviewStatus(status, isPublishedStale)
 
     if (isNew || isDirty) {
       const result = await saveDraftAndMaybeSync(false)

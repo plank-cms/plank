@@ -99,6 +99,7 @@ export async function triggerWebhooks(
 export async function triggerPreviewSyncWebhook(params: {
   contentType: string
   entry: Record<string, unknown> & { id?: string; status?: string | null }
+  status?: string
 }): Promise<void> {
   const settings = await getSettings('preview')
   const enabled = String(settings.enabled ?? 'false').toLowerCase() === 'true'
@@ -116,16 +117,20 @@ export async function triggerPreviewSyncWebhook(params: {
   const slugField = settings.slug_field?.trim() || 'slug'
   const slugValue = params.entry[slugField]
   const slug = typeof slugValue === 'string' && slugValue.trim() ? slugValue.trim() : null
+  const entry =
+    params.status && params.status !== params.entry.status
+      ? { ...params.entry, status: params.status }
+      : params.entry
   const previewUrl = resolvePreviewUrlFromSettings(settings, {
     contentType: params.contentType,
-    entry: params.entry,
+    entry,
   })
 
   const payload: PreviewSyncWebhookPayload = {
     event: 'preview.sync',
     content_type: params.contentType,
-    entry_id: params.entry.id ? String(params.entry.id) : '',
-    status: typeof params.entry.status === 'string' ? params.entry.status : null,
+    entry_id: entry.id ? String(entry.id) : '',
+    status: typeof entry.status === 'string' ? entry.status : null,
     slug,
     preview_url: previewUrl,
     triggered_at: new Date().toISOString(),

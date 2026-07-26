@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express'
+import type { RequestHandler, Response } from 'express'
 import { pool } from '@plank-cms/db'
 import { findContentTypeBySlug, assertSafeIdentifier } from '@plank-cms/schema'
 import type { ContentType, FieldDefinition } from '@plank-cms/schema'
@@ -407,6 +407,11 @@ const SYSTEM_FIELDS = new Set([
   'updated_at',
 ])
 
+function setPreviewCacheHeaders(res: Response, statusParam: string): void {
+  if (statusParam === 'published') return
+  res.set('Cache-Control', 'no-store, max-age=0')
+}
+
 function stripSystemFields(row: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([k]) => !SYSTEM_FIELDS.has(k)))
 }
@@ -639,6 +644,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
 
   if (ct.kind === 'single') {
     const statusParam = String(req.query.status ?? 'published')
+    setPreviewCacheHeaders(res, statusParam)
     const locale = req.query.locale ? String(req.query.locale) : undefined
     const fallbacks = req.query.fallback ? String(req.query.fallback).split(',') : []
     const statusClause =
@@ -689,6 +695,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
 
   // Status filter: default published, opt-in to draft or all
   const statusParam = String(req.query.status ?? 'published')
+  setPreviewCacheHeaders(res, statusParam)
   if (statusParam === 'published' || statusParam === 'draft') {
     filterClauses.push(`e.status = $${filterValues.length + 1}`)
     filterValues.push(statusParam)
@@ -811,6 +818,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
 
   assertSafeIdentifier(ct.tableName)
   const statusParam = String(req.query.status ?? 'published')
+  setPreviewCacheHeaders(res, statusParam)
   const statusClause =
     statusParam === 'published' || statusParam === 'draft' ? ` AND e.status = $2` : ''
   const values: unknown[] = statusClause ? [req.params.id, statusParam] : [req.params.id]
