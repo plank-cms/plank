@@ -68,16 +68,6 @@ export async function detectPackageManager(projectDir: string): Promise<PackageM
   return parseUserAgentPackageManager()?.name ?? 'npm'
 }
 
-export function getPackageManagerVersion(name: PackageManagerName): string | null {
-  const userAgentPackageManager = parseUserAgentPackageManager()
-
-  if (userAgentPackageManager?.name === name) {
-    return userAgentPackageManager.version
-  }
-
-  return null
-}
-
 export function getInstallCommand(name: PackageManagerName): {
   command: string
   args: string[]
