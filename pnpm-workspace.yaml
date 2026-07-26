@@ -1,2 +1,14 @@
 packages:
   - "packages/*"
+
+verifyDepsBeforeRun: false
+saveExact: true
+minimumReleaseAge: 1440
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+
+onlyBuiltDependencies:
+  - esbuild
+
+overrides:
+  chokidar: 4.0.1

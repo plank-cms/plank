@@ -34,7 +34,27 @@ The API is token-authenticated. Tokens are managed from the admin panel and can 
 ## Requirements
 
 - Node.js 20+
+- pnpm 11
 - PostgreSQL 18
+
+## Releasing
+
+Run version bumps from the repository root:
+
+```bash
+pnpm version:bump 0.31.4
+```
+
+This updates all package versions and the CLI init template version. Commit and push those changes,
+then create and publish a GitHub Release. The `Publish` GitHub Actions workflow builds the monorepo
+and publishes `@plank-cms/plank` to npm from `packages/cli`.
+
+If pnpm fails while switching to the version declared in `packageManager`, refresh the local Corepack
+shim:
+
+```bash
+corepack prepare pnpm@11.10.0 --activate
+```
 
 ## License
 
