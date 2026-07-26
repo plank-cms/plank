@@ -34,8 +34,9 @@ The API is token-authenticated. Tokens are managed from the admin panel and can 
 ## Requirements
 
 - Node.js 20+
-- pnpm 11
 - PostgreSQL 18
+
+Building or releasing this repository requires Node.js 22.13+ and pnpm 11.
 
 ## Releasing
 
