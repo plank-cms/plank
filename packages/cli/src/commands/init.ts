@@ -9,6 +9,8 @@ import {
   getInstallCommand,
   getStartScriptCommand,
   getUpdateScriptCommand,
+  getPackageManagerSpec,
+  type PackageManagerName,
 } from '../packageManager.js'
 
 const PACKAGE_VERSION = '0.32.0'
@@ -26,11 +28,14 @@ function buildEnv(jwtSecret: string, encryptionKey: string): string {
   ].join('\n') + '\n'
 }
 
-function buildPackageJson(name: string): object {
+function buildPackageJson(name: string, packageManager: PackageManagerName): object {
+  const packageManagerSpec = getPackageManagerSpec(packageManager)
+
   return {
     name,
     version: '0.1.0',
     private: true,
+    ...(packageManagerSpec ? { packageManager: packageManagerSpec } : {}),
     scripts: {
       plank: 'plank',
       start: 'plank start',
@@ -90,7 +95,7 @@ export async function init(projectName?: string): Promise<void> {
   s.start('Creating project...')
   await fs.ensureDir(projectDir)
   await fs.writeFile(join(projectDir, '.env'), buildEnv(generateSecret(), generateSecret()))
-  await fs.writeJSON(join(projectDir, 'package.json'), buildPackageJson(name), {
+  await fs.writeJSON(join(projectDir, 'package.json'), buildPackageJson(name, packageManager), {
     spaces: 2,
   })
   await fs.writeFile(join(projectDir, '.gitignore'), '.env\nnode_modules\n')

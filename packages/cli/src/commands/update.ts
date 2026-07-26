@@ -3,9 +3,40 @@ import chalk from 'chalk'
 import { execa } from 'execa'
 import fs from 'fs-extra'
 import { join } from 'node:path'
-import { detectPackageManager, getUpdateDependencyCommand } from '../packageManager.js'
+import {
+  detectPackageManager,
+  getPackageManagerSpec,
+  getUpdateDependencyCommand,
+  type PackageManagerName,
+} from '../packageManager.js'
 
 const PACKAGE_NAME = '@plank-cms/plank'
+
+async function ensurePnpmPackageManager(packageJsonPath: string): Promise<void> {
+  const packageJson = await fs.readJSON(packageJsonPath)
+  packageJson.packageManager = getPackageManagerSpec('pnpm')
+  await fs.writeJSON(packageJsonPath, packageJson, { spaces: 2 })
+}
+
+async function ensurePnpmWorkspacePackages(projectDir: string): Promise<void> {
+  const workspacePath = join(projectDir, 'pnpm-workspace.yaml')
+  if (!await fs.pathExists(workspacePath)) return
+
+  const source = await fs.readFile(workspacePath, 'utf8')
+  if (/^packages:/m.test(source)) return
+
+  await fs.writeFile(workspacePath, `packages:\n  - "."\n\n${source}`)
+}
+
+async function ensurePnpmDeployConfig(
+  packageManager: PackageManagerName,
+  packageJsonPath: string,
+): Promise<void> {
+  if (packageManager !== 'pnpm') return
+
+  await ensurePnpmPackageManager(packageJsonPath)
+  await ensurePnpmWorkspacePackages(process.cwd())
+}
 
 export async function update(version = 'latest'): Promise<void> {
   intro(chalk.bold('▲ Plank CMS'))
@@ -39,6 +70,7 @@ export async function update(version = 'latest'): Promise<void> {
       cwd: process.cwd(),
       stdio: 'inherit',
     })
+    await ensurePnpmDeployConfig(packageManager, packageJsonPath)
   } catch (error) {
     s.stop(chalk.red('Update failed'))
     throw error

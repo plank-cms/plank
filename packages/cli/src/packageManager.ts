@@ -4,6 +4,8 @@ import fs from 'fs-extra'
 
 export type PackageManagerName = 'npm' | 'pnpm'
 
+const PNPM_VERSION = '11.10.0'
+
 type PackageJsonShape = {
   packageManager?: string
 }
@@ -103,6 +105,10 @@ export function getUpdateDependencyCommand(
     command: 'npm',
     args: ['install', '--save-exact', target],
   }
+}
+
+export function getPackageManagerSpec(name: PackageManagerName): string | null {
+  return name === 'pnpm' ? `pnpm@${PNPM_VERSION}` : null
 }
 
 export function getStartScriptCommand(name: PackageManagerName): string {
