@@ -34,6 +34,7 @@ import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes
 
 let previewWindowRef: Window | null = null
 const TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
+const ARRAY_TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
 
 function getPreviewStatus(status: Entry['status'], stale: boolean): PreviewStatus {
   if (status === 'published' && stale) return 'preview'
@@ -238,6 +239,48 @@ export function EntryForm() {
     })
   }
 
+  function handleLocaleChange(locale: string) {
+    setActiveLocale(locale)
+
+    if (!localizationEnabled || !ct || locale === defaultLocale) return
+
+    setValues((prev) => {
+      const localized: LocalizedData =
+        prev.localized && typeof prev.localized === 'object'
+          ? { ...(prev.localized as LocalizedData) }
+          : {}
+      const target =
+        localized[locale] && typeof localized[locale] === 'object'
+          ? { ...(localized[locale] as Record<string, unknown>) }
+          : {}
+      const source =
+        localized[defaultLocale] && typeof localized[defaultLocale] === 'object'
+          ? (localized[defaultLocale] as Record<string, unknown>)
+          : prev
+
+      for (const field of ct.fields) {
+        if (field.type !== 'array' || target[field.name] !== undefined) continue
+        const items = source[field.name]
+        if (!Array.isArray(items)) continue
+
+        const textFields = new Set(
+          (field.arrayFields ?? [])
+            .filter((subField) => ARRAY_TEXT_FIELD_TYPES.has(subField.type))
+            .map((subField) => subField.name),
+        )
+        target[field.name] = items.map((item) => {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) return item
+          const nextItem = { ...(item as Record<string, unknown>) }
+          for (const name of textFields) nextItem[name] = ''
+          return nextItem
+        })
+      }
+
+      localized[locale] = target
+      return { ...prev, localized }
+    })
+  }
+
   function toggleLocalization(enabled: boolean) {
     setLocalizationEnabled(enabled)
     setValues((prev) => {
@@ -258,9 +301,11 @@ export function EntryForm() {
           if (ct && ct.fields) {
             const defaultBucket = localized[defaultLocale] as Record<string, unknown>
             ct.fields.forEach((f) => {
-              if (['string', 'text', 'richtext'].includes(f.type)) {
+              if (['string', 'text', 'richtext', 'array'].includes(f.type)) {
                 const v = next[f.name]
-                if (v !== undefined && v !== null && v !== '') defaultBucket[f.name] = v
+                if (v !== undefined && v !== null && (f.type === 'array' || v !== '')) {
+                  defaultBucket[f.name] = v
+                }
               }
             })
           }
@@ -274,7 +319,7 @@ export function EntryForm() {
             : null
         if (src && ct && ct.fields) {
           ct.fields.forEach((f) => {
-            if (['string', 'text', 'richtext', 'uid'].includes(f.type)) {
+            if (['string', 'text', 'richtext', 'uid', 'array'].includes(f.type)) {
               const v = src[f.name]
               if (v !== undefined) next[f.name] = v
             }
@@ -318,7 +363,8 @@ export function EntryForm() {
     ct.fields.forEach((f) => {
       let v = values[f.name]
       if (
-        (v === undefined || v === null || v === '') &&
+        localizationEnabled &&
+        ['string', 'text', 'richtext', 'array'].includes(f.type) &&
         localizedDefault &&
         localizedDefault[f.name] !== undefined
       ) {
@@ -794,7 +840,7 @@ export function EntryForm() {
           onToggleLocalization={toggleLocalization}
           readOnly={readOnly}
           activeLocale={activeLocale}
-          onActiveLocaleChange={setActiveLocale}
+          onActiveLocaleChange={handleLocaleChange}
           locales={locales}
         />
         <EntryFieldsGrid

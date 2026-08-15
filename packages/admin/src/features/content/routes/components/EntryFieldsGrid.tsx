@@ -35,7 +35,7 @@ export function EntryFieldsGrid({
   return (
     <div className="grid grid-cols-6 gap-4">
       {ct.fields.map((field) => {
-        const isLocalizable = ['string', 'text', 'richtext'].includes(field.type)
+        const isLocalizable = ['string', 'text', 'richtext', 'array'].includes(field.type)
         const localizedValue =
           values.localized && (values.localized as LocalizedData)[activeLocale]
             ? ((values.localized as LocalizedData)[activeLocale] as Record<string, unknown>)[

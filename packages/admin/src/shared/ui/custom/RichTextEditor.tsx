@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   useEditor,
+  useEditorState,
   EditorContent,
   NodeViewWrapper,
   ReactNodeViewRenderer,
@@ -252,6 +253,25 @@ export function RichTextEditor({
     },
   })
 
+  const toolbar = useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      bold: editor.isActive('bold'),
+      italic: editor.isActive('italic'),
+      underline: editor.isActive('underline'),
+      strike: editor.isActive('strike'),
+      heading1: editor.isActive('heading', { level: 1 }),
+      heading2: editor.isActive('heading', { level: 2 }),
+      heading3: editor.isActive('heading', { level: 3 }),
+      bulletList: editor.isActive('bulletList'),
+      orderedList: editor.isActive('orderedList'),
+      blockquote: editor.isActive('blockquote'),
+      code: editor.isActive('code'),
+      codeBlock: editor.isActive('codeBlock'),
+      link: editor.isActive('link'),
+    }),
+  })
+
   useEffect(() => {
     if (!editor) return
     const incoming = value
@@ -309,28 +329,28 @@ export function RichTextEditor({
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-background px-2 py-1.5">
         <ToolbarButton
           title="Bold"
-          active={editor.isActive('bold')}
+          active={toolbar?.bold}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
           <BoldIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Italic"
-          active={editor.isActive('italic')}
+          active={toolbar?.italic}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
           <ItalicIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Underline"
-          active={editor.isActive('underline')}
+          active={toolbar?.underline}
           onClick={() => editor.chain().focus().toggleUnderline().run()}
         >
           <UnderlineIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Strikethrough"
-          active={editor.isActive('strike')}
+          active={toolbar?.strike}
           onClick={() => editor.chain().focus().toggleStrike().run()}
         >
           <StrikethroughIcon className="size-3.5" />
@@ -340,21 +360,21 @@ export function RichTextEditor({
 
         <ToolbarButton
           title="Heading 1"
-          active={editor.isActive('heading', { level: 1 })}
+          active={toolbar?.heading1}
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         >
           <Heading1Icon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Heading 2"
-          active={editor.isActive('heading', { level: 2 })}
+          active={toolbar?.heading2}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         >
           <Heading2Icon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Heading 3"
-          active={editor.isActive('heading', { level: 3 })}
+          active={toolbar?.heading3}
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         >
           <Heading3Icon className="size-3.5" />
@@ -364,14 +384,14 @@ export function RichTextEditor({
 
         <ToolbarButton
           title="Bullet list"
-          active={editor.isActive('bulletList')}
+          active={toolbar?.bulletList}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
           <ListIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Ordered list"
-          active={editor.isActive('orderedList')}
+          active={toolbar?.orderedList}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
           <ListOrderedIcon className="size-3.5" />
@@ -381,21 +401,21 @@ export function RichTextEditor({
 
         <ToolbarButton
           title="Blockquote"
-          active={editor.isActive('blockquote')}
+          active={toolbar?.blockquote}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
         >
           <QuoteIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Inline code"
-          active={editor.isActive('code')}
+          active={toolbar?.code}
           onClick={() => editor.chain().focus().toggleCode().run()}
         >
           <CodeIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Code block"
-          active={editor.isActive('codeBlock')}
+          active={toolbar?.codeBlock}
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         >
           <SquareCodeIcon className="size-3.5" />
@@ -403,12 +423,12 @@ export function RichTextEditor({
 
         <ToolbarDivider />
 
-        <ToolbarButton title="Add link" active={editor.isActive('link')} onClick={handleSetLink}>
+        <ToolbarButton title="Add link" active={toolbar?.link} onClick={handleSetLink}>
           <LinkIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
           title="Remove link"
-          disabled={!editor.isActive('link')}
+          disabled={!toolbar?.link}
           onClick={() => editor.chain().focus().unsetLink().run()}
         >
           <Unlink2Icon className="size-3.5" />
