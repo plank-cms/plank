@@ -34,7 +34,16 @@ import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes
 
 let previewWindowRef: Window | null = null
 const TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
-const ARRAY_TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
+const LOCALIZED_TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
+
+function blankNavigationItems(items: unknown[]): unknown[] {
+  return items.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item
+    const next = { ...(item as Record<string, unknown>), label: '', href: '' }
+    if (Array.isArray(next.items)) next.items = blankNavigationItems(next.items)
+    return next
+  })
+}
 
 function getPreviewStatus(status: Entry['status'], stale: boolean): PreviewStatus {
   if (status === 'published' && stale) return 'preview'
@@ -253,19 +262,24 @@ export function EntryForm() {
         localized[locale] && typeof localized[locale] === 'object'
           ? { ...(localized[locale] as Record<string, unknown>) }
           : {}
-      const source =
+      const defaultBucket =
         localized[defaultLocale] && typeof localized[defaultLocale] === 'object'
           ? (localized[defaultLocale] as Record<string, unknown>)
-          : prev
+          : null
 
       for (const field of ct.fields) {
-        if (field.type !== 'array' || target[field.name] !== undefined) continue
-        const items = source[field.name]
+        if (!['array', 'navigation'].includes(field.type) || target[field.name] !== undefined) continue
+        const items = defaultBucket?.[field.name] ?? prev[field.name]
         if (!Array.isArray(items)) continue
+
+        if (field.type === 'navigation') {
+          target[field.name] = blankNavigationItems(items)
+          continue
+        }
 
         const textFields = new Set(
           (field.arrayFields ?? [])
-            .filter((subField) => ARRAY_TEXT_FIELD_TYPES.has(subField.type))
+            .filter((subField) => LOCALIZED_TEXT_FIELD_TYPES.has(subField.type))
             .map((subField) => subField.name),
         )
         target[field.name] = items.map((item) => {
@@ -291,25 +305,30 @@ export function EntryForm() {
           : {}
       if (!localized._meta) localized._meta = {}
       if (enabled && defaultLocale) {
-        // Enabling: if no localized bucket for defaultLocale, copy top-level values into it
-        const existingDefault =
+        // Enabling: fill any missing localized values from the top-level entry.
+        const defaultBucket =
           localized[defaultLocale] && typeof localized[defaultLocale] === 'object'
             ? (localized[defaultLocale] as Record<string, unknown>)
-            : null
-        if (!existingDefault) {
-          localized[defaultLocale] = {}
-          if (ct && ct.fields) {
-            const defaultBucket = localized[defaultLocale] as Record<string, unknown>
-            ct.fields.forEach((f) => {
-              if (['string', 'text', 'richtext', 'array'].includes(f.type)) {
-                const v = next[f.name]
-                if (v !== undefined && v !== null && (f.type === 'array' || v !== '')) {
-                  defaultBucket[f.name] = v
-                }
-              }
-            })
-          }
+            : {}
+        if (ct && ct.fields) {
+          ct.fields.forEach((f) => {
+            if (
+              !['string', 'text', 'richtext', 'array', 'navigation'].includes(f.type) ||
+              defaultBucket[f.name] !== undefined
+            ) {
+              return
+            }
+            const v = next[f.name]
+            if (
+              v !== undefined &&
+              v !== null &&
+              (['array', 'navigation'].includes(f.type) || v !== '')
+            ) {
+              defaultBucket[f.name] = v
+            }
+          })
         }
+        localized[defaultLocale] = defaultBucket
         localized._meta.primary = defaultLocale
       } else if (!enabled && defaultLocale) {
         // Disabling: copy values from localized[defaultLocale] back to top-level fields
@@ -319,7 +338,7 @@ export function EntryForm() {
             : null
         if (src && ct && ct.fields) {
           ct.fields.forEach((f) => {
-            if (['string', 'text', 'richtext', 'uid', 'array'].includes(f.type)) {
+            if (['string', 'text', 'richtext', 'uid', 'array', 'navigation'].includes(f.type)) {
               const v = src[f.name]
               if (v !== undefined) next[f.name] = v
             }
@@ -364,7 +383,7 @@ export function EntryForm() {
       let v = values[f.name]
       if (
         localizationEnabled &&
-        ['string', 'text', 'richtext', 'array'].includes(f.type) &&
+        ['string', 'text', 'richtext', 'array', 'navigation'].includes(f.type) &&
         localizedDefault &&
         localizedDefault[f.name] !== undefined
       ) {

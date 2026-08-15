@@ -565,7 +565,7 @@ function serializeEntry(
         : row.localized && typeof row.localized === 'object'
           ? (row.localized as LocalizedValues)
           : {}
-    const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array'])
+    const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array', 'navigation'])
     for (const f of ct.fields) {
       if (!localizableTypes.has(f.type)) continue
       let val: unknown = undefined

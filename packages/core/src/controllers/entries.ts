@@ -25,7 +25,7 @@ function resolveLocalizedRow(
   const localized: LocalizedValues =
     row.localized && typeof row.localized === 'object' ? (row.localized as LocalizedValues) : {}
   const resolved: Record<string, unknown> = { ...row }
-  const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array'])
+  const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array', 'navigation'])
   for (const f of ct.fields) {
     if (!localizableTypes.has(f.type)) continue
     let val: unknown = undefined
