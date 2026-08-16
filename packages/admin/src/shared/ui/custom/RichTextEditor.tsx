@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   useEditor,
   useEditorState,
@@ -29,7 +29,18 @@ import {
   Trash2Icon,
 } from 'lucide-react'
 import { cn } from '@/shared/lib/utils.ts'
+import { Button } from '@/shared/ui/button.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog.tsx'
+import { Field, FieldGroup, FieldLabel } from '@/shared/ui/field.tsx'
+import { Input } from '@/shared/ui/input.tsx'
 import { Textarea } from '@/shared/ui/textarea.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip.tsx'
 
 export type ImageInsert = {
   id?: string | null
@@ -46,6 +57,15 @@ type RichTextEditorProps = {
   onChange: (json: string) => void
   placeholder?: string
   onInsertImage?: () => Promise<ImageInsert[] | null>
+}
+
+type LinkMenu = {
+  href: string
+  left: number
+  top: number
+  width: number
+  height: number
+  pos: number
 }
 
 type ToolbarButtonProps = {
@@ -113,7 +133,13 @@ async function updateMediaCaption(mediaId: string, caption: string | null) {
   if (!res.ok) throw new Error('Could not update media caption.')
 }
 
-function RichTextImageCard({ node, deleteNode, selected, updateAttributes, editor }: NodeViewProps) {
+function RichTextImageCard({
+  node,
+  deleteNode,
+  selected,
+  updateAttributes,
+  editor,
+}: NodeViewProps) {
   const src = String(node.attrs.src ?? '')
   const mediaId = typeof node.attrs.mediaId === 'string' ? node.attrs.mediaId : null
   const nodeFilename = typeof node.attrs.filename === 'string' ? node.attrs.filename : null
@@ -175,7 +201,11 @@ function RichTextImageCard({ node, deleteNode, selected, updateAttributes, edito
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {dimensions && <span>{dimensions}</span>}
-            {alt && <span className="truncate" title={alt}>Alt: {alt}</span>}
+            {alt && (
+              <span className="truncate" title={alt}>
+                Alt: {alt}
+              </span>
+            )}
           </div>
           <div className="space-y-1">
             <Textarea
@@ -213,6 +243,11 @@ export function RichTextEditor({
   onInsertImage,
 }: RichTextEditorProps) {
   const [isEmpty, setIsEmpty] = useState(!value)
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('https://')
+  const [linkDialogMode, setLinkDialogMode] = useState<'add' | 'edit'>('add')
+  const [linkMenu, setLinkMenu] = useState<LinkMenu | null>(null)
+  const linkMenuTimer = useRef<number | null>(null)
 
   const editor = useEditor({
     extensions: [
@@ -245,6 +280,55 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: 'h-128 px-3 py-2.5 focus:outline-none',
+      },
+      handleKeyDown(view, event) {
+        if (
+          !event.shiftKey ||
+          (!event.ctrlKey && !event.metaKey) ||
+          event.altKey ||
+          !['ArrowLeft', 'ArrowRight'].includes(event.key)
+        ) {
+          return false
+        }
+
+        const { $head } = view.state.selection
+        if (!$head.parent.isTextblock) return false
+        return event.key === 'ArrowLeft'
+          ? $head.parentOffset === 0
+          : $head.parentOffset === $head.parent.content.size
+      },
+      handleDOMEvents: {
+        mouseover(view, event) {
+          const target = event.target
+          if (!(target instanceof Element)) return false
+          const link = target.closest('a[href]')
+          if (!link) return false
+
+          if (linkMenuTimer.current) window.clearTimeout(linkMenuTimer.current)
+          const rect = link.getBoundingClientRect()
+          setLinkMenu({
+            href: link.getAttribute('href') ?? '',
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            pos: view.posAtDOM(link, 0),
+          })
+          return false
+        },
+        mouseout(_view, event) {
+          const target = event.target
+          const relatedTarget = event.relatedTarget
+          if (
+            target instanceof Element &&
+            target.closest('a[href]')?.contains(relatedTarget as Node | null)
+          ) {
+            return false
+          }
+
+          linkMenuTimer.current = window.setTimeout(() => setLinkMenu(null), 150)
+          return false
+        },
       },
     },
     onUpdate({ editor }) {
@@ -288,6 +372,12 @@ export function RichTextEditor({
     setIsEmpty(editor.isEmpty)
   }, [value])
 
+  useEffect(() => {
+    return () => {
+      if (linkMenuTimer.current) window.clearTimeout(linkMenuTimer.current)
+    }
+  }, [])
+
   async function handleInsertImage() {
     if (!editor || !onInsertImage) return
     const images = await onInsertImage()
@@ -309,16 +399,36 @@ export function RichTextEditor({
     editor.chain().focus().insertContent(content).run()
   }
 
-  function handleSetLink() {
+  function handleOpenLinkDialog() {
     if (!editor) return
-    const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('URL', prev ?? 'https://')
-    if (url === null) return
-    if (!url) {
-      editor.chain().focus().unsetLink().run()
-      return
-    }
-    editor.chain().focus().setLink({ href: url }).run()
+    const href = editor.getAttributes('link').href as string | undefined
+    setLinkUrl(href ?? 'https://')
+    setLinkDialogMode(href ? 'edit' : 'add')
+    setLinkDialogOpen(true)
+  }
+
+  function handleSaveLink() {
+    if (!editor) return
+    const href = linkUrl.trim()
+    const chain = editor.chain().focus().extendMarkRange('link')
+    if (href) chain.setLink({ href }).run()
+    else chain.unsetLink().run()
+    setLinkDialogOpen(false)
+  }
+
+  function handleEditLink() {
+    if (!editor || !linkMenu) return
+    editor.chain().focus().setTextSelection(linkMenu.pos).extendMarkRange('link').run()
+    setLinkUrl(linkMenu.href)
+    setLinkDialogMode('edit')
+    setLinkMenu(null)
+    setLinkDialogOpen(true)
+  }
+
+  function handleRemoveLink() {
+    if (!editor || !linkMenu) return
+    editor.chain().focus().setTextSelection(linkMenu.pos).extendMarkRange('link').unsetLink().run()
+    setLinkMenu(null)
   }
 
   if (!editor) return null
@@ -423,7 +533,7 @@ export function RichTextEditor({
 
         <ToolbarDivider />
 
-        <ToolbarButton title="Add link" active={toolbar?.link} onClick={handleSetLink}>
+        <ToolbarButton title="Add link" active={toolbar?.link} onClick={handleOpenLinkDialog}>
           <LinkIcon className="size-3.5" />
         </ToolbarButton>
         <ToolbarButton
@@ -459,6 +569,81 @@ export function RichTextEditor({
         )}
         <EditorContent editor={editor} />
       </div>
+
+      {linkMenu && (
+        <Tooltip open>
+          <TooltipTrigger asChild>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none fixed"
+              style={{
+                left: linkMenu.left,
+                top: linkMenu.top,
+                width: linkMenu.width,
+                height: linkMenu.height,
+              }}
+            />
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            className="flex items-center gap-1 p-1"
+            onPointerEnter={() => {
+              if (linkMenuTimer.current) window.clearTimeout(linkMenuTimer.current)
+            }}
+            onPointerLeave={() => setLinkMenu(null)}
+          >
+            <Button
+              size="sm"
+              variant="ghost"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleEditLink}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleRemoveLink}
+            >
+              Remove
+            </Button>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{linkDialogMode === 'edit' ? 'Edit Link' : 'Add Link'}</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              handleSaveLink()
+            }}
+          >
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="rich-text-link-url">URL</FieldLabel>
+                <Input
+                  id="rich-text-link-url"
+                  value={linkUrl}
+                  onChange={(event) => setLinkUrl(event.target.value)}
+                  autoFocus
+                />
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setLinkDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
