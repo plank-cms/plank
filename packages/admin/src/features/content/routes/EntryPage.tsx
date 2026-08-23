@@ -31,6 +31,7 @@ import { LocalizationControls } from './components/LocalizationControls.tsx'
 import { SchedulerPanel } from './components/SchedulerPanel.tsx'
 import { parseDuplicatedFieldName, stableStringify } from './lib/entryPage.ts'
 import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes.ts'
+import type { FieldDef } from '@/shared/components/content/FieldInput.tsx'
 
 let previewWindowRef: Window | null = null
 const TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
@@ -39,9 +40,109 @@ const LOCALIZED_TEXT_FIELD_TYPES = new Set(['string', 'text', 'richtext'])
 function blankNavigationItems(items: unknown[]): unknown[] {
   return items.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return item
-    const next = { ...(item as Record<string, unknown>), label: '', href: '' }
+    const next: Record<string, unknown> = {
+      ...(item as Record<string, unknown>),
+      label: '',
+      href: '',
+    }
     if (Array.isArray(next.items)) next.items = blankNavigationItems(next.items)
     return next
+  })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hasNavigationStructureChanged(current: unknown, next: unknown): boolean {
+  if (!Array.isArray(current) || !Array.isArray(next)) return current !== next
+  if (current.length !== next.length) return true
+
+  return next.some((item, index) => {
+    const currentItem = current[index]
+    if (!isRecord(item) || !isRecord(currentItem)) return item !== currentItem
+    return hasNavigationStructureChanged(currentItem.items ?? [], item.items ?? [])
+  })
+}
+
+function findPreviousItemIndex(
+  previous: unknown[],
+  item: unknown,
+  index: number,
+  used: Set<number>,
+) {
+  const matchingIndex = previous.findIndex(
+    (candidate, candidateIndex) => !used.has(candidateIndex) && candidate === item,
+  )
+  if (matchingIndex >= 0) return matchingIndex
+  return !used.has(index) && index < previous.length ? index : -1
+}
+
+function synchronizeNavigationItems(
+  previous: unknown,
+  next: unknown,
+  localizedValue: unknown,
+): unknown[] {
+  const previousItems = Array.isArray(previous) ? previous : []
+  const nextItems = Array.isArray(next) ? next : []
+  const localizedItems = Array.isArray(localizedValue) ? localizedValue : []
+  const usedPreviousIndexes = new Set<number>()
+
+  return nextItems.map((item, index) => {
+    const previousIndex = findPreviousItemIndex(previousItems, item, index, usedPreviousIndexes)
+    if (previousIndex < 0 || !isRecord(item)) {
+      return isRecord(item) ? blankNavigationItems([item])[0] : item
+    }
+
+    usedPreviousIndexes.add(previousIndex)
+    const localizedItem = localizedItems[previousIndex]
+    const result = isRecord(localizedItem)
+      ? { ...localizedItem }
+      : isRecord(previousItems[previousIndex])
+        ? (blankNavigationItems([previousItems[previousIndex]])[0] as Record<string, unknown>)
+        : { label: '', href: '' }
+
+    if (Array.isArray(item.items) && item.items.length > 0) {
+      result.items = synchronizeNavigationItems(
+        isRecord(previousItems[previousIndex]) ? previousItems[previousIndex].items : [],
+        item.items,
+        isRecord(localizedItem) ? localizedItem.items : [],
+      )
+    } else {
+      delete result.items
+    }
+
+    return result
+  })
+}
+
+function synchronizeArrayItems(
+  previous: unknown,
+  next: unknown,
+  localizedValue: unknown,
+  field: FieldDef,
+): unknown[] {
+  const previousItems = Array.isArray(previous) ? previous : []
+  const nextItems = Array.isArray(next) ? next : []
+  const localizedItems = Array.isArray(localizedValue) ? localizedValue : []
+  const textFields = new Set(
+    (field.arrayFields ?? [])
+      .filter((subField) => LOCALIZED_TEXT_FIELD_TYPES.has(subField.type))
+      .map((subField) => subField.name),
+  )
+  const usedPreviousIndexes = new Set<number>()
+
+  return nextItems.map((item, index) => {
+    const previousIndex = findPreviousItemIndex(previousItems, item, index, usedPreviousIndexes)
+    if (previousIndex >= 0) {
+      usedPreviousIndexes.add(previousIndex)
+      return localizedItems[previousIndex] ?? item
+    }
+    if (!isRecord(item)) return item
+
+    const localizedItem = { ...item }
+    for (const name of textFields) localizedItem[name] = ''
+    return localizedItem
   })
 }
 
@@ -230,21 +331,50 @@ export function EntryForm() {
     setValues((prev) => ({ ...prev, [name]: value }))
   }
 
-  function handleLocalizedChange(locale: string, name: string, value: unknown) {
+  function handleLocalizedChange(locale: string, field: FieldDef, value: unknown) {
     setValues((prev) => {
-      const next: Record<string, unknown> = { ...prev }
       const localized: LocalizedData =
-        next.localized && typeof next.localized === 'object'
-          ? (next.localized as LocalizedData)
+        prev.localized && typeof prev.localized === 'object'
+          ? { ...(prev.localized as LocalizedData) }
           : {}
-      const localeBucket =
+      const localeBucket: Record<string, unknown> =
         localized[locale] && typeof localized[locale] === 'object'
-          ? (localized[locale] as Record<string, unknown>)
+          ? { ...(localized[locale] as Record<string, unknown>) }
           : {}
-      localeBucket[name] = value
+      const currentValue = localeBucket[field.name]
+      localeBucket[field.name] = value
       localized[locale] = localeBucket
-      next.localized = localized
-      return next
+
+      const structureChanged =
+        field.type === 'array'
+          ? !Array.isArray(currentValue) ||
+            !Array.isArray(value) ||
+            currentValue.length !== value.length
+          : field.type === 'navigation'
+            ? hasNavigationStructureChanged(currentValue, value)
+            : false
+
+      if (structureChanged) {
+        const targetLocales = new Set([
+          ...locales,
+          ...Object.keys(localized).filter((key) => !key.startsWith('_')),
+        ])
+
+        for (const targetLocale of targetLocales) {
+          if (targetLocale === locale) continue
+          const targetBucket: Record<string, unknown> =
+            localized[targetLocale] && typeof localized[targetLocale] === 'object'
+              ? { ...(localized[targetLocale] as Record<string, unknown>) }
+              : {}
+          targetBucket[field.name] =
+            field.type === 'array'
+              ? synchronizeArrayItems(currentValue, value, targetBucket[field.name], field)
+              : synchronizeNavigationItems(currentValue, value, targetBucket[field.name])
+          localized[targetLocale] = targetBucket
+        }
+      }
+
+      return { ...prev, localized }
     })
   }
 

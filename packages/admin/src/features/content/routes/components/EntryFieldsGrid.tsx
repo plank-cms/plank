@@ -15,7 +15,7 @@ type EntryFieldsGridProps = {
   readOnly: boolean
   uidErrorField: string | null
   setUidErrorField: (field: string | null) => void
-  handleLocalizedChange: (locale: string, name: string, value: unknown) => void
+  handleLocalizedChange: (locale: string, field: FieldDef, value: unknown) => void
   handleChange: (name: string, value: unknown) => void
 }
 
@@ -72,7 +72,7 @@ export function EntryFieldsGrid({
                     setUidErrorField(null)
                   }
                   if (isLocalizable && localizationEnabled) {
-                    handleLocalizedChange(activeLocale, field.name, value)
+                    handleLocalizedChange(activeLocale, field as FieldDef, value)
                   } else {
                     handleChange(field.name, value)
                   }
