@@ -1,4 +1,5 @@
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, CopyIcon, DownloadIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog.tsx'
 import { Input } from '@/shared/ui/input.tsx'
@@ -46,6 +47,17 @@ export function MediaPreviewDialog({
   canWriteMedia,
   onSave,
 }: MediaPreviewDialogProps) {
+  async function handleCopyUrl() {
+    if (!preview) return
+
+    try {
+      await navigator.clipboard.writeText(preview.url)
+      toast.success('Asset URL copied')
+    } catch {
+      toast.error('Could not copy asset URL')
+    }
+  }
+
   return (
     <Dialog open={!!preview} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden p-0">
@@ -139,17 +151,29 @@ export function MediaPreviewDialog({
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3 pt-2">
-                  <a
-                    href={preview.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={preview.filename}
-                  >
-                    <Button variant="outline" size="sm" type="button">
-                      <DownloadIcon className="size-3.5" />
-                      Download
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={preview.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={preview.filename}
+                    >
+                      <Button variant="outline" size="sm" type="button">
+                        <DownloadIcon className="size-3.5" />
+                        Download
+                      </Button>
+                    </a>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={handleCopyUrl}
+                      aria-label="Copy asset URL"
+                      title="Copy asset URL"
+                    >
+                      <CopyIcon className="size-3.5" />
                     </Button>
-                  </a>
+                  </div>
                   <Button
                     type="button"
                     size="sm"
