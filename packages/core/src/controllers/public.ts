@@ -1,6 +1,6 @@
 import type { RequestHandler, Response } from 'express'
 import { pool } from '@plank-cms/db'
-import { findContentTypeBySlug, assertSafeIdentifier } from '@plank-cms/schema'
+import { findAllContentTypes, findContentTypeBySlug, assertSafeIdentifier } from '@plank-cms/schema'
 import type { ContentType, FieldDefinition } from '@plank-cms/schema'
 import { getProvider } from '../media/index.js'
 
@@ -406,6 +406,14 @@ const SYSTEM_FIELDS = new Set([
   'created_at',
   'updated_at',
 ])
+const LOCALIZABLE_FIELD_TYPES = new Set([
+  'string',
+  'text',
+  'richtext',
+  'uid',
+  'array',
+  'navigation',
+])
 
 function setPreviewCacheHeaders(res: Response, statusParam: string): void {
   if (statusParam === 'published') return
@@ -416,9 +424,71 @@ function stripSystemFields(row: Record<string, unknown>): Record<string, unknown
   return Object.fromEntries(Object.entries(row).filter(([k]) => !SYSTEM_FIELDS.has(k)))
 }
 
+function localizeRelatedEntry(
+  row: Record<string, unknown>,
+  fields: FieldDefinition[],
+  locale?: string,
+  fallbacks: string[] = [],
+): Record<string, unknown> {
+  if (!locale) return row
+
+  const localized: LocalizedValues =
+    row.localized && typeof row.localized === 'object' ? (row.localized as LocalizedValues) : {}
+  const resolved = { ...row }
+
+  for (const field of fields) {
+    if (!LOCALIZABLE_FIELD_TYPES.has(field.type)) continue
+
+    let value: unknown = localized[locale]?.[field.name]
+    if (value === undefined) {
+      for (const fallback of fallbacks) {
+        if (localized[fallback]?.[field.name] !== undefined) {
+          value = localized[fallback][field.name]
+          break
+        }
+      }
+    }
+
+    if (value !== undefined) resolved[field.name] = value
+  }
+
+  return resolved
+}
+
+async function getRelatedContentTypes(
+  fields: FieldDefinition[],
+): Promise<Map<string, ContentType>> {
+  const relatedContentTypes = new Map<string, ContentType>()
+  const relatedSlugs = [
+    ...new Set(
+      fields.map((field) => field.relatedSlug).filter((slug): slug is string => Boolean(slug)),
+    ),
+  ]
+
+  await Promise.all(
+    relatedSlugs.map(async (slug) => {
+      const contentType = await findContentTypeBySlug(slug)
+      if (contentType) relatedContentTypes.set(contentType.tableName, contentType)
+    }),
+  )
+
+  const hasUnresolvedRelation = fields.some(
+    (field) => field.relatedTable && !relatedContentTypes.has(field.relatedTable),
+  )
+  if (!hasUnresolvedRelation) return relatedContentTypes
+
+  for (const contentType of await findAllContentTypes()) {
+    relatedContentTypes.set(contentType.tableName, contentType)
+  }
+
+  return relatedContentTypes
+}
+
 async function resolveRelationFields(
   entries: Record<string, unknown>[],
   ct: ContentType,
+  locale?: string,
+  fallbacks: string[] = [],
 ): Promise<void> {
   const scalarFields = ct.fields.filter(
     (f) =>
@@ -434,6 +504,16 @@ async function resolveRelationFields(
   )
 
   const entryIds = entries.map((e) => e.id as string)
+  const relationFields = [...scalarFields, ...mmFields]
+  const relatedContentTypes = locale ? await getRelatedContentTypes(relationFields) : new Map()
+
+  function resolveRelatedEntry(row: Record<string, unknown>, field: FieldDefinition) {
+    const relatedContentType = relatedContentTypes.get(field.relatedTable ?? '')
+    const entry = stripSystemFields(row)
+    return relatedContentType
+      ? localizeRelatedEntry(entry, relatedContentType.fields, locale, fallbacks)
+      : entry
+  }
 
   await Promise.all([
     ...scalarFields.map(async (field) => {
@@ -443,7 +523,7 @@ async function resolveRelationFields(
       const { rows } = await pool.query(`SELECT * FROM ${field.relatedTable} WHERE id = ANY($1)`, [
         ids,
       ])
-      const map = new Map(rows.map((r) => [r.id as string, stripSystemFields(r)]))
+      const map = new Map(rows.map((row) => [row.id as string, resolveRelatedEntry(row, field)]))
       for (const entry of entries) {
         const id = entry[field.name] as string | null
         entry[field.name] = id ? (map.get(id) ?? null) : null
@@ -464,7 +544,9 @@ async function resolveRelationFields(
           `SELECT * FROM ${field.relatedTable} WHERE id = ANY($1)`,
           [allTargetIds],
         )
-        for (const row of relRows) relatedMap.set(row.id as string, stripSystemFields(row))
+        for (const row of relRows) {
+          relatedMap.set(row.id as string, resolveRelatedEntry(row, field))
+        }
       }
       const sourceMap = new Map<string, Record<string, unknown>[]>()
       for (const row of jRows) {
@@ -565,9 +647,8 @@ function serializeEntry(
         : row.localized && typeof row.localized === 'object'
           ? (row.localized as LocalizedValues)
           : {}
-    const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array', 'navigation'])
     for (const f of ct.fields) {
-      if (!localizableTypes.has(f.type)) continue
+      if (!LOCALIZABLE_FIELD_TYPES.has(f.type)) continue
       let val: unknown = undefined
       if (localizedContainer[locale] && localizedContainer[locale][f.name] !== undefined) {
         val = localizedContainer[locale][f.name]
@@ -667,7 +748,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
     await Promise.all([
       resolveMediaFields([entry], ct),
       resolveAuthorAvatars([entry]),
-      resolveRelationFields([entry], ct),
+      resolveRelationFields([entry], ct, locale, fallbacks),
     ])
     res.json(selectEntryFields(entry, ct, selection))
     return
@@ -793,7 +874,7 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields(data, ct),
     resolveAuthorAvatars(data),
-    resolveRelationFields(data, ct),
+    resolveRelationFields(data, ct, locale, fallbacks),
   ])
   res.json({
     data: data.map((entry) => selectEntryFields(entry, ct, selection)),
@@ -843,7 +924,7 @@ export const getPublicEntry: SlugIdParam = async (req, res) => {
   await Promise.all([
     resolveMediaFields([entry], ct),
     resolveAuthorAvatars([entry]),
-    resolveRelationFields([entry], ct),
+    resolveRelationFields([entry], ct, locale, fallbacks),
   ])
   res.json(selectEntryFields(entry, ct, selection))
 }
