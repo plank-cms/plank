@@ -220,14 +220,6 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-cyan-50',
   },
   {
-    type: 'table',
-    icon: TablePropertiesIcon,
-    label: 'Table',
-    description: 'Rows and columns of text',
-    color: 'text-lime-700',
-    bg: 'bg-lime-50',
-  },
-  {
     type: 'navigation',
     icon: ListTreeIcon,
     label: 'Navigation',
@@ -236,12 +228,12 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-cyan-50',
   },
   {
-    type: 'separator',
-    icon: SeparatorHorizontalIcon,
-    label: 'Separator',
-    description: 'Visual divider in the builder',
-    color: 'text-muted-foreground',
-    bg: 'bg-muted',
+    type: 'table',
+    icon: TablePropertiesIcon,
+    label: 'Table',
+    description: 'Rows and columns of text',
+    color: 'text-lime-700',
+    bg: 'bg-lime-50',
   },
   {
     type: 'number',
@@ -268,6 +260,14 @@ const TYPE_OPTIONS: TypeOption[] = [
     description: 'Link to another content type',
     color: 'text-indigo-600',
     bg: 'bg-indigo-50',
+  },
+  {
+    type: 'separator',
+    icon: SeparatorHorizontalIcon,
+    label: 'Separator',
+    description: 'Visual divider in the builder',
+    color: 'text-muted-foreground',
+    bg: 'bg-muted',
   },
 ]
 

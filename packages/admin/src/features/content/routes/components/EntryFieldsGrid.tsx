@@ -32,11 +32,17 @@ export function EntryFieldsGrid({
   handleLocalizedChange,
   handleChange,
 }: EntryFieldsGridProps) {
-  const visibleFields = ct.fields.filter((field) => field.type !== 'separator')
-
   return (
     <div className="grid grid-cols-6 gap-4">
-      {visibleFields.map((field) => {
+      {ct.fields.map((field) => {
+        if (field.type === 'separator') {
+          return (
+            <div key={field.name} className="col-span-6 py-2" aria-hidden="true">
+              <div className="h-px w-full bg-border" />
+            </div>
+          )
+        }
+
         const isLocalizable = ['string', 'text', 'richtext', 'array', 'table', 'navigation'].includes(
           field.type,
         )
