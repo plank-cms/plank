@@ -70,6 +70,7 @@ type FieldType =
   | 'uid'
   | 'array'
   | 'navigation'
+  | 'separator'
 type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
 type ArraySubFieldType =
   | 'string'

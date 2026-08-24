@@ -11,6 +11,7 @@ export type FieldType =
   | 'uid'
   | 'array'
   | 'navigation'
+  | 'separator'
 
 export type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
 

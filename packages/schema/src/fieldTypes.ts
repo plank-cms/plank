@@ -47,6 +47,10 @@ export function isVirtualRelation(field: FieldDefinition): boolean {
   return rt === 'one-to-many' || rt === 'many-to-many'
 }
 
+export function isVirtualField(field: FieldDefinition): boolean {
+  return field.type === 'separator' || isVirtualRelation(field)
+}
+
 export function hasRelationColumn(field: FieldDefinition): boolean {
   if (field.type !== 'relation') return false
   const rt = field.relationType ?? 'many-to-one'

@@ -14,6 +14,7 @@ import {
   Trash2Icon,
   LayoutListIcon,
   ListTreeIcon,
+  SeparatorHorizontalIcon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { DraggableSyntheticListeners } from '@dnd-kit/core'
@@ -31,6 +32,7 @@ type FieldType =
   | 'uid'
   | 'array'
   | 'navigation'
+  | 'separator'
 type NumberSubtype = 'integer' | 'float'
 export type FieldWidth = 'full' | 'two-thirds' | 'half' | 'third'
 export type MediaAllowedType = 'image' | 'video' | 'audio' | 'document'
@@ -133,6 +135,13 @@ function getFieldMeta(type: FieldType | ArraySubFieldType, subtype?: NumberSubty
       return { icon: LayoutListIcon, label: 'Array', color: 'text-cyan-600', bg: 'bg-cyan-50' }
     case 'navigation':
       return { icon: ListTreeIcon, label: 'Navigation', color: 'text-cyan-600', bg: 'bg-cyan-50' }
+    case 'separator':
+      return {
+        icon: SeparatorHorizontalIcon,
+        label: 'Separator',
+        color: 'text-muted-foreground',
+        bg: 'bg-muted',
+      }
   }
 }
 
@@ -156,6 +165,7 @@ export const DEFAULT_FIELD_WIDTH: Record<FieldType, FieldWidth> = {
   uid: 'half',
   array: 'full',
   navigation: 'full',
+  separator: 'full',
 }
 
 function WidthIcon({ width }: { width: FieldWidth }) {
@@ -216,6 +226,35 @@ export function FieldCard({
   dragListeners,
   dragAttributes,
 }: FieldCardProps) {
+  if (field.type === 'separator') {
+    return (
+      <div className="flex items-center gap-2 py-2">
+        {dragListeners && (
+          <button
+            type="button"
+            className="flex shrink-0 cursor-grab items-center text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+            {...dragListeners}
+            {...dragAttributes}
+            aria-label="Move separator"
+          >
+            <GripVerticalIcon className="size-4" />
+          </button>
+        )}
+        <div className="h-px flex-1 bg-border" />
+        {onDelete && (
+          <button
+            type="button"
+            title="Delete separator"
+            onClick={onDelete}
+            className="flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2Icon className="size-3.5" />
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const { icon: Icon, label, color, bg } = getFieldMeta(field.type, field.subtype)
   const currentWidth = field.width ?? 'full'
   const isDraggable = Boolean(dragListeners)

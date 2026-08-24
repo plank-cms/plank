@@ -11,6 +11,7 @@ export type FieldType =
   | 'uid'
   | 'array'
   | 'navigation'
+  | 'separator'
 
 export type ArraySubFieldType =
   | 'string'

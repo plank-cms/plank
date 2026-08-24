@@ -16,6 +16,7 @@ import {
   PencilIcon,
   Trash2Icon,
   ListTreeIcon,
+  SeparatorHorizontalIcon,
   ChevronUpIcon,
   ChevronDownIcon,
 } from 'lucide-react'
@@ -226,6 +227,14 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-cyan-50',
   },
   {
+    type: 'separator',
+    icon: SeparatorHorizontalIcon,
+    label: 'Separator',
+    description: 'Visual divider in the builder',
+    color: 'text-muted-foreground',
+    bg: 'bg-muted',
+  },
+  {
     type: 'number',
     subtype: 'integer',
     icon: HashIcon,
@@ -379,6 +388,12 @@ const EMPTY_CONFIG: ConfigState = {
   targetField: '',
   allowedTypes: [],
   arrayFields: [],
+}
+
+function getSeparatorName(existingNames: string[]): string {
+  let index = 1
+  while (existingNames.includes(`separator_${index}`)) index += 1
+  return `separator_${index}`
 }
 
 type AvailableCT = { tableName: string; slug: string; name: string }
@@ -611,13 +626,13 @@ export function AddFieldDialog({
   }
 
   function handleConfirm() {
-    if (!selected || !validate()) return
+    if (!selected || (selected.type !== 'separator' && !validate())) return
     if (selected.type === 'array' && !validateArraySubFields()) return
     onConfirm({
-      name: config.name.trim(),
+      name: selected.type === 'separator' ? getSeparatorName(existingNames) : config.name.trim(),
       type: selected.type,
       subtype: selected.subtype,
-      required: config.required || undefined,
+      required: selected.type === 'separator' ? undefined : config.required || undefined,
       relationType: selected.type === 'relation' ? config.relationType : undefined,
       relatedTable: selected.type === 'relation' ? config.relatedTable : undefined,
       relatedSlug: selected.type === 'relation' ? config.relatedSlug : undefined,
@@ -632,7 +647,10 @@ export function AddFieldDialog({
         selected.type === 'array'
           ? config.arrayFields.map((f) => ({ ...f, name: f.name.trim() }))
           : undefined,
-      width: initialField?.width ?? DEFAULT_FIELD_WIDTH[selected.type],
+      width:
+        selected.type === 'separator'
+          ? undefined
+          : (initialField?.width ?? DEFAULT_FIELD_WIDTH[selected.type]),
     })
     handleOpenChange(false)
   }
@@ -698,25 +716,32 @@ export function AddFieldDialog({
         {/* Step 2 — configure */}
         {showStep2 && (
           <div className="flex flex-col gap-4 pt-1">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="field-name">Field name</Label>
-              <Input
-                id="field-name"
-                placeholder="e.g. article_title"
-                value={config.name}
-                onChange={(e) => {
-                  setConfig((prev) => ({ ...prev, name: e.target.value }))
-                  setNameError('')
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleConfirm()
-                }}
-              />
-              {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-              <p className="text-xs text-muted-foreground">
-                Lowercase letters, digits and underscores. Must start with a letter.
+            {selected?.type === 'separator' ? (
+              <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+                Adds a full-width visual divider in the Content Type Builder. It is not included in
+                entry forms or API responses.
               </p>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="field-name">Field name</Label>
+                <Input
+                  id="field-name"
+                  placeholder="e.g. article_title"
+                  value={config.name}
+                  onChange={(e) => {
+                    setConfig((prev) => ({ ...prev, name: e.target.value }))
+                    setNameError('')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleConfirm()
+                  }}
+                />
+                {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+                <p className="text-xs text-muted-foreground">
+                  Lowercase letters, digits and underscores. Must start with a letter.
+                </p>
+              </div>
+            )}
 
             {selected?.type === 'media' && (
               <div className="flex flex-col gap-2">
@@ -1071,18 +1096,20 @@ export function AddFieldDialog({
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="field-required"
-                checked={config.required}
-                onCheckedChange={(val) =>
-                  setConfig((prev) => ({ ...prev, required: Boolean(val) }))
-                }
-              />
-              <Label htmlFor="field-required" className="cursor-pointer font-normal">
-                Required field
-              </Label>
-            </div>
+            {selected?.type !== 'separator' && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="field-required"
+                  checked={config.required}
+                  onCheckedChange={(val) =>
+                    setConfig((prev) => ({ ...prev, required: Boolean(val) }))
+                  }
+                />
+                <Label htmlFor="field-required" className="cursor-pointer font-normal">
+                  Required field
+                </Label>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 border-t border-border pt-3">
               <Button variant="outline" onClick={() => handleOpenChange(false)}>

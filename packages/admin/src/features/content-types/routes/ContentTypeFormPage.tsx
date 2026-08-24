@@ -79,7 +79,7 @@ function SortableFieldCard({
   field: FieldCardData
   onWidthChange: (w: FieldWidth) => void
   onArraySubFieldWidthChange: (subFieldName: string, width: FieldWidth) => void
-  onEdit: () => void
+  onEdit?: () => void
   onDelete: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -427,7 +427,9 @@ export function ContentTypeForm() {
                             onArraySubFieldWidthChange={(subFieldName, width) =>
                               handleArraySubFieldWidthChange(field.name, subFieldName, width)
                             }
-                            onEdit={() => setEditingField(field)}
+                            onEdit={
+                              field.type === 'separator' ? undefined : () => setEditingField(field)
+                            }
                             onDelete={() => handleDeleteField(field.name)}
                           />
                         ))}

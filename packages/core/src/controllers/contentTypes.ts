@@ -126,6 +126,7 @@ const FieldSchema = z.object({
     'uid',
     'array',
     'navigation',
+    'separator',
   ]),
   required: z.boolean().optional(),
   subtype: z.enum(['integer', 'float']).optional(),

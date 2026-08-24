@@ -184,7 +184,7 @@ function parseFieldSelection(
   const includeFields = [...parseCsvParam(query.fields), ...parseCsvParam(query.select)]
   const excludeFields = parseCsvParam(query.exclude)
   const allowedFields = new Set<string>([
-    ...ct.fields.map((field) => field.name),
+    ...ct.fields.filter((field) => field.type !== 'separator').map((field) => field.name),
     ...SYSTEM_RESPONSE_FIELDS,
   ])
   const invalidFields = [...includeFields, ...excludeFields].filter(
@@ -210,7 +210,7 @@ function selectEntryFields(
   const out: Record<string, unknown> = {}
   const orderedKeys = [
     'id',
-    ...ct.fields.map((field) => field.name),
+    ...ct.fields.filter((field) => field.type !== 'separator').map((field) => field.name),
     'status',
     'published_at',
     'created_at',
@@ -666,6 +666,7 @@ function serializeEntry(
 
   const out: Record<string, unknown> = { id: row.id }
   for (const field of ct.fields) {
+    if (field.type === 'separator') continue
     if (!(field.name in effective)) continue
     if (field.type === 'navigation') {
       out[field.name] = normalizeNavigationItems(effective[field.name])
@@ -760,8 +761,9 @@ export const listPublicEntries: SlugParam = async (req, res) => {
   const locale = req.query.locale ? String(req.query.locale) : undefined
   const fallbacks = req.query.fallback ? String(req.query.fallback).split(',') : []
 
-  const knownFields = new Set(ct.fields.map((f) => f.name))
-  const fieldMap = new Map(ct.fields.map((field) => [field.name, field]))
+  const publicFields = ct.fields.filter((field) => field.type !== 'separator')
+  const knownFields = new Set(publicFields.map((field) => field.name))
+  const fieldMap = new Map(publicFields.map((field) => [field.name, field]))
   const systemSortFields = new Set(['created_at', 'updated_at', 'published_at'])
   const filterClauses: string[] = []
   const filterValues: unknown[] = []

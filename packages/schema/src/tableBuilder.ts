@@ -3,14 +3,14 @@ import {
   assertSafeIdentifier,
   quoteIdentifier,
   toPostgresType,
-  isVirtualRelation,
+  isVirtualField,
   hasRelationColumn,
 } from './fieldTypes.js'
 import type { ContentType, FieldDefinition } from './types.js'
 import { findAllContentTypes } from './store.js'
 
 function buildColumnDef(field: FieldDefinition): string | null {
-  if (isVirtualRelation(field)) return null
+  if (isVirtualField(field)) return null
   assertSafeIdentifier(field.name)
   const pgType = toPostgresType(field)
   const notNull = field.required ? ' NOT NULL' : ''
@@ -50,7 +50,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
   assertSafeIdentifier(contentType.tableName)
   const quotedTableName = quoteIdentifier(contentType.tableName)
 
-  const columnFields = contentType.fields.filter((f) => !isVirtualRelation(f))
+  const columnFields = contentType.fields.filter((f) => !isVirtualField(f))
   const columns = columnFields.map(buildColumnDef).filter(Boolean) as string[]
 
   const sql = [
@@ -105,7 +105,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
 
   for (const [name, field] of nextFields) {
     if (!prevFields.has(name)) {
-      if (isVirtualRelation(field)) continue
+      if (isVirtualField(field)) continue
 
       assertSafeIdentifier(name)
       const colDef = buildColumnDef(field)
@@ -128,7 +128,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
       const prevField = prevFields.get(name)!
       assertSafeIdentifier(name)
 
-      if (!isVirtualRelation(prevField)) {
+      if (!isVirtualField(prevField)) {
         statements.push(`ALTER TABLE ${quotedTableName} DROP COLUMN ${quoteIdentifier(name)}`)
       }
 
@@ -145,6 +145,38 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
   for (const [name, nextField] of nextFields) {
     const prevField = prevFields.get(name)
     if (!prevField) continue
+
+    if (prevField.type === 'separator' || nextField.type === 'separator') {
+      assertSafeIdentifier(name)
+
+      if (!isVirtualField(prevField)) {
+        statements.push(
+          `ALTER TABLE ${quotedTableName} DROP COLUMN IF EXISTS ${quoteIdentifier(name)}`,
+        )
+      } else if (
+        prevField.type === 'relation' &&
+        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
+      ) {
+        const junctionTable = junctionTableName(next.tableName, name)
+        junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${junctionTable}`))
+      }
+
+      if (!isVirtualField(nextField)) {
+        const colDef = buildColumnDef(nextField)
+        if (colDef) {
+          statements.push(`ALTER TABLE ${quotedTableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
+        }
+      } else if (
+        nextField.type === 'relation' &&
+        (nextField.relationType ?? 'many-to-one') === 'many-to-many' &&
+        nextField.relatedTable
+      ) {
+        const sql = buildJunctionTableSQL(next.tableName, name, nextField.relatedTable)
+        junctionOps.push(() => pool.query(sql))
+      }
+
+      continue
+    }
 
     if (nextField.type === 'relation' || prevField.type === 'relation') {
       const prevSig = relationSignature(prevField)
@@ -279,7 +311,7 @@ export async function syncAllTables(): Promise<void> {
     }
 
     for (const field of ct.fields) {
-      if (!isVirtualRelation(field) && !existingColumns.has(field.name)) {
+      if (!isVirtualField(field) && !existingColumns.has(field.name)) {
         assertSafeIdentifier(field.name)
         const colDef = buildColumnDef(field)
         if (colDef) {

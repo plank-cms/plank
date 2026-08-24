@@ -164,9 +164,10 @@ export function EntriesList() {
 
   useEffect(() => {
     if (!ct || !slug) return
+    const entryFields = ct.fields.filter((field) => field.type !== 'separator')
     fetchViewConfig(slug)
-      .then((saved) => setViewConfig(parseViewConfig(saved, ct.fields)))
-      .catch(() => setViewConfig(defaultViewConfig(ct.fields)))
+      .then((saved) => setViewConfig(parseViewConfig(saved, entryFields)))
+      .catch(() => setViewConfig(defaultViewConfig(entryFields)))
   }, [ct?.slug])
 
   useEffect(() => {
@@ -174,7 +175,11 @@ export function EntriesList() {
   }, [page, limit])
 
   const config = viewConfig ?? {
-    visibleFields: ct?.fields.slice(0, DEFAULT_VISIBLE).map((f) => f.name) ?? [],
+    visibleFields:
+      ct?.fields
+        .filter((field) => field.type !== 'separator')
+        .slice(0, DEFAULT_VISIBLE)
+        .map((field) => field.name) ?? [],
     visibleSystemCols: SYSTEM_COL_DEFS.map((c) => c.name),
     sort: DEFAULT_SORT,
   }
@@ -194,7 +199,7 @@ export function EntriesList() {
       const parts = String(v).split('.')
       const base = parts[0]
       const sub = parts[1]
-      const f = ct?.fields.find((ff) => ff.name === base)
+      const f = ct?.fields.find((field) => field.name === base && field.type !== 'separator')
       return f ? { field: f, displayField: sub } : null
     })
     .filter(Boolean) as Column[]
@@ -686,7 +691,7 @@ export function EntriesList() {
           <ConfigureViewDialog
             open={configOpen}
             onOpenChange={setConfigOpen}
-            allFields={ct.fields}
+            allFields={ct.fields.filter((field) => field.type !== 'separator')}
             config={viewConfig}
             onApply={handleApplyConfig}
           />

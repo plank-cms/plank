@@ -67,6 +67,8 @@ export function validate(
   const errors: string[] = []
 
   for (const field of contentType.fields) {
+    if (field.type === 'separator') continue
+
     const value = payload[field.name]
     const isEmpty = value === undefined || value === null || value === ''
 

@@ -4,7 +4,7 @@ import {
   findContentTypeBySlug,
   validate,
   assertSafeIdentifier,
-  isVirtualRelation,
+  isVirtualField,
   quoteIdentifier,
 } from '@plank-cms/schema'
 import type { FieldDefinition } from '@plank-cms/schema'
@@ -166,7 +166,12 @@ export const listEntries: SlugParam = async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? 20))))
   const offset = (page - 1) * limit
 
-  const allowedSort = ['created_at', 'updated_at', 'published_at', ...ct.fields.map((f) => f.name)]
+  const allowedSort = [
+    'created_at',
+    'updated_at',
+    'published_at',
+    ...ct.fields.filter((field) => field.type !== 'separator').map((field) => field.name),
+  ]
   const sortField = allowedSort.includes(String(req.query.sort ?? ''))
     ? String(req.query.sort)
     : 'created_at'
@@ -411,7 +416,7 @@ export const createEntry: SlugParam = async (req, res) => {
       (f.relationType ?? 'many-to-one') === 'many-to-many' &&
       req.body[f.name] !== undefined,
   )
-  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualRelation(f))
+  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualField(f))
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   // Single Types: upsert — update the existing entry if one already exists
@@ -588,7 +593,7 @@ export const updateEntry: SlugIdParam = async (req, res) => {
       (f.relationType ?? 'many-to-one') === 'many-to-many' &&
       req.body[f.name] !== undefined,
   )
-  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualRelation(f))
+  const fields = ct.fields.filter((f) => req.body[f.name] !== undefined && !isVirtualField(f))
   fields.forEach((f) => assertSafeIdentifier(f.name))
 
   const setClauses = fields
