@@ -50,6 +50,10 @@ function blankNavigationItems(items: unknown[]): unknown[] {
   })
 }
 
+function blankTableRows(rows: unknown[], columns: number): string[][] {
+  return rows.map(() => Array.from({ length: columns }, () => ''))
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -146,6 +150,18 @@ function synchronizeArrayItems(
   })
 }
 
+function synchronizeTableRows(next: unknown, localizedValue: unknown, columns: number): string[][] {
+  const nextRows = Array.isArray(next) ? next : []
+  const localizedRows = Array.isArray(localizedValue) ? localizedValue : []
+
+  return nextRows.map((_, index) => {
+    const localizedRow = localizedRows[index]
+    return Array.isArray(localizedRow)
+      ? Array.from({ length: columns }, (_, columnIndex) => String(localizedRow[columnIndex] ?? ''))
+      : Array.from({ length: columns }, () => '')
+  })
+}
+
 function getPreviewStatus(status: Entry['status'], stale: boolean): PreviewStatus {
   if (status === 'published' && stale) return 'preview'
   return status ?? 'draft'
@@ -223,7 +239,7 @@ export function EntryForm() {
     if (isNew) {
       const empty: Record<string, unknown> = {}
       ct?.fields.forEach((f) => {
-        empty[f.name] = f.type === 'boolean' ? false : ''
+        empty[f.name] = f.type === 'boolean' ? false : f.type === 'table' ? [] : ''
       })
       // prepare localized container and default locales
       empty.localized = {}
@@ -250,7 +266,7 @@ export function EntryForm() {
 
     const initial: Record<string, unknown> = {}
     ct.fields.forEach((f) => {
-      initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : '')
+      initial[f.name] = existing[f.name] ?? (f.type === 'boolean' ? false : f.type === 'table' ? [] : '')
     })
     // localized values
     // normalize to a plain object so TS doesn't treat it as `unknown`
@@ -346,7 +362,7 @@ export function EntryForm() {
       localized[locale] = localeBucket
 
       const structureChanged =
-        field.type === 'array'
+        field.type === 'array' || field.type === 'table'
           ? !Array.isArray(currentValue) ||
             !Array.isArray(value) ||
             currentValue.length !== value.length
@@ -369,7 +385,9 @@ export function EntryForm() {
           targetBucket[field.name] =
             field.type === 'array'
               ? synchronizeArrayItems(currentValue, value, targetBucket[field.name], field)
-              : synchronizeNavigationItems(currentValue, value, targetBucket[field.name])
+              : field.type === 'table'
+                ? synchronizeTableRows(value, targetBucket[field.name], field.tableColumns ?? 1)
+                : synchronizeNavigationItems(currentValue, value, targetBucket[field.name])
           localized[targetLocale] = targetBucket
         }
       }
@@ -398,12 +416,18 @@ export function EntryForm() {
           : null
 
       for (const field of ct.fields) {
-        if (!['array', 'navigation'].includes(field.type) || target[field.name] !== undefined) continue
+        if (!['array', 'table', 'navigation'].includes(field.type) || target[field.name] !== undefined)
+          continue
         const items = defaultBucket?.[field.name] ?? prev[field.name]
         if (!Array.isArray(items)) continue
 
         if (field.type === 'navigation') {
           target[field.name] = blankNavigationItems(items)
+          continue
+        }
+
+        if (field.type === 'table') {
+          target[field.name] = blankTableRows(items, field.tableColumns ?? 1)
           continue
         }
 
@@ -443,7 +467,7 @@ export function EntryForm() {
         if (ct && ct.fields) {
           ct.fields.forEach((f) => {
             if (
-              !['string', 'text', 'richtext', 'array', 'navigation'].includes(f.type) ||
+              !['string', 'text', 'richtext', 'array', 'table', 'navigation'].includes(f.type) ||
               defaultBucket[f.name] !== undefined
             ) {
               return
@@ -452,7 +476,7 @@ export function EntryForm() {
             if (
               v !== undefined &&
               v !== null &&
-              (['array', 'navigation'].includes(f.type) || v !== '')
+              (['array', 'table', 'navigation'].includes(f.type) || v !== '')
             ) {
               defaultBucket[f.name] = v
             }
@@ -468,7 +492,9 @@ export function EntryForm() {
             : null
         if (src && ct && ct.fields) {
           ct.fields.forEach((f) => {
-            if (['string', 'text', 'richtext', 'uid', 'array', 'navigation'].includes(f.type)) {
+            if (
+              ['string', 'text', 'richtext', 'uid', 'array', 'table', 'navigation'].includes(f.type)
+            ) {
               const v = src[f.name]
               if (v !== undefined) next[f.name] = v
             }
@@ -513,7 +539,7 @@ export function EntryForm() {
       let v = values[f.name]
       if (
         localizationEnabled &&
-        ['string', 'text', 'richtext', 'array', 'navigation'].includes(f.type) &&
+        ['string', 'text', 'richtext', 'array', 'table', 'navigation'].includes(f.type) &&
         localizedDefault &&
         localizedDefault[f.name] !== undefined
       ) {

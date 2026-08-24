@@ -188,6 +188,24 @@ export function validate(
           }
         }
         break
+      case 'table':
+        if (!Array.isArray(value)) {
+          errors.push(`Field "${field.name}" must be an array of rows`)
+        } else if (field.required && value.length === 0) {
+          errors.push(`Field "${field.name}" is required`)
+        } else {
+          const columns = field.tableColumns ?? 1
+          for (const [index, row] of value.entries()) {
+            if (
+              !Array.isArray(row) ||
+              row.length !== columns ||
+              row.some((cell) => typeof cell !== 'string')
+            ) {
+              errors.push(`Field "${field.name}[${index}]" must contain ${columns} text cells`)
+            }
+          }
+        }
+        break
       case 'navigation':
         if (field.required && Array.isArray(value) && value.length === 0) {
           errors.push(`Field "${field.name}" is required`)

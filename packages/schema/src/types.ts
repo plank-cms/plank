@@ -10,6 +10,7 @@ export type FieldType =
   | 'relation'
   | 'uid'
   | 'array'
+  | 'table'
   | 'navigation'
   | 'separator'
 
@@ -53,6 +54,8 @@ export interface FieldDefinition {
   allowedTypes?: MediaAllowedType[]
   width?: FieldWidth
   arrayFields?: ArraySubField[]
+  tableColumns?: number
+  tableHasHeader?: boolean
 }
 
 export type ContentTypeKind = 'collection' | 'single'

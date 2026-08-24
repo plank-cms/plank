@@ -412,6 +412,7 @@ const LOCALIZABLE_FIELD_TYPES = new Set([
   'richtext',
   'uid',
   'array',
+  'table',
   'navigation',
 ])
 

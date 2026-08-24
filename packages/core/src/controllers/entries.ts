@@ -26,7 +26,15 @@ function resolveLocalizedRow(
   const localized: LocalizedValues =
     row.localized && typeof row.localized === 'object' ? (row.localized as LocalizedValues) : {}
   const resolved: Record<string, unknown> = { ...row }
-  const localizableTypes = new Set(['string', 'text', 'richtext', 'uid', 'array', 'navigation'])
+  const localizableTypes = new Set([
+    'string',
+    'text',
+    'richtext',
+    'uid',
+    'array',
+    'table',
+    'navigation',
+  ])
   for (const f of ct.fields) {
     if (!localizableTypes.has(f.type)) continue
     let val: unknown = undefined
@@ -432,7 +440,7 @@ export const createEntry: SlugParam = async (req, res) => {
     if (existing[0]) {
       const setClauses = fields
         .map((f, i) =>
-          f.type === 'media-gallery' || f.type === 'array'
+          f.type === 'media-gallery' || f.type === 'array' || f.type === 'table'
             || f.type === 'navigation'
             ? `${quoteIdentifier(f.name)} = $${i + 1}::jsonb`
             : `${quoteIdentifier(f.name)} = $${i + 1}`,
@@ -449,7 +457,12 @@ export const createEntry: SlugParam = async (req, res) => {
         ...fields.map((f) => {
           const v = req.body[f.name]
           const normalized = f.type === 'navigation' ? normalizeNavigationItems(v) : v
-          return f.type === 'media-gallery' || f.type === 'array' || f.type === 'navigation'
+          return (
+            f.type === 'media-gallery' ||
+            f.type === 'array' ||
+            f.type === 'table' ||
+            f.type === 'navigation'
+          )
             ? JSON.stringify(normalized)
             : v
         }),
@@ -490,7 +503,7 @@ export const createEntry: SlugParam = async (req, res) => {
     '$1',
     '$2',
     ...fields.map((f, i) =>
-      f.type === 'media-gallery' || f.type === 'array' || f.type === 'navigation'
+      f.type === 'media-gallery' || f.type === 'array' || f.type === 'table' || f.type === 'navigation'
         ? `$${i + 3}::jsonb`
         : `$${i + 3}`,
     ),
@@ -502,7 +515,12 @@ export const createEntry: SlugParam = async (req, res) => {
     ...fields.map((f) => {
       const v = req.body[f.name]
       const normalized = f.type === 'navigation' ? normalizeNavigationItems(v) : v
-      return f.type === 'media-gallery' || f.type === 'array' || f.type === 'navigation'
+      return (
+        f.type === 'media-gallery' ||
+        f.type === 'array' ||
+        f.type === 'table' ||
+        f.type === 'navigation'
+      )
         ? JSON.stringify(normalized)
         : v
     }),
@@ -605,7 +623,7 @@ export const updateEntry: SlugIdParam = async (req, res) => {
 
   const setClauses = fields
     .map((f, i) =>
-      f.type === 'media-gallery' || f.type === 'array'
+      f.type === 'media-gallery' || f.type === 'array' || f.type === 'table'
         || f.type === 'navigation'
         ? `${quoteIdentifier(f.name)} = $${i + 1}::jsonb`
         : `${quoteIdentifier(f.name)} = $${i + 1}`,
@@ -622,7 +640,12 @@ export const updateEntry: SlugIdParam = async (req, res) => {
     ...fields.map((f) => {
       const v = req.body[f.name]
       const normalized = f.type === 'navigation' ? normalizeNavigationItems(v) : v
-      return f.type === 'media-gallery' || f.type === 'array' || f.type === 'navigation'
+      return (
+        f.type === 'media-gallery' ||
+        f.type === 'array' ||
+        f.type === 'table' ||
+        f.type === 'navigation'
+      )
         ? JSON.stringify(normalized)
         : v
     }),

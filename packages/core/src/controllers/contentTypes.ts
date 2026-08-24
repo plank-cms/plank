@@ -125,6 +125,7 @@ const FieldSchema = z.object({
     'relation',
     'uid',
     'array',
+    'table',
     'navigation',
     'separator',
   ]),
@@ -138,6 +139,8 @@ const FieldSchema = z.object({
   allowedTypes: z.array(z.enum(['image', 'video', 'audio', 'document'])).optional(),
   width: z.enum(['full', 'two-thirds', 'half', 'third']).optional(),
   arrayFields: z.array(ArraySubFieldSchema).optional(),
+  tableColumns: z.number().int().min(1).optional(),
+  tableHasHeader: z.boolean().optional(),
 })
 
 const ContentTypeSchema = z.object({

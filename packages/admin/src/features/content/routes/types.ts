@@ -10,6 +10,7 @@ export type FieldType =
   | 'relation'
   | 'uid'
   | 'array'
+  | 'table'
   | 'navigation'
   | 'separator'
 
@@ -20,6 +21,8 @@ export type FieldDef = {
   type: FieldType
   relationType?: RelationType
   relatedSlug?: string
+  tableColumns?: number
+  tableHasHeader?: boolean
 }
 
 export type ContentType = { name: string; slug: string; fields: FieldDef[] }

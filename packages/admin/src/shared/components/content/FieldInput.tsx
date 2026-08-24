@@ -69,6 +69,7 @@ type FieldType =
   | 'relation'
   | 'uid'
   | 'array'
+  | 'table'
   | 'navigation'
   | 'separator'
 type RelationType = 'many-to-one' | 'one-to-one' | 'one-to-many' | 'many-to-many'
@@ -106,6 +107,8 @@ export type FieldDef = {
   allowedTypes?: ('image' | 'video' | 'audio' | 'document')[]
   width?: string
   arrayFields?: ArraySubField[]
+  tableColumns?: number
+  tableHasHeader?: boolean
 }
 
 type FieldInputProps = {
@@ -1617,6 +1620,122 @@ function ArrayInput({
   )
 }
 
+function TableInput({
+  field,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  field: FieldDef
+  value: unknown
+  onChange: (v: unknown) => void
+  disabled?: boolean
+}) {
+  const columns = field.tableColumns ?? 1
+  const hasHeader = Boolean(field.tableHasHeader)
+  const rows = Array.isArray(value)
+    ? value.map((row) =>
+        Array.isArray(row)
+          ? Array.from({ length: columns }, (_, index) => String(row[index] ?? ''))
+          : Array.from({ length: columns }, () => ''),
+      )
+    : []
+
+  function emptyRow() {
+    return Array.from({ length: columns }, () => '')
+  }
+
+  function ensureHeader(source: string[][]) {
+    return hasHeader && source.length === 0 ? [emptyRow()] : source
+  }
+
+  function changeCell(rowIndex: number, columnIndex: number, cellValue: string) {
+    const next = ensureHeader(rows).map((row) => [...row])
+    next[rowIndex][columnIndex] = cellValue
+    onChange(next)
+  }
+
+  function addRow() {
+    onChange([...ensureHeader(rows), emptyRow()])
+  }
+
+  function removeRow(rowIndex: number) {
+    onChange(rows.filter((_, index) => index !== rowIndex))
+  }
+
+  const displayRows = hasHeader && rows.length === 0 ? [emptyRow()] : rows
+  const bodyRows = hasHeader ? displayRows.slice(1) : displayRows
+
+  return (
+    <div className="overflow-hidden rounded-md border">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          {hasHeader && (
+            <thead className="bg-muted/50">
+              <tr>
+                {displayRows[0]?.map((cell, columnIndex) => (
+                  <th key={columnIndex} className="min-w-32 border-b p-1 text-left">
+                    <Input
+                      value={cell}
+                      onChange={(event) => changeCell(0, columnIndex, event.target.value)}
+                      placeholder={`Header ${columnIndex + 1}`}
+                      disabled={disabled}
+                      className="h-8 border-0 bg-transparent px-2 font-medium shadow-none focus-visible:ring-0"
+                    />
+                  </th>
+                ))}
+                <th className="w-9 border-b" />
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {bodyRows.map((row, rowIndex) => {
+              const actualIndex = hasHeader ? rowIndex + 1 : rowIndex
+              return (
+                <tr key={actualIndex} className="border-b last:border-0">
+                  {row.map((cell, columnIndex) => (
+                    <td key={columnIndex} className="min-w-32 p-1">
+                      <Input
+                        value={cell}
+                        onChange={(event) =>
+                          changeCell(actualIndex, columnIndex, event.target.value)
+                        }
+                        disabled={disabled}
+                        className="h-8 border-0 px-2 shadow-none focus-visible:ring-0"
+                      />
+                    </td>
+                  ))}
+                  <td className="p-1 text-center">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => removeRow(actualIndex)}
+                      disabled={disabled}
+                      className="size-7 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <button
+        type="button"
+        onClick={addRow}
+        disabled={disabled}
+        className="flex w-full items-center justify-center gap-1.5 border-t border-dashed py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/50"
+      >
+        <PlusIcon className="size-3.5" />
+        Add row
+      </button>
+    </div>
+  )
+}
+
 type NavigationItem = {
   label: string
   href: string
@@ -2210,6 +2329,12 @@ export function FieldInput({
   if (field.type === 'array') {
     return (
       <ArrayInput field={field} value={value} onChange={onChange} disabled={Boolean(disabled)} />
+    )
+  }
+
+  if (field.type === 'table') {
+    return (
+      <TableInput field={field} value={value} onChange={onChange} disabled={Boolean(disabled)} />
     )
   }
 

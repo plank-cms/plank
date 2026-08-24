@@ -8,7 +8,7 @@ import {
   ownsManyToManyRelation,
 } from './fieldTypes.js'
 import type { ContentType, FieldDefinition } from './types.js'
-import { findAllContentTypes } from './store.js'
+import { findAllContentTypes, updateContentType } from './store.js'
 
 function buildColumnDef(field: FieldDefinition): string | null {
   if (isVirtualField(field)) return null
@@ -45,6 +45,55 @@ function relationSignature(field: FieldDefinition): string {
   if (field.type !== 'relation') return ''
   const rt = field.relationType ?? 'many-to-one'
   return `${rt}:${field.relatedTable ?? ''}`
+}
+
+function isInvalidManyToManyInverse(
+  field: FieldDefinition,
+  contentTypes: Map<string, ContentType>,
+): boolean {
+  if (
+    field.type !== 'relation' ||
+    (field.relationType ?? 'many-to-one') !== 'many-to-many' ||
+    !field.relatedTable ||
+    !field.relatedField
+  ) {
+    return false
+  }
+
+  const relatedField = contentTypes
+    .get(field.relatedTable)
+    ?.fields.find((candidate) => candidate.name === field.relatedField)
+  if (!relatedField) return true
+
+  return (
+    relatedField?.type === 'relation' &&
+    (relatedField.relationType ?? 'many-to-one') === 'many-to-many' &&
+    Boolean(relatedField.relatedField)
+  )
+}
+
+async function pruneInvalidManyToManyInverses(): Promise<ContentType[]> {
+  const contentTypes = await findAllContentTypes()
+  const byTableName = new Map(contentTypes.map((contentType) => [contentType.tableName, contentType]))
+
+  await Promise.all(
+    contentTypes.map(async (contentType) => {
+      const fields = contentType.fields.filter(
+        (field) => !isInvalidManyToManyInverse(field, byTableName),
+      )
+
+      if (fields.length !== contentType.fields.length) {
+        await updateContentType(contentType.slug, { ...contentType, fields })
+      }
+    }),
+  )
+
+  return contentTypes.map((contentType) => {
+    const fields = contentType.fields.filter(
+      (field) => !isInvalidManyToManyInverse(field, byTableName),
+    )
+    return fields.length === contentType.fields.length ? contentType : { ...contentType, fields }
+  })
 }
 
 export async function createTable(contentType: ContentType): Promise<void> {
@@ -222,7 +271,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
 }
 
 export async function syncAllTables(): Promise<void> {
-  const contentTypes = await findAllContentTypes()
+  const contentTypes = await pruneInvalidManyToManyInverses()
 
   for (const ct of contentTypes) {
     assertSafeIdentifier(ct.tableName)

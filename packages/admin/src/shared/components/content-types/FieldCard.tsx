@@ -13,6 +13,7 @@ import {
   PencilIcon,
   Trash2Icon,
   LayoutListIcon,
+  TablePropertiesIcon,
   ListTreeIcon,
   SeparatorHorizontalIcon,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ type FieldType =
   | 'relation'
   | 'uid'
   | 'array'
+  | 'table'
   | 'navigation'
   | 'separator'
 type NumberSubtype = 'integer' | 'float'
@@ -68,6 +70,8 @@ export type FieldCardData = {
   allowedTypes?: MediaAllowedType[]
   width?: FieldWidth
   arrayFields?: ArraySubField[]
+  tableColumns?: number
+  tableHasHeader?: boolean
 }
 
 type FieldMeta = {
@@ -133,6 +137,13 @@ function getFieldMeta(type: FieldType | ArraySubFieldType, subtype?: NumberSubty
       return { icon: FingerprintIcon, label: 'UID', color: 'text-teal-600', bg: 'bg-teal-50' }
     case 'array':
       return { icon: LayoutListIcon, label: 'Array', color: 'text-cyan-600', bg: 'bg-cyan-50' }
+    case 'table':
+      return {
+        icon: TablePropertiesIcon,
+        label: 'Table',
+        color: 'text-lime-700',
+        bg: 'bg-lime-50',
+      }
     case 'navigation':
       return { icon: ListTreeIcon, label: 'Navigation', color: 'text-cyan-600', bg: 'bg-cyan-50' }
     case 'separator':
@@ -164,6 +175,7 @@ export const DEFAULT_FIELD_WIDTH: Record<FieldType, FieldWidth> = {
   relation: 'half',
   uid: 'half',
   array: 'full',
+  table: 'full',
   navigation: 'full',
   separator: 'full',
 }
@@ -259,6 +271,7 @@ export function FieldCard({
   const currentWidth = field.width ?? 'full'
   const isDraggable = Boolean(dragListeners)
   const isArray = field.type === 'array'
+  const isTable = field.type === 'table'
   const isInverse = Boolean(field.relatedField)
 
   return (
@@ -391,6 +404,11 @@ export function FieldCard({
             )
           })}
         </div>
+      )}
+      {isTable && (
+        <p className="px-3 pb-3 text-xs text-muted-foreground">
+          {field.tableColumns ?? 1} columns · {field.tableHasHeader ? 'With header row' : 'No header row'}
+        </p>
       )}
     </div>
   )

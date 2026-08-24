@@ -16,6 +16,7 @@ import {
   PencilIcon,
   Trash2Icon,
   ListTreeIcon,
+  TablePropertiesIcon,
   SeparatorHorizontalIcon,
   ChevronUpIcon,
   ChevronDownIcon,
@@ -219,6 +220,14 @@ const TYPE_OPTIONS: TypeOption[] = [
     bg: 'bg-cyan-50',
   },
   {
+    type: 'table',
+    icon: TablePropertiesIcon,
+    label: 'Table',
+    description: 'Rows and columns of text',
+    color: 'text-lime-700',
+    bg: 'bg-lime-50',
+  },
+  {
     type: 'navigation',
     icon: ListTreeIcon,
     label: 'Navigation',
@@ -377,6 +386,8 @@ type ConfigState = {
   targetField: string
   allowedTypes: MediaAllowedType[]
   arrayFields: ArraySubField[]
+  tableColumns: number
+  tableHasHeader: boolean
 }
 
 const EMPTY_CONFIG: ConfigState = {
@@ -388,6 +399,8 @@ const EMPTY_CONFIG: ConfigState = {
   targetField: '',
   allowedTypes: [],
   arrayFields: [],
+  tableColumns: 3,
+  tableHasHeader: true,
 }
 
 function getSeparatorName(existingNames: string[]): string {
@@ -452,6 +465,8 @@ export function AddFieldDialog({
         targetField: initialField.targetField ?? '',
         allowedTypes: initialField.allowedTypes ?? [],
         arrayFields: initialField.arrayFields ?? [],
+        tableColumns: initialField.tableColumns ?? 3,
+        tableHasHeader: initialField.tableHasHeader ?? true,
       })
     }
   }, [open, initialField])
@@ -647,6 +662,8 @@ export function AddFieldDialog({
         selected.type === 'array'
           ? config.arrayFields.map((f) => ({ ...f, name: f.name.trim() }))
           : undefined,
+      tableColumns: selected.type === 'table' ? config.tableColumns : undefined,
+      tableHasHeader: selected.type === 'table' ? config.tableHasHeader : undefined,
       width:
         selected.type === 'separator'
           ? undefined
@@ -1000,6 +1017,39 @@ export function AddFieldDialog({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {selected?.type === 'table' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="table-columns">Columns</Label>
+                  <Input
+                    id="table-columns"
+                    type="number"
+                    min={1}
+                    value={config.tableColumns}
+                    onChange={(e) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        tableColumns: Math.max(1, Number(e.target.value) || 1),
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">At least one column.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="table-header"
+                    checked={config.tableHasHeader}
+                    onCheckedChange={(value) =>
+                      setConfig((prev) => ({ ...prev, tableHasHeader: Boolean(value) }))
+                    }
+                  />
+                  <Label htmlFor="table-header" className="cursor-pointer font-normal">
+                    Include a header row
+                  </Label>
+                </div>
               </div>
             )}
 

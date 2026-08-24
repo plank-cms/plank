@@ -37,7 +37,7 @@ export function EntryFieldsGrid({
   return (
     <div className="grid grid-cols-6 gap-4">
       {visibleFields.map((field) => {
-        const isLocalizable = ['string', 'text', 'richtext', 'array', 'navigation'].includes(
+        const isLocalizable = ['string', 'text', 'richtext', 'array', 'table', 'navigation'].includes(
           field.type,
         )
         const localizedValue =

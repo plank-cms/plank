@@ -34,6 +34,7 @@ export function toPostgresType(field: FieldDefinition): string {
     case 'uid':
       return 'VARCHAR(255) UNIQUE'
     case 'array':
+    case 'table':
     case 'navigation':
       return 'JSONB'
     default:
