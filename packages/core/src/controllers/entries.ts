@@ -5,6 +5,7 @@ import {
   validate,
   assertSafeIdentifier,
   isVirtualField,
+  ownsManyToManyRelation,
   quoteIdentifier,
 } from '@plank-cms/schema'
 import type { FieldDefinition } from '@plank-cms/schema'
@@ -328,13 +329,19 @@ async function loadManyToManyIds(
   await Promise.all(
     mmFields.map(async (f) => {
       const binding = resolveManyToManyBinding(tableName, f)
-      const { rows } = await pool.query<Record<'related_id', string>>(
-        `SELECT ${quoteIdentifier(binding.relatedIdColumn)} AS related_id
-         FROM ${quoteIdentifier(binding.junctionTable)}
-         WHERE ${quoteIdentifier(binding.currentIdColumn)} = $1`,
-        [entryId],
-      )
-      result[f.name] = rows.map((r) => r.related_id)
+      try {
+        const { rows } = await pool.query<Record<'related_id', string>>(
+          `SELECT ${quoteIdentifier(binding.relatedIdColumn)} AS related_id
+           FROM ${quoteIdentifier(binding.junctionTable)}
+           WHERE ${quoteIdentifier(binding.currentIdColumn)} = $1`,
+          [entryId],
+        )
+        result[f.name] = rows.map((r) => r.related_id)
+      } catch (error) {
+        const code = (error as { code?: string }).code
+        if (code !== '42P01' || ownsManyToManyRelation(f)) throw error
+        result[f.name] = []
+      }
     }),
   )
   return result

@@ -1,7 +1,13 @@
 export type { ContentType, FieldDefinition, FieldType, NumberSubtype, RelationType, ArraySubField, ArraySubFieldType } from './types.js'
 export { ValidationError, SchemaError } from './types.js'
 export { createTable, syncTable, syncAllTables } from './tableBuilder.js'
-export { assertSafeIdentifier, isVirtualField, isVirtualRelation, quoteIdentifier } from './fieldTypes.js'
+export {
+  assertSafeIdentifier,
+  isVirtualField,
+  isVirtualRelation,
+  ownsManyToManyRelation,
+  quoteIdentifier,
+} from './fieldTypes.js'
 export { validate } from './validator.js'
 export {
   findAllContentTypes,

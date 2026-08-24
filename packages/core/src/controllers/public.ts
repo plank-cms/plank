@@ -531,12 +531,17 @@ async function resolveRelationFields(
     }),
     ...mmFields.map(async (field) => {
       if (entryIds.length === 0) return
-      const jt = `_rel_${ct.tableName}_${field.name}`
+      const isInverse = Boolean(field.relatedField)
+      const jt = isInverse
+        ? `_rel_${field.relatedTable}_${field.relatedField}`
+        : `_rel_${ct.tableName}_${field.name}`
+      const currentIdColumn = isInverse ? 'target_id' : 'source_id'
+      const relatedIdColumn = isInverse ? 'source_id' : 'target_id'
       const { rows: jRows } = await pool.query<{ source_id: string; target_id: string }>(
-        `SELECT source_id, target_id FROM ${jt} WHERE source_id = ANY($1)`,
+        `SELECT source_id, target_id FROM ${jt} WHERE ${currentIdColumn} = ANY($1)`,
         [entryIds],
       )
-      const allTargetIds = [...new Set(jRows.map((r) => r.target_id))]
+      const allTargetIds = [...new Set(jRows.map((r) => r[relatedIdColumn]))]
       const relatedMap = new Map<string, Record<string, unknown>>()
       if (allTargetIds.length > 0) {
         assertSafeIdentifier(field.relatedTable!)
@@ -550,11 +555,11 @@ async function resolveRelationFields(
       }
       const sourceMap = new Map<string, Record<string, unknown>[]>()
       for (const row of jRows) {
-        const obj = relatedMap.get(row.target_id)
+        const obj = relatedMap.get(row[relatedIdColumn])
         if (!obj) continue
-        const list = sourceMap.get(row.source_id)
+        const list = sourceMap.get(row[currentIdColumn])
         if (list) list.push(obj)
-        else sourceMap.set(row.source_id, [obj])
+        else sourceMap.set(row[currentIdColumn], [obj])
       }
       for (const entry of entries) {
         entry[field.name] = sourceMap.get(entry.id as string) ?? []

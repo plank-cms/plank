@@ -5,6 +5,7 @@ import {
   toPostgresType,
   isVirtualField,
   hasRelationColumn,
+  ownsManyToManyRelation,
 } from './fieldTypes.js'
 import type { ContentType, FieldDefinition } from './types.js'
 import { findAllContentTypes } from './store.js'
@@ -83,11 +84,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
   }
 
   for (const field of contentType.fields) {
-    if (
-      field.type === 'relation' &&
-      (field.relationType ?? 'many-to-one') === 'many-to-many' &&
-      field.relatedTable
-    ) {
+    if (ownsManyToManyRelation(field) && field.relatedTable) {
       await pool.query(buildJunctionTableSQL(contentType.tableName, field.name, field.relatedTable))
     }
   }
@@ -112,11 +109,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
       if (colDef)
         statements.push(`ALTER TABLE ${quotedTableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
 
-      if (
-        field.type === 'relation' &&
-        (field.relationType ?? 'many-to-one') === 'many-to-many' &&
-        field.relatedTable
-      ) {
+      if (ownsManyToManyRelation(field) && field.relatedTable) {
         const sql = buildJunctionTableSQL(next.tableName, name, field.relatedTable)
         junctionOps.push(() => pool.query(sql))
       }
@@ -132,10 +125,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
         statements.push(`ALTER TABLE ${quotedTableName} DROP COLUMN ${quoteIdentifier(name)}`)
       }
 
-      if (
-        prevField.type === 'relation' &&
-        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
-      ) {
+      if (ownsManyToManyRelation(prevField)) {
         const jt = junctionTableName(next.tableName, name)
         junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${jt}`))
       }
@@ -153,10 +143,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
         statements.push(
           `ALTER TABLE ${quotedTableName} DROP COLUMN IF EXISTS ${quoteIdentifier(name)}`,
         )
-      } else if (
-        prevField.type === 'relation' &&
-        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
-      ) {
+      } else if (ownsManyToManyRelation(prevField)) {
         const junctionTable = junctionTableName(next.tableName, name)
         junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${junctionTable}`))
       }
@@ -166,11 +153,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
         if (colDef) {
           statements.push(`ALTER TABLE ${quotedTableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
         }
-      } else if (
-        nextField.type === 'relation' &&
-        (nextField.relationType ?? 'many-to-one') === 'many-to-many' &&
-        nextField.relatedTable
-      ) {
+      } else if (ownsManyToManyRelation(nextField) && nextField.relatedTable) {
         const sql = buildJunctionTableSQL(next.tableName, name, nextField.relatedTable)
         junctionOps.push(() => pool.query(sql))
       }
@@ -185,10 +168,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
 
       assertSafeIdentifier(name)
 
-      if (
-        prevField.type === 'relation' &&
-        (prevField.relationType ?? 'many-to-one') === 'many-to-many'
-      ) {
+      if (ownsManyToManyRelation(prevField)) {
         const jt = junctionTableName(next.tableName, name)
         junctionOps.push(() => pool.query(`DROP TABLE IF EXISTS ${jt}`))
       }
@@ -203,11 +183,7 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
           statements.push(`ALTER TABLE ${quotedTableName} ADD COLUMN IF NOT EXISTS ${colDef}`)
       }
 
-      if (
-        nextField.type === 'relation' &&
-        (nextField.relationType ?? 'many-to-one') === 'many-to-many' &&
-        nextField.relatedTable
-      ) {
+      if (ownsManyToManyRelation(nextField) && nextField.relatedTable) {
         const sql = buildJunctionTableSQL(next.tableName, name, nextField.relatedTable)
         junctionOps.push(() => pool.query(sql))
       }
@@ -238,10 +214,10 @@ export async function syncTable(next: ContentType, prev: ContentType): Promise<v
     } finally {
       client.release()
     }
+  }
 
-    for (const op of junctionOps) {
-      await op()
-    }
+  for (const op of junctionOps) {
+    await op()
   }
 }
 
@@ -320,11 +296,7 @@ export async function syncAllTables(): Promise<void> {
         }
       }
 
-      if (
-        field.type === 'relation' &&
-        (field.relationType ?? 'many-to-one') === 'many-to-many' &&
-        field.relatedTable
-      ) {
+      if (ownsManyToManyRelation(field) && field.relatedTable) {
         await pool.query(buildJunctionTableSQL(ct.tableName, field.name, field.relatedTable))
         console.log(`[plank] Created missing junction table for "${ct.tableName}.${field.name}"`)
       }

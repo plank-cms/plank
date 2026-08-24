@@ -404,8 +404,8 @@ export function ContentTypeForm() {
       <section className="mt-24">
         {fields.length > 0 ? (
           (() => {
-            const editableFields = fields.filter((f) => f.relationType !== 'one-to-many')
-            const inverseFields = fields.filter((f) => f.relationType === 'one-to-many')
+            const editableFields = fields.filter((f) => !f.relatedField)
+            const inverseFields = fields.filter((f) => Boolean(f.relatedField))
             return (
               <div className="flex flex-col gap-3">
                 {editableFields.length > 0 && (

@@ -227,13 +227,13 @@ async function syncInverseFields(savedCT: ContentType, prevCT: ContentType | nul
   // Fields that owned relation columns in the previous version
   const prevRelFields = new Map(
     (prevCT?.fields ?? [])
-      .filter((f) => f.type === 'relation' && f.relationType !== 'one-to-many')
+      .filter((f) => f.type === 'relation' && f.relationType !== 'one-to-many' && !f.relatedField)
       .map((f) => [f.name, f]),
   )
 
   // Fields that own relation columns in the new version
   const nextRelFields = savedCT.fields.filter(
-    (f) => f.type === 'relation' && f.relationType !== 'one-to-many',
+    (f) => f.type === 'relation' && f.relationType !== 'one-to-many' && !f.relatedField,
   )
 
   // Remove inverse fields for relation fields that were deleted or changed relatedTable

@@ -259,6 +259,7 @@ export function FieldCard({
   const currentWidth = field.width ?? 'full'
   const isDraggable = Boolean(dragListeners)
   const isArray = field.type === 'array'
+  const isInverse = Boolean(field.relatedField)
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-xs">
@@ -284,14 +285,14 @@ export function FieldCard({
               {field.name}
               {field.required && <span className="ml-1 text-destructive">*</span>}
             </p>
-            {field.relationType === 'one-to-many' && (
+            {isInverse && (
               <span className="shrink-0 rounded border border-indigo-200 bg-indigo-50 px-1 py-px text-[10px] font-medium text-indigo-600">
                 Auto
               </span>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {field.relationType === 'one-to-many' ? 'Inverse relation · read-only' : label}
+            {isInverse ? 'Inverse relation · read-only' : label}
           </p>
         </div>
 
