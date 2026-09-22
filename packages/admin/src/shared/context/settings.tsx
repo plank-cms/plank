@@ -6,6 +6,7 @@ interface SettingsContextValue {
   locales: string[]
   defaultLocale: string
   editorialMode: boolean
+  settingsLoaded: boolean
   refreshSettings: () => void
 }
 
@@ -14,6 +15,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   locales: ['en'],
   defaultLocale: 'en',
   editorialMode: false,
+  settingsLoaded: false,
   refreshSettings: () => {},
 })
 
@@ -23,9 +25,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [locales, setLocales] = useState<string[]>(['en'])
   const [defaultLocale, setDefaultLocale] = useState<string>('en')
   const [editorialMode, setEditorialMode] = useState(false)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const fetchSettings = useCallback(() => {
     if (status !== 'authenticated') return
+    setSettingsLoaded(false)
 
     // Editorial mode must be available to every authenticated role.
     fetch('/cms/admin/modes', {
@@ -64,11 +68,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (data?.default_locale) setDefaultLocale(data.default_locale)
       })
       .catch(() => {})
+      .finally(() => setSettingsLoaded(true))
   }, [status])
 
   useEffect(() => {
     if (status !== 'authenticated') {
       setEditorialMode(false)
+      setSettingsLoaded(false)
       return
     }
     fetchSettings()
@@ -76,7 +82,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   return (
     <SettingsContext.Provider
-      value={{ timezone, locales, defaultLocale, editorialMode, refreshSettings: fetchSettings }}
+      value={{
+        timezone,
+        locales,
+        defaultLocale,
+        editorialMode,
+        settingsLoaded,
+        refreshSettings: fetchSettings,
+      }}
     >
       {children}
     </SettingsContext.Provider>

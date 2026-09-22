@@ -27,7 +27,7 @@ import HeaderFixed from '@/shared/components/Header'
 import { EntryFieldsGrid } from './components/EntryFieldsGrid.tsx'
 import { EntryHeaderActions } from './components/EntryHeaderActions.tsx'
 import { EntryStatusBadge } from './components/EntryStatusBadge.tsx'
-import { LocalizationControls } from './components/LocalizationControls.tsx'
+import { LocalizationControls, LocalizationTabs } from './components/LocalizationControls.tsx'
 import { SchedulerPanel } from './components/SchedulerPanel.tsx'
 import { parseDuplicatedFieldName, stableStringify } from './lib/entryPage.ts'
 import type { ContentType, Entry, LocalizedData, UserOption } from './entryTypes.ts'
@@ -171,7 +171,8 @@ export function EntryForm() {
   const { slug, id } = useParams<{ slug: string; id: string }>()
   const navigate = useNavigate()
   const isNew = !id
-  const { timezone, locales: settingsLocales, defaultLocale, editorialMode } = useSettings()
+  const { timezone, locales: settingsLocales, defaultLocale, editorialMode, settingsLoaded } =
+    useSettings()
   const { user, status: authStatus } = useAuth()
   const role = user?.role?.toLowerCase() ?? ''
 
@@ -236,6 +237,11 @@ export function EntryForm() {
         : 'Preview is disabled. Configure Settings > Overview > Preview to enable it.'
 
   useEffect(() => {
+    if (!settingsLoaded) return
+
+    const configuredLocales = settingsLocales.length > 0 ? settingsLocales : ['en']
+    const initialLocale = defaultLocale || configuredLocales[0]
+
     if (isNew) {
       const empty: Record<string, unknown> = {}
       ct?.fields.forEach((f) => {
@@ -243,9 +249,8 @@ export function EntryForm() {
       })
       // prepare localized container and default locales
       empty.localized = {}
-      const defaults = settingsLocales && settingsLocales.length > 0 ? settingsLocales : ['en']
-      setLocales(defaults)
-      setActiveLocale(defaultLocale ?? defaults[0])
+      setLocales(configuredLocales)
+      setActiveLocale(initialLocale)
       setLocalizationEnabled(false)
       setValues(empty)
       setStatus('draft')
@@ -279,11 +284,10 @@ export function EntryForm() {
     const enabled = meta.enabled ?? detectedLocales.length > 0
     if (detectedLocales.length > 0) {
       setLocales(detectedLocales)
-      setActiveLocale(defaultLocale)
+      setActiveLocale(initialLocale)
     } else {
-      const defaults = settingsLocales && settingsLocales.length > 0 ? settingsLocales : ['en']
-      setLocales(defaults)
-      setActiveLocale(defaultLocale ?? defaults[0])
+      setLocales(configuredLocales)
+      setActiveLocale(initialLocale)
     }
     setLocalizationEnabled(Boolean(enabled))
     setValues(initial)
@@ -332,11 +336,7 @@ export function EntryForm() {
     } else {
       setIsPublishedStale(false)
     }
-  }, [existing, ct, isNew])
-
-  useEffect(() => {
-    if (localizationEnabled) setActiveLocale(defaultLocale)
-  }, [defaultLocale, localizationEnabled])
+  }, [existing, ct, isNew, settingsLoaded])
 
   const isDirty = stableStringify(values) !== original.current
 
@@ -455,6 +455,7 @@ export function EntryForm() {
 
   function toggleLocalization(enabled: boolean) {
     setLocalizationEnabled(enabled)
+    if (enabled) setActiveLocale(defaultLocale)
     setValues((prev) => {
       const next: Record<string, unknown> = { ...prev }
       const localized: LocalizedData =
@@ -841,7 +842,7 @@ export function EntryForm() {
     }
   }
 
-  const loading = loadingCt || (!isNew && loadingEntry)
+  const loading = !settingsLoaded || loadingCt || (!isNew && loadingEntry)
   const busy = saving || patching
   const permissions = user?.permissions ?? []
   const canWriteEntries = permissions.includes('*') || permissions.includes('entries:write')
@@ -952,48 +953,59 @@ export function EntryForm() {
               <p className="mt-1 text-xs text-amber-600">{previewSetupError}</p>
             )}
           </div>
-          <EntryHeaderActions
-            isNew={isNew}
-            canDeleteCurrentEntry={canDeleteCurrentEntry}
-            isReadOnlySingle={isReadOnlySingle}
-            deleting={deleting}
-            onDeleteClick={() => setDeleteConfirmOpen(true)}
-            status={status}
-            readOnly={readOnly}
-            onRevertToDraft={handleRevertToDraft}
-            busy={busy}
-            patching={patching}
-            showReviewerControl={showReviewerControl}
-            assignedEditorId={assignedEditorId}
-            assignedEditorAvatarUrl={assignedEditorAvatarUrl}
-            assignedEditorFirstName={assignedEditorFirstName}
-            assignedEditorLastName={assignedEditorLastName}
-            reviewerLabel={reviewerLabel}
-            handleAssignEditor={handleAssignEditor}
-            canManageReviewer={canManageReviewer}
-            isEditorRole={isEditorRole}
-            reviewerCandidates={reviewerCandidates}
-            showReviewerInfo={showReviewerInfo}
-            showReviewEditButton={showReviewEditButton}
-            onToggleReviewLock={handleToggleReviewLock}
-            showRejectButton={showRejectButton}
-            onReject={handleReject}
-            supportsPreviewUI={supportsPreviewUI}
-            previewEnabled={previewConfig.enabled}
-            canOpenPreview={canOpenPreview}
-            onOpenPreview={handleOpenPreview}
-            previewSetupError={previewSetupError}
-            previewHint={previewHint}
-            onSaveDraft={handleSaveDraft}
-            editorialMode={editorialMode}
-            saveDraftEnabled={saveDraftEnabled}
-            onOpenScheduler={openScheduler}
-            isContributorRole={isContributorRole}
-            canPublish={canPublish}
-            onPublish={handlePublish}
-            publishLabel={publishLabel}
-            isPublishedStale={isPublishedStale}
-          />
+          <div className="flex shrink-0 items-center gap-4">
+            {localizationEnabled && (
+              <LocalizationTabs
+                readOnly={readOnly}
+                activeLocale={activeLocale}
+                onActiveLocaleChange={handleLocaleChange}
+                locales={locales}
+                defaultLocale={defaultLocale}
+              />
+            )}
+            <EntryHeaderActions
+              isNew={isNew}
+              canDeleteCurrentEntry={canDeleteCurrentEntry}
+              isReadOnlySingle={isReadOnlySingle}
+              deleting={deleting}
+              onDeleteClick={() => setDeleteConfirmOpen(true)}
+              status={status}
+              readOnly={readOnly}
+              onRevertToDraft={handleRevertToDraft}
+              busy={busy}
+              patching={patching}
+              showReviewerControl={showReviewerControl}
+              assignedEditorId={assignedEditorId}
+              assignedEditorAvatarUrl={assignedEditorAvatarUrl}
+              assignedEditorFirstName={assignedEditorFirstName}
+              assignedEditorLastName={assignedEditorLastName}
+              reviewerLabel={reviewerLabel}
+              handleAssignEditor={handleAssignEditor}
+              canManageReviewer={canManageReviewer}
+              isEditorRole={isEditorRole}
+              reviewerCandidates={reviewerCandidates}
+              showReviewerInfo={showReviewerInfo}
+              showReviewEditButton={showReviewEditButton}
+              onToggleReviewLock={handleToggleReviewLock}
+              showRejectButton={showRejectButton}
+              onReject={handleReject}
+              supportsPreviewUI={supportsPreviewUI}
+              previewEnabled={previewConfig.enabled}
+              canOpenPreview={canOpenPreview}
+              onOpenPreview={handleOpenPreview}
+              previewSetupError={previewSetupError}
+              previewHint={previewHint}
+              onSaveDraft={handleSaveDraft}
+              editorialMode={editorialMode}
+              saveDraftEnabled={saveDraftEnabled}
+              onOpenScheduler={openScheduler}
+              isContributorRole={isContributorRole}
+              canPublish={canPublish}
+              onPublish={handlePublish}
+              publishLabel={publishLabel}
+              isPublishedStale={isPublishedStale}
+            />
+          </div>
         </div>
       </HeaderFixed>
 
@@ -1018,10 +1030,6 @@ export function EntryForm() {
           localizationEnabled={localizationEnabled}
           onToggleLocalization={toggleLocalization}
           readOnly={readOnly}
-          activeLocale={activeLocale}
-          onActiveLocaleChange={handleLocaleChange}
-          locales={locales}
-          defaultLocale={defaultLocale}
         />
         <EntryFieldsGrid
           ct={ct}

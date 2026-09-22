@@ -1,7 +1,7 @@
 import { Switch } from '@/shared/ui/switch.tsx'
 import { Tabs, TabsList, TabsTrigger } from '@/shared/ui/tabs.tsx'
 
-type LocalizationControlsProps = {
+type LocalizationProps = {
   localizationEnabled: boolean
   onToggleLocalization: (enabled: boolean) => void
   readOnly: boolean
@@ -11,15 +11,45 @@ type LocalizationControlsProps = {
   defaultLocale: string
 }
 
+type LocalizationControlsProps = Pick<
+  LocalizationProps,
+  'localizationEnabled' | 'onToggleLocalization' | 'readOnly'
+>
+
 export function LocalizationControls({
   localizationEnabled,
   onToggleLocalization,
+  readOnly,
+}: LocalizationControlsProps) {
+  return (
+    <div className="mb-4 flex items-center">
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={localizationEnabled}
+          onCheckedChange={onToggleLocalization}
+          disabled={readOnly}
+        />
+        <div>
+          <p className="text-sm font-medium">Localization</p>
+          <p className="text-xs text-muted-foreground">Enable per-entry localization</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type LocalizationTabsProps = Pick<
+  LocalizationProps,
+  'readOnly' | 'activeLocale' | 'onActiveLocaleChange' | 'locales' | 'defaultLocale'
+>
+
+export function LocalizationTabs({
   readOnly,
   activeLocale,
   onActiveLocaleChange,
   locales,
   defaultLocale,
-}: LocalizationControlsProps) {
+}: LocalizationTabsProps) {
   const orderedLocales = [...new Set([defaultLocale, ...locales])].sort((left, right) => {
     if (left === defaultLocale) return -1
     if (right === defaultLocale) return 1
@@ -27,34 +57,14 @@ export function LocalizationControls({
   })
 
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={localizationEnabled}
-            onCheckedChange={onToggleLocalization}
-            disabled={readOnly}
-          />
-          <div>
-            <p className="text-sm font-medium">Localization</p>
-            <p className="text-xs text-muted-foreground">Enable per-entry localization</p>
-          </div>
-        </div>
-        <div />
-      </div>
-      <div>
-        {localizationEnabled && (
-          <Tabs value={activeLocale} onValueChange={onActiveLocaleChange}>
-            <TabsList>
-              {orderedLocales.map((locale) => (
-                <TabsTrigger key={locale} value={locale} disabled={readOnly}>
-                  {locale.toUpperCase()}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
-      </div>
-    </div>
+    <Tabs value={activeLocale} onValueChange={onActiveLocaleChange}>
+      <TabsList className="w-auto">
+        {orderedLocales.map((locale) => (
+          <TabsTrigger key={locale} value={locale} disabled={readOnly}>
+            {locale.toUpperCase()}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   )
 }
