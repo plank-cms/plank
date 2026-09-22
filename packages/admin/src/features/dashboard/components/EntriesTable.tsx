@@ -46,7 +46,13 @@ export function EntriesTable({
 }: EntriesTableProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-background">
-      <Table className="w-full text-sm">
+      <Table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col className="w-[42%]" />
+          <col className="w-[24%]" />
+          <col className="w-[14%]" />
+          <col className="w-[20%]" />
+        </colgroup>
         <TableHeader className="border-b border-border font-bold uppercase">
           <TableRow className="hover:bg-transparent">
             <TableHead colSpan={4} className="h-auto px-4 py-3">
