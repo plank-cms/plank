@@ -97,7 +97,7 @@ export function getUpdateDependencyCommand(
   if (name === 'pnpm') {
     return {
       command: 'pnpm',
-      args: ['add', '--save-exact', target],
+      args: ['add', '--save-exact', '--force', target],
     }
   }
 
