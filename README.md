@@ -24,6 +24,8 @@ Plank is a headless CMS that runs as a standalone Express server and exposes a R
 
 The API is token-authenticated. Tokens are managed from the admin panel and can be scoped to read-only or full access.
 
+MCP clients can discover schemas and prepare draft entries through `/mcp` using an MCP Server token. See the [MCP integration guide](packages/core/MCP.md).
+
 ## Architecture
 
 - **Server** — Express 5, REST API, JWT auth, role-based access control

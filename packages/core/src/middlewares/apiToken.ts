@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { createHash } from 'node:crypto'
 import { pool } from '@plank-cms/db'
+import { resolveMcpIdentity } from '../services/mcpAuth.js'
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const PUBLIC_API_ACCESS_TYPES = new Set<Express.ApiTokenAccessType>(['read-only', 'full-access'])
@@ -44,6 +45,15 @@ async function enforceApiToken(
   req.apiToken = {
     id: rows[0].id,
     accessType: rows[0].access_type,
+  }
+
+  if (rows[0].access_type === 'mcp-server') {
+    const identity = await resolveMcpIdentity(rows[0].id)
+    if (!identity) {
+      res.status(401).json({ error: 'MCP token owner is unavailable or disabled' })
+      return
+    }
+    req.user = { id: identity.id, roleId: identity.roleId }
   }
 
   next()

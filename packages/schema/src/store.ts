@@ -29,15 +29,18 @@ function rowToContentType(row: ContentTypeRow): ContentType {
   }
 }
 
-export async function findAllContentTypes(): Promise<ContentType[]> {
-  const { rows } = await pool.query<ContentTypeRow>(
-    'SELECT * FROM plank_content_types ORDER BY name',
-  )
+export async function findAllContentTypes(
+  db: Pick<typeof pool, 'query'> = pool,
+): Promise<ContentType[]> {
+  const { rows } = await db.query<ContentTypeRow>('SELECT * FROM plank_content_types ORDER BY name')
   return rows.map(rowToContentType)
 }
 
-export async function findContentTypeBySlug(slug: string): Promise<ContentType | null> {
-  const { rows } = await pool.query<ContentTypeRow>(
+export async function findContentTypeBySlug(
+  slug: string,
+  db: Pick<typeof pool, 'query'> = pool,
+): Promise<ContentType | null> {
+  const { rows } = await db.query<ContentTypeRow>(
     'SELECT * FROM plank_content_types WHERE slug = $1',
     [slug],
   )

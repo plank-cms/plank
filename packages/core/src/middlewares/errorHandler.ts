@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import { ValidationError, SchemaError } from '@plank-cms/schema'
+import { EntryError } from '../services/entries.js'
 import { ZodError, flattenError } from 'zod'
 
 type PostgresError = {
@@ -22,6 +23,11 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  if (err instanceof EntryError) {
+    res.status(err.status).json({ error: err.message })
+    return
+  }
+
   if (err instanceof ValidationError) {
     res.status(400).json({ errors: err.errors })
     return

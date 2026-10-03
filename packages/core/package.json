@@ -17,11 +17,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "node --env-file=../../.env --import tsx/esm --watch src/index.ts",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "tsx --tsconfig tsconfig.test.json --test src/controllers/mcp.test.ts src/services/mcpEntries.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.995.0",
     "@aws-sdk/s3-request-presigner": "3.995.0",
+    "@modelcontextprotocol/node": "2.1.0",
+    "@modelcontextprotocol/server": "2.2.0",
     "@plank-cms/db": "workspace:*",
     "@plank-cms/schema": "workspace:*",
     "bcryptjs": "3.0.3",
@@ -36,6 +39,7 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.2.0",
     "@types/bcryptjs": "3.0.0",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",

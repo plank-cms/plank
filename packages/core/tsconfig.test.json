@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "paths": {
+      "@plank-cms/schema": ["../schema/src/index.ts"],
+      "@plank-cms/db": ["../db/src/index.ts"]
+    }
+  },
+  "include": ["src", "../schema/src", "../db/src"]
+}

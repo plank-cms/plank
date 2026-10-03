@@ -1,34 +1,19 @@
 import type { Request, Response } from 'express'
-import { findAllContentTypes, findContentTypeBySlug } from '@plank-cms/schema'
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server'
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node'
+import { z } from 'zod'
+import { findAllContentTypes, findContentTypeBySlug, ValidationError } from '@plank-cms/schema'
 import { getSettings } from '../lib/settings.js'
 import { getCurrentVersion } from '../lib/version.js'
+import { resolveAppModes } from '../lib/appModes.js'
+import { resolveMcpIdentity, hasMcpPermission } from '../services/mcpAuth.js'
+import type { McpIdentity } from '../services/mcpAuth.js'
+import { EntryError, listEntryData, getEntryData } from '../services/entries.js'
+import type { EntryContext } from '../services/entries.js'
+import { writeMcpEntry, McpEntryError } from '../services/mcpEntries.js'
 
-const MCP_PROTOCOL_VERSION = '2025-11-25'
-const JSON_RPC_VERSION = '2.0'
 const CONTENT_TYPES_URI = 'plank://content-types'
 const LOCALES_URI = 'plank://locales'
-
-type JsonRpcId = string | number
-
-type JsonRpcError = {
-  code: number
-  message: string
-  data?: unknown
-}
-
-type JsonRpcRequest = {
-  jsonrpc?: string
-  id?: JsonRpcId
-  method?: string
-  params?: unknown
-}
-
-type JsonRpcResponse = {
-  jsonrpc: '2.0'
-  id: JsonRpcId | null
-  result?: unknown
-  error?: JsonRpcError
-}
 
 type ContentTypeSummary = {
   name: string
@@ -51,14 +36,16 @@ function parseLocales(raw: string | undefined, fallback: string): string[] {
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return [fallback]
 
-    const locales = parsed.filter((value): value is string => typeof value === 'string' && value.length > 0)
+    const locales = parsed.filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    )
     return locales.length > 0 ? [...new Set(locales)] : [fallback]
   } catch {
     return [fallback]
   }
 }
 
-async function getLocalesPayload(): Promise<{ defaultLocale: string; locales: string[] }> {
+export async function getLocalesPayload(): Promise<{ defaultLocale: string; locales: string[] }> {
   const settings = await getSettings('general')
   const defaultLocale = settings.default_locale ?? 'en'
   const locales = parseLocales(settings.locales, defaultLocale)
@@ -70,7 +57,7 @@ async function getLocalesPayload(): Promise<{ defaultLocale: string; locales: st
   return { defaultLocale, locales }
 }
 
-async function getContentTypeSummaries(): Promise<ContentTypeSummary[]> {
+export async function getContentTypeSummaries(): Promise<ContentTypeSummary[]> {
   const contentTypes = await findAllContentTypes()
   return contentTypes.map((contentType) => ({
     name: contentType.name,
@@ -83,231 +70,264 @@ async function getContentTypeSummaries(): Promise<ContentTypeSummary[]> {
   }))
 }
 
-async function listResources() {
-  const contentTypes = await getContentTypeSummaries()
-
-  return [
-    {
-      name: 'content-types',
-      title: 'Content Types',
-      uri: CONTENT_TYPES_URI,
-      description: 'Lists the content types available in this Plank instance.',
-      mimeType: 'application/json',
-    },
-    {
-      name: 'locales',
-      title: 'Locales',
-      uri: LOCALES_URI,
-      description: 'Lists the enabled locales and the default locale for this Plank instance.',
-      mimeType: 'application/json',
-    },
-    ...contentTypes.map((contentType) => ({
-      name: `content-type-schema-${contentType.slug}`,
-      title: `${contentType.name} schema`,
-      uri: contentType.schemaUri,
-      description: `Schema for the "${contentType.slug}" content type.`,
-      mimeType: 'application/json',
-      annotations: contentType.updatedAt
-        ? {
-            lastModified: contentType.updatedAt,
-          }
-        : undefined,
-    })),
-  ]
+function toolResult(payload: Record<string, unknown>, isError = false) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+    structuredContent: payload,
+    ...(isError ? { isError: true } : {}),
+  }
 }
 
-async function readResource(uri: string) {
-  if (uri === CONTENT_TYPES_URI) {
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: 'application/json',
-          text: JSON.stringify({ contentTypes: await getContentTypeSummaries() }, null, 2),
-        },
-      ],
-    }
-  }
-
-  if (uri === LOCALES_URI) {
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: 'application/json',
-          text: JSON.stringify(await getLocalesPayload(), null, 2),
-        },
-      ],
-    }
-  }
-
-  const match = /^plank:\/\/content-types\/([^/]+)\/schema$/.exec(uri)
-  if (!match) {
-    throw buildJsonRpcError(-32602, 'Unknown resource URI', { uri })
-  }
-
-  const slug = decodeURIComponent(match[1] ?? '')
-  const contentType = await findContentTypeBySlug(slug)
-  if (!contentType) {
-    throw buildJsonRpcError(-32004, 'Content type not found', { slug })
-  }
-
-  return {
-    contents: [
+export function mcpError(error: unknown) {
+  if (error instanceof McpEntryError)
+    return toolResult({ error: { code: error.code, message: error.message } }, true)
+  if (error instanceof ValidationError)
+    return toolResult(
       {
-        uri,
-        mimeType: 'application/json',
-        text: JSON.stringify(contentType, null, 2),
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Entry validation failed',
+          details: error.errors,
+        },
       },
-    ],
+      true,
+    )
+  if (error instanceof EntryError) {
+    const code =
+      error.status === 404 ? 'NOT_FOUND' : error.status === 403 ? 'FORBIDDEN' : 'INVALID_ARGUMENT'
+    return toolResult({ error: { code, message: error.message } }, true)
   }
+  const code = (error as { code?: string })?.code
+  if (code === '23505')
+    return toolResult(
+      { error: { code: 'CONFLICT', message: 'A unique value already exists.' } },
+      true,
+    )
+  if (code === '23503')
+    return toolResult(
+      { error: { code: 'INVALID_REFERENCE', message: 'An entry reference is invalid.' } },
+      true,
+    )
+  return toolResult({ error: { code: 'INTERNAL_ERROR', message: 'The operation failed.' } }, true)
 }
 
-function buildJsonRpcError(code: number, message: string, data?: unknown): JsonRpcError {
-  return data === undefined ? { code, message } : { code, message, data }
-}
-
-function buildResult(id: JsonRpcId, result: unknown): JsonRpcResponse {
-  return {
-    jsonrpc: JSON_RPC_VERSION,
-    id,
-    result,
-  }
-}
-
-function buildError(id: JsonRpcId | null, error: JsonRpcError): JsonRpcResponse {
-  return {
-    jsonrpc: JSON_RPC_VERSION,
-    id,
-    error,
-  }
-}
-
-function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-async function handleRequest(message: JsonRpcRequest): Promise<JsonRpcResponse | null> {
-  if (message.jsonrpc !== JSON_RPC_VERSION) {
-    return buildError(message.id ?? null, buildJsonRpcError(-32600, 'Invalid JSON-RPC version'))
-  }
-
-  if (typeof message.method !== 'string' || message.method.length === 0) {
-    return buildError(message.id ?? null, buildJsonRpcError(-32600, 'Invalid method'))
-  }
-
-  if (message.id === undefined) {
-    if (message.method === 'notifications/initialized') {
-      return null
-    }
-
-    return null
-  }
-
+async function resourceOperation<T>(operation: () => Promise<T>): Promise<T> {
   try {
-    switch (message.method) {
-      case 'initialize': {
-        const version = await getCurrentVersion()
-        return buildResult(message.id, {
-          protocolVersion: MCP_PROTOCOL_VERSION,
-          capabilities: {
-            resources: {},
-          },
-          serverInfo: {
-            name: 'plank-cms',
-            title: 'Plank CMS',
-            version,
-          },
-          instructions:
-            'Use resources/list to discover available resources, then resources/read to load Plank content types, per-type schemas, and locales.',
-        })
-      }
-
-      case 'ping':
-        return buildResult(message.id, {})
-
-      case 'resources/list':
-        return buildResult(message.id, { resources: await listResources() })
-
-      case 'resources/read': {
-        const uri = (message.params as { uri?: unknown } | undefined)?.uri
-        if (typeof uri !== 'string' || uri.length === 0) {
-          return buildError(message.id, buildJsonRpcError(-32602, 'A resource URI is required'))
-        }
-
-        return buildResult(message.id, await readResource(uri))
-      }
-
-      default:
-        return buildError(message.id, buildJsonRpcError(-32601, 'Method not found', { method: message.method }))
-    }
+    return await operation()
   } catch (error) {
-    if (isJsonRpcError(error)) {
-      return buildError(message.id, error)
-    }
-
-    return buildError(message.id, buildJsonRpcError(-32603, 'Internal server error'))
+    if (error instanceof EntryError) throw error
+    throw new Error('The resource operation failed.', { cause: error })
   }
 }
 
-function isJsonRpcError(error: unknown): error is JsonRpcError {
-  return typeof error === 'object' && error !== null && 'code' in error && 'message' in error
+const slugSchema = z.string().min(1)
+const dataSchema = z.record(z.string(), z.unknown())
+
+export async function createMcpServer(tokenId: string, identity: McpIdentity) {
+  const server = new McpServer(
+    { name: 'plank-cms', title: 'Plank CMS', version: await getCurrentVersion() },
+    {
+      instructions:
+        'Discover content types and field formats before writing. Create drafts or edit working content only. Publishing, scheduling, deleting and media management require the Plank admin. Read an entry before editing it. Rich text is a JSON-stringified TipTap document.',
+    },
+  )
+  async function authorize(permission?: string) {
+    const current = await resolveMcpIdentity(tokenId)
+    if (!current) throw new EntryError(403, 'The MCP token or its owner is no longer available')
+    if (permission && !hasMcpPermission(current, permission)) throw new EntryError(403, 'Forbidden')
+    return current
+  }
+  const contents = (uri: string, payload: unknown) => ({
+    contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(payload) }],
+  })
+  server.registerResource(
+    'locales',
+    LOCALES_URI,
+    { title: 'Locales', mimeType: 'application/json' },
+    async (uri) =>
+      resourceOperation(async () => {
+        await authorize()
+        return contents(uri.href, await getLocalesPayload())
+      }),
+  )
+  if (hasMcpPermission(identity, 'content-types:read')) {
+    server.registerResource(
+      'content-types',
+      CONTENT_TYPES_URI,
+      { title: 'Content Types', mimeType: 'application/json' },
+      async (uri) =>
+        resourceOperation(async () => {
+          await authorize('content-types:read')
+          return contents(uri.href, { contentTypes: await getContentTypeSummaries() })
+        }),
+    )
+    server.registerResource(
+      'content-type-schema',
+      new ResourceTemplate('plank://content-types/{slug}/schema', {
+        list: async () =>
+          resourceOperation(async () => {
+            await authorize('content-types:read')
+            return {
+              resources: (await getContentTypeSummaries()).map((ct) => ({
+                name: `content-type-schema-${ct.slug}`,
+                title: `${ct.name} schema`,
+                uri: ct.schemaUri,
+                mimeType: 'application/json',
+              })),
+            }
+          }),
+      }),
+      { title: 'Content type schema', mimeType: 'application/json' },
+      async (uri, variables) =>
+        resourceOperation(async () => {
+          await authorize('content-types:read')
+          const ct = await findContentTypeBySlug(String(variables.slug))
+          if (!ct) throw new EntryError(404, 'Content type not found')
+          return contents(uri.href, ct)
+        }),
+    )
+  }
+  function register<T extends z.ZodRawShape>(
+    name: string,
+    description: string,
+    inputSchema: T,
+    permission: string | undefined,
+    readOnly: boolean,
+    run: (input: z.infer<z.ZodObject<T>>, current: McpIdentity) => Promise<Record<string, unknown>>,
+  ) {
+    if (permission && !hasMcpPermission(identity, permission)) return
+    server.registerTool(
+      name,
+      {
+        description,
+        inputSchema: z.object(inputSchema).strict(),
+        annotations: {
+          readOnlyHint: readOnly,
+          destructiveHint: !readOnly,
+          idempotentHint: readOnly,
+          openWorldHint: false,
+        },
+      },
+      async (input) => {
+        try {
+          return toolResult(await run(input, await authorize(permission)))
+        } catch (error) {
+          return mcpError(error)
+        }
+      },
+    )
+  }
+  register(
+    'list_content_types',
+    'List available content types and their schema resource URIs.',
+    {},
+    'content-types:read',
+    true,
+    async () => ({ contentTypes: await getContentTypeSummaries() }),
+  )
+  register(
+    'get_content_type_schema',
+    'Read field definitions. Rich text is a JSON-stringified TipTap document. Relations use entry IDs; media uses existing references. localized contains locale-keyed field objects and optional _meta.enabled/_meta.primary.',
+    { slug: slugSchema },
+    'content-types:read',
+    true,
+    async ({ slug }) => {
+      const ct = await findContentTypeBySlug(slug)
+      if (!ct) throw new EntryError(404, 'Content type not found')
+      return { contentType: ct }
+    },
+  )
+  register(
+    'get_locales',
+    'Read enabled locales and the default locale.',
+    {},
+    undefined,
+    true,
+    getLocalesPayload,
+  )
+  register(
+    'list_entries',
+    'Search working entries, including drafts, with pagination. Text search defaults to all textual fields.',
+    {
+      slug: slugSchema,
+      page: z.number().int().min(1).default(1),
+      limit: z.number().int().min(1).max(100).default(20),
+      search: z.string().optional(),
+      searchFields: z.array(z.string()).optional(),
+      status: z.enum(['draft', 'published', 'scheduled', 'pending', 'in_review']).optional(),
+      sort: z.string().optional(),
+      order: z.enum(['asc', 'desc']).optional(),
+    },
+    'entries:read',
+    true,
+    async ({ slug, searchFields, ...query }) => {
+      const ct = await findContentTypeBySlug(slug)
+      if (!ct) throw new EntryError(404, 'Content type not found')
+      const fields =
+        searchFields ??
+        ct.fields
+          .filter((field) => ['string', 'uid', 'text', 'richtext'].includes(field.type))
+          .map((field) => field.name)
+      return listEntryData({
+        slug,
+        id: '',
+        data: {},
+        query: { ...query, searchFields: fields.join(',') },
+      })
+    },
+  )
+  register(
+    'get_entry',
+    'Read the working content of an entry by content type slug and entry ID.',
+    { slug: slugSchema, id: z.string().min(1) },
+    'entries:read',
+    true,
+    async ({ slug, id }) => ({ entry: await getEntryData({ slug, id, data: {}, query: {} }) }),
+  )
+  for (const create of [true, false]) {
+    register(
+      create ? 'create_entry' : 'update_entry',
+      create
+        ? 'Create a draft. Single types must not already exist. Only schema fields and localized are accepted.'
+        : 'Patch working content without publishing. Omitted fields are preserved, arrays replaced, localized fields merged. Scheduled entries and unsafe public relationships must be edited in the admin.',
+      { slug: slugSchema, ...(create ? {} : { id: z.string().min(1) }), data: dataSchema },
+      'entries:write',
+      false,
+      async (input, current) => {
+        const context: EntryContext = {
+          slug: input.slug,
+          id: 'id' in input ? String(input.id) : '',
+          data: input.data,
+          query: {},
+          user: { id: current.id, roleId: current.roleId },
+          editorial: (await resolveAppModes()).editorial,
+        }
+        return { entry: await writeMcpEntry(context, create) }
+      },
+    )
+  }
+  return server
 }
 
 export async function handleMcpRequest(req: Request, res: Response): Promise<void> {
-  const payload = req.body as unknown
-
-  if (Array.isArray(payload)) {
-    if (payload.length === 0) {
-      res.status(400).json(buildError(null, buildJsonRpcError(-32600, 'Batch requests cannot be empty')))
-      return
-    }
-
-    const responses = (
-      await Promise.all(
-        payload.map(async (message) => {
-          if (!isJsonRpcRequest(message)) {
-            return buildError(null, buildJsonRpcError(-32600, 'Invalid request'))
-          }
-
-          return await handleRequest(message)
-        }),
-      )
-    ).filter((response): response is JsonRpcResponse => response !== null)
-
-    if (responses.length === 0) {
-      res.status(202).end()
-      return
-    }
-
-    res.json(responses)
+  if (req.method !== 'POST') {
+    res.set('Allow', 'POST').status(405).end()
     return
   }
-
-  if (!isJsonRpcRequest(payload)) {
-    res.status(400).json(buildError(null, buildJsonRpcError(-32600, 'Invalid request')))
+  const tokenId = req.apiToken!.id
+  const identity = await resolveMcpIdentity(tokenId)
+  if (!identity) {
+    res.status(401).json({ error: 'MCP token owner is unavailable or disabled' })
     return
   }
-
-  const response = await handleRequest(payload)
-  if (!response) {
-    res.status(202).end()
-    return
-  }
-
-  res.json(response)
-}
-
-export function handleMcpGet(_req: Request, res: Response): void {
-  res.status(200).json({
-    name: 'plank-cms',
-    transport: 'streamable-http',
-    endpoint: '/mcp',
-    protocolVersion: MCP_PROTOCOL_VERSION,
-    capabilities: ['resources'],
+  const server = await createMcpServer(tokenId, identity)
+  const transport = new NodeStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
   })
-}
-
-export function handleMcpDelete(_req: Request, res: Response): void {
-  res.status(405).json({ error: 'Session termination is not supported' })
+  res.once('close', () => {
+    void server.close().catch(() => {})
+  })
+  await server.connect(transport)
+  await transport.handleRequest(req, res, req.body)
 }
