@@ -11,6 +11,7 @@ import type { McpIdentity } from '../services/mcpAuth.js'
 import { EntryError, listEntryData, getEntryData } from '../services/entries.js'
 import type { EntryContext } from '../services/entries.js'
 import { writeMcpEntry, McpEntryError } from '../services/mcpEntries.js'
+import { searchMcpEntries } from '../services/mcpSearch.js'
 
 const CONTENT_TYPES_URI = 'plank://content-types'
 const LOCALES_URI = 'plank://locales'
@@ -244,6 +245,21 @@ export async function createMcpServer(tokenId: string, identity: McpIdentity) {
     undefined,
     true,
     getLocalesPayload,
+  )
+  register(
+    'search_entries',
+    'Search entries across all content types in one request. Returns compact titles, content types, current status, authors and update dates. For the user\'s own entries pass author: "me"; omit author for all accessible entries or pass a user ID. Use status: "draft" for drafts, including previously published entries. Follow hasMore and page to retrieve every result. Use get_entry for full content.',
+    {
+      page: z.number().int().min(1).default(1),
+      limit: z.number().int().min(1).max(100).default(20),
+      search: z.string().optional(),
+      status: z.enum(['draft', 'published', 'scheduled', 'pending', 'in_review']).optional(),
+      author: z.string().min(1).optional(),
+    },
+    'entries:read',
+    true,
+    async ({ author, ...query }, current) =>
+      searchMcpEntries({ ...query, author: author === 'me' ? current.id : author }),
   )
   register(
     'list_entries',

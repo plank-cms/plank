@@ -59,6 +59,7 @@ test('official HTTP client discovers resources and safely creates and edits work
   let relationStatus = 'draft'
   let failRelation = false
   const queries: string[] = []
+  const globalQueries: Array<{ sql: string; values: unknown[] }> = []
   const events: Row[] = []
   const token = 'plank_test'
   const hash = createHash('sha256').update(token).digest('hex')
@@ -158,6 +159,22 @@ test('official HTTP client discovers resources and safely creates and edits work
       }
       return result([row])
     }
+    if (sql.includes(') entries')) {
+      globalQueries.push({ sql, values })
+      if (sql.includes('COUNT(*)')) return result([{ count: '2' }])
+      return result([
+        {
+          id: 'project',
+          title: 'Project draft',
+          content_type: 'projects',
+          content_type_name: 'Projects',
+          status: 'draft',
+          author_id: 'user',
+          author: 'Test User',
+          updated_at: new Date(),
+        },
+      ])
+    }
     if (sql.includes('COUNT(*)')) return result([{ count: String(rows.length) }])
     if (sql.includes('SELECT DISTINCT')) return result([{ status: 'draft' }])
     if (sql.includes('FROM "posts"') || sql.includes('FROM posts')) {
@@ -205,7 +222,7 @@ test('official HTTP client discovers resources and safely creates and edits work
     }),
   )
   assert.equal(client.getServerVersion()?.name, 'plank-cms')
-  assert.equal((await client.listTools()).tools.length, 7)
+  assert.equal((await client.listTools()).tools.length, 8)
   assert.equal((await client.listResources()).resources.length, 3)
   assert.equal(
     (await client.listResourceTemplates()).resourceTemplates[0].uriTemplate,
@@ -255,6 +272,28 @@ test('official HTTP client discovers resources and safely creates and edits work
   assert.equal(listed.total, 1)
   assert.equal(listed.limit, 20)
   assert.equal((listed.data as Row[]).length, 1)
+  types.push({ ...typeRow, slug: 'projects', name: 'Projects', table_name: 'projects' })
+  const global = payload(
+    await client.callTool({
+      name: 'search_entries',
+      arguments: { status: 'draft', author: 'me', search: 'Project', limit: 1, page: 2 },
+    }),
+  )
+  assert.equal(global.total, 2)
+  assert.equal(global.hasMore, false)
+  assert.equal(global.page, 2)
+  assert.equal((global.data as Row[])[0].content_type, 'projects')
+  assert.equal((global.contentTypes as Row[]).length, 2)
+  for (const { sql, values } of globalQueries) {
+    assert.match(sql, /UNION ALL/)
+    assert.match(sql, /FROM "posts" e/)
+    assert.match(sql, /FROM "projects" e/)
+    assert.match(sql, /e.status = \$1/)
+    assert.match(sql, /e.created_by = \$2/)
+    assert.deepEqual(values.slice(0, 3), ['draft', 'user', '%Project%'])
+  }
+  assert.deepEqual(globalQueries[0].values.slice(-2), [1, 1])
+  types.pop()
   assert.ok(queries.includes('COMMIT'))
   await new Promise<void>((resolve) => setImmediate(resolve))
   assert.deepEqual(
@@ -349,6 +388,7 @@ test('official HTTP client discovers resources and safely creates and edits work
     'get_entry',
     'get_locales',
     'list_entries',
+    'search_entries',
   ])
   assert.deepEqual(
     (await client.listResources()).resources.map((resource) => resource.uri),
