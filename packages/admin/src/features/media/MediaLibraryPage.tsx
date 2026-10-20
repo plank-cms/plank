@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   UploadIcon,
@@ -50,6 +51,7 @@ import { FolderCard } from './components/FolderCard.tsx'
 import { MediaCard } from './components/MediaCard.tsx'
 import { MediaPreviewDialog } from './components/MediaPreviewDialog.tsx'
 import { buildDefaultAlt, readFSEntry } from './lib/media.ts'
+import { getFolderTrail, getMediaPath } from './lib/navigation.ts'
 import type { BreadcrumbEntry, Folder, FolderList, MediaItem, MediaList } from './types.ts'
 
 const ROOT_FOLDER_ID = '__root__'
@@ -88,6 +90,27 @@ function isDescendant(folderId: string, ancestorId: string, folders: Folder[]): 
 }
 
 export function MediaLibrary() {
+  const { '*': folderPath = '' } = useParams()
+  const folderIds = folderPath.split('/').filter(Boolean)
+  const currentFolderId = folderIds.at(-1) ?? null
+
+  return (
+    <MediaFolder
+      key={currentFolderId ?? ROOT_FOLDER_ID}
+      currentFolderId={currentFolderId}
+      folderIds={folderIds}
+    />
+  )
+}
+
+function MediaFolder({
+  currentFolderId,
+  folderIds,
+}: {
+  currentFolderId: string | null
+  folderIds: string[]
+}) {
+  const navigate = useNavigate()
   const { timezone } = useSettings()
   const inputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
@@ -95,8 +118,6 @@ export function MediaLibrary() {
   const canWriteMedia = permissions.includes('*') || permissions.includes('media:write')
   const canDeleteMedia = permissions.includes('*') || permissions.includes('media:delete')
 
-  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([{ id: null, name: 'Media' }])
-  const currentFolderId = breadcrumb[breadcrumb.length - 1].id
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -109,12 +130,6 @@ export function MediaLibrary() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  useEffect(() => {
-    setPage(1)
-    setSearchQuery('')
-    setDebouncedSearch('')
-  }, [currentFolderId])
-
   const MEDIA_LIMIT = 48
 
   const {
@@ -122,9 +137,17 @@ export function MediaLibrary() {
     loading: foldersLoading,
     refetch: refetchFolders,
   } = useFetch<FolderList>(`/cms/admin/folders?parent_id=${currentFolderId ?? ''}`)
-  const { data: allFolderData, refetch: refetchAllFolders } = useFetch<FolderList>(
-    '/cms/admin/folders?all=true',
-  )
+  const {
+    data: allFolderData,
+    loading: allFoldersLoading,
+    error: allFoldersError,
+    refetch: refetchAllFolders,
+  } = useFetch<FolderList>('/cms/admin/folders?all=true')
+  const folderTrail = getFolderTrail(currentFolderId, allFolderData?.folders ?? [])
+  const breadcrumb: BreadcrumbEntry[] = [
+    { id: null, name: 'Media' },
+    ...(folderTrail ?? []).map(({ id, name }) => ({ id, name })),
+  ]
   const {
     data: mediaData,
     loading: mediaLoading,
@@ -254,13 +277,7 @@ export function MediaLibrary() {
   // Navigation
 
   function openFolder(folder: Folder) {
-    setBreadcrumb((prev) => [...prev, { id: folder.id, name: folder.name }])
-    setSelected(new Set())
-  }
-
-  function navigateTo(index: number) {
-    setBreadcrumb((prev) => prev.slice(0, index + 1))
-    setSelected(new Set())
+    navigate(getMediaPath([...breadcrumb.map((entry) => entry.id), folder.id]))
   }
 
   // Folder CRUD
@@ -509,8 +526,34 @@ export function MediaLibrary() {
     }
   }
 
-  const loading = foldersLoading || mediaLoading
+  const loading = foldersLoading || mediaLoading || allFoldersLoading
   const empty = folders.length === 0 && items.length === 0
+
+  if (allFoldersError || (allFolderData && !folderTrail)) {
+    return (
+      <div className="flex flex-col items-start gap-4 py-8">
+        <p className="text-sm text-muted-foreground">
+          {allFoldersError ? 'Could not load folders.' : 'Folder not found.'}
+        </p>
+        {allFoldersError ? (
+          <Button variant="outline" onClick={refetchAllFolders}>
+            Retry
+          </Button>
+        ) : (
+          <Button asChild variant="outline">
+            <Link to="/media">Back to Media</Link>
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  if (allFolderData && folderTrail) {
+    const canonicalPath = getMediaPath(folderTrail.map((folder) => folder.id))
+    if (canonicalPath !== getMediaPath(folderIds)) {
+      return <Navigate to={canonicalPath} replace />
+    }
+  }
 
   return (
     <div>
@@ -557,9 +600,9 @@ export function MediaLibrary() {
                       </BreadcrumbPage>
                     ) : (
                       <BreadcrumbLink asChild>
-                        <button onClick={() => navigateTo(i)}>
+                        <Link to={getMediaPath(breadcrumb.slice(0, i + 1).map((entry) => entry.id))}>
                           {i === 0 ? <HomeIcon className="size-3.5" /> : entry.name}
-                        </button>
+                        </Link>
                       </BreadcrumbLink>
                     )}
                   </BreadcrumbItem>

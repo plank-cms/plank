@@ -62,7 +62,7 @@ export const router = createBrowserRouter(
           ],
         },
         {
-          path: 'media',
+          path: 'media/*',
           element: (
             <ProtectedRoute roles={NON_VIEWER_ROLES} redirectTo="/content">
               <MediaLibrary />
