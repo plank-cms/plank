@@ -152,17 +152,15 @@ export function MediaPreviewDialog({
                 </div>
                 <div className="flex items-center justify-between gap-3 pt-2">
                   <div className="flex items-center gap-2">
-                    <a
-                      href={preview.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      download={preview.filename}
-                    >
-                      <Button variant="outline" size="sm" type="button">
+                    <Button asChild variant="outline" size="sm">
+                      <a
+                        href={`/cms/admin/media/${encodeURIComponent(preview.id)}/download`}
+                        download={preview.filename}
+                      >
                         <DownloadIcon className="size-3.5" />
                         Download
-                      </Button>
-                    </a>
+                      </a>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

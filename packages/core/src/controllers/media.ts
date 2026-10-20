@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express'
 import { randomBytes } from 'node:crypto'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import type { ReadableStream } from 'node:stream/web'
 import { pool, createId } from '@plank-cms/db'
 import { getProvider } from '../media/index.js'
 import { getMediaFolderPrefix, moveMediaBundleKey, moveMediaKey } from '../media/paths.js'
@@ -86,6 +89,47 @@ export async function listMedia(req: Request, res: Response): Promise<void> {
 
   const total = rows[0] ? parseInt(rows[0].total) : 0
   res.json({ items, total, page, limit, pages: Math.ceil(total / limit) })
+}
+
+export async function downloadMedia(req: Request, res: Response): Promise<void> {
+  const { rows } = await pool.query<MediaRow>('SELECT * FROM plank_media WHERE id = $1', [
+    req.params.id,
+  ])
+  const media = rows[0]
+
+  if (!media) {
+    res.status(404).json({ error: 'Media not found' })
+    return
+  }
+
+  const provider = await getProvider()
+  const url = await provider.getUrl(media.provider_key)
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  res.once('close', abort)
+
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+
+    if (!response.ok || !response.body) {
+      await response.body?.cancel()
+      res.status(502).json({ error: 'Could not download asset' })
+      return
+    }
+
+    res.attachment(media.filename)
+    res.setHeader('Content-Type', media.mime_type ?? 'application/octet-stream')
+    await pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), res)
+  } catch {
+    if (res.destroyed) return
+    if (res.headersSent) {
+      res.destroy()
+    } else {
+      res.status(502).json({ error: 'Could not download asset' })
+    }
+  } finally {
+    res.off('close', abort)
+  }
 }
 
 export async function uploadMedia(req: Request, res: Response): Promise<void> {

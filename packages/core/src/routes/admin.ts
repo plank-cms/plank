@@ -44,6 +44,7 @@ import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/ap
 import {
   uploadMedia,
   listMedia,
+  downloadMedia,
   deleteMedia,
   getMediaUrl,
   presignMedia,
@@ -141,6 +142,7 @@ router.post('/media/presign', authorize('media:write'), presignMedia)
 router.post('/media/confirm', authorize('media:write'), confirmMedia)
 router.post('/media', authorize('media:write'), upload.array('files', 500), uploadMedia)
 router.get('/media/:id/url', authorize('media:read'), getMediaUrl)
+router.get('/media/:id/download', authorize('media:read'), downloadMedia)
 router.patch('/media/:id', authorize('media:write'), updateMedia)
 router.delete('/media/:id', authorize('media:delete'), deleteMedia)
 
