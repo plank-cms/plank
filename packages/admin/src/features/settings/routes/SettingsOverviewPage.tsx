@@ -24,6 +24,7 @@ import { toast } from 'sonner'
 import pkg from '../../../../package.json'
 import HeaderFixed from '@/shared/components/Header.tsx'
 import { parsePreviewConfig } from '@/shared/lib/preview.ts'
+import { AboutDialog } from '../components/AboutDialog.tsx'
 
 const TIMEZONES = [
   { value: 'UTC', label: 'UTC — Coordinated Universal Time' },
@@ -126,6 +127,9 @@ function GeneralSettings() {
           <div>
             <p className="font-bold">Plank CMS by AM25</p>
             <p className="text-sm text-muted-foreground">Version {pkg.version}</p>
+          </div>
+          <div className="ml-auto">
+            <AboutDialog />
           </div>
         </CardContent>
       </Card>

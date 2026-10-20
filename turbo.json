@@ -12,6 +12,7 @@
     },
     "@plank-cms/admin#build": {
       "dependsOn": ["^build"],
+      "env": ["GITHUB_SHA"],
       "outputs": ["../core/public/admin/**"]
     },
     "@plank-cms/plank#build": {

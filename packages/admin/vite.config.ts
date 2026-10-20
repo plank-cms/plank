@@ -2,9 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
+import { getBuildInfo } from './buildInfo.ts'
 
 export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), react()],
+  define: {
+    __PLANK_BUILD_INFO__: JSON.stringify(getBuildInfo(resolve(import.meta.dirname, '../..'))),
+  },
   base: command === 'build' ? '/admin/' : '/',
   resolve: {
     alias: {
