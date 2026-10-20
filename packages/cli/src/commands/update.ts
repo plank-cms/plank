@@ -11,6 +11,27 @@ import {
 } from '../packageManager.js'
 
 const PACKAGE_NAME = '@plank-cms/plank'
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[\da-z.-]+)?(?:\+[\da-z.-]+)?$/i
+
+async function resolveUpdateVersion(
+  packageManager: PackageManagerName,
+  version: string,
+): Promise<string> {
+  if (version !== 'latest') return version
+
+  const { stdout } = await execa(
+    packageManager,
+    ['view', PACKAGE_NAME, 'dist-tags.latest', '--json'],
+    { cwd: process.cwd() },
+  )
+  const latest: unknown = JSON.parse(stdout)
+
+  if (typeof latest !== 'string' || !VERSION_PATTERN.test(latest)) {
+    throw new Error(`Could not resolve the latest version of ${PACKAGE_NAME}.`)
+  }
+
+  return latest
+}
 
 async function ensurePnpmPackageManager(packageJsonPath: string): Promise<void> {
   const packageJson = await fs.readJSON(packageJsonPath)
@@ -59,23 +80,39 @@ export async function update(version = 'latest'): Promise<void> {
   }
 
   const s = spinner()
-  const target = `${PACKAGE_NAME}@${version}`
   const packageManager = await detectPackageManager(process.cwd())
-  const updateCommand = getUpdateDependencyCommand(packageManager, target)
+  let installedVersion: string
 
-  s.start(`Updating ${PACKAGE_NAME} to ${chalk.cyan(version)}...`)
+  s.start(`Resolving ${PACKAGE_NAME}@${version}...`)
 
   try {
+    const targetVersion = await resolveUpdateVersion(packageManager, version)
+    const target = `${PACKAGE_NAME}@${targetVersion}`
+    const updateCommand = getUpdateDependencyCommand(packageManager, target)
+    s.message(`Updating ${PACKAGE_NAME} to ${chalk.cyan(targetVersion)}...`)
+
     await execa(updateCommand.command, updateCommand.args, {
       cwd: process.cwd(),
       stdio: 'inherit',
     })
+    const installed = (await fs.readJSON(
+      join(process.cwd(), 'node_modules', PACKAGE_NAME, 'package.json'),
+    )) as { version?: string }
+    if (typeof installed.version !== 'string' || !VERSION_PATTERN.test(installed.version)) {
+      throw new Error(`Could not verify the installed version of ${PACKAGE_NAME}.`)
+    }
+    if (VERSION_PATTERN.test(targetVersion) && installed.version !== targetVersion) {
+      throw new Error(
+        `Expected ${PACKAGE_NAME}@${targetVersion}, but ${installed.version} is installed.`,
+      )
+    }
+    installedVersion = installed.version
     await ensurePnpmDeployConfig(packageManager, packageJsonPath)
   } catch (error) {
     s.stop(chalk.red('Update failed'))
     throw error
   }
 
-  s.stop(`Updated ${PACKAGE_NAME}`)
-  outro(`Plank is now installed from ${chalk.cyan(target)}`)
+  s.stop(`Updated ${PACKAGE_NAME} to ${installedVersion}`)
+  outro(`Plank ${chalk.cyan(installedVersion)} is now installed`)
 }
