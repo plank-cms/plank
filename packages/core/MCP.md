@@ -14,37 +14,41 @@ El servidor actúa como el usuario que creó el token. Revisa en cada solicitud 
 
 Los tokens `read-only` y `full-access` no sirven para `/mcp`; los tokens `mcp-server` no sirven para `/api`.
 
-## Conectar ChatGPT con OAuth
+## Administrar MCP OAuth
 
-1. En [Plugins de ChatGPT](https://chatgpt.com/plugins), elegí **Add custom MCP server**, ingresá la URL pública `https://plank.example.com/mcp` y seleccioná **OAuth**.
-2. Usá un cliente OAuth preconfigurado. Elegí un ID para la conexión, generá un secreto con `openssl rand -hex 32` y copiá la URL de retorno exacta que muestra ChatGPT.
-3. Agregá estos valores al entorno de Plank y reiniciá la instancia. Plank aplica la migración al arrancar.
+En el admin, abrí **Settings → API Tokens → MCP OAuth**. Guardá el origen público HTTPS de Plank, por ejemplo `https://plank.example.com`. El panel muestra la URL del servidor MCP con el sufijo `/mcp`.
 
-   ```dotenv
-   PLANK_MCP_OAUTH_ORIGIN=https://plank.example.com
-   PLANK_MCP_OAUTH_CLIENT_ID=plank-chatgpt
-   PLANK_MCP_OAUTH_CLIENT_SECRET=<secreto-generado>
-   PLANK_MCP_OAUTH_REDIRECT_URI=<url-de-retorno-de-chatgpt>
-   ```
+Elegí **New OAuth client** y seleccioná **ChatGPT**, **Claude** o **Custom**. Plank genera un ID y un secreto para cada registro. Copiá el secreto cuando se muestre, porque Plank guarda su hash. Podés editar la URL de retorno o revocar el cliente desde el mismo panel. Ambas acciones revocan las autorizaciones afectadas. Los cambios se aplican al guardarlos.
 
-4. Ingresá el mismo ID y secreto en ChatGPT. Si solicita un scope, usá `mcp`. Cuando ChatGPT abra la pantalla de autorización, iniciá sesión en el admin de esa instancia si hace falta, volvé a la pantalla de autorización y elegí **Authorize**.
+Si la instancia ya usaba las variables `PLANK_MCP_OAUTH_*`, Plank importa el origen y los clientes al iniciar por primera vez con esta versión. Los clientes importados se administran desde el panel.
 
-Plank publica los metadatos en `/.well-known/oauth-protected-resource/mcp` y `/.well-known/oauth-authorization-server`. El endpoint MCP y el admin tienen que estar disponibles en el mismo origen HTTPS.
+### Conectar ChatGPT
 
-ChatGPT solo recibe acceso a las herramientas que permite el rol actual de la cuenta que autorizó la conexión. Los tokens de acceso duran hasta una hora y la conexión se puede renovar durante 30 días. Cerrar sesión en Plank, cambiar la contraseña mediante la recuperación o deshabilitar la cuenta invalida sus tokens OAuth. Los clientes que usan un token de tipo **MCP Server** pueden seguir conectándose por Bearer.
+1. Creá un cliente con el perfil **ChatGPT**. El panel completa la URL de retorno estable `https://chatgpt.com/connector_platform_oauth_redirect`. [Identificación del emisor y URL de retorno en OpenAI](https://developers.openai.com/plugins/build/auth#redirect-url)
+2. En [Plugins de ChatGPT](https://chatgpt.com/plugins), agregá un servidor MCP personalizado con la URL que muestra el panel. Seleccioná **OAuth** y un cliente preconfigurado en **Ajustes avanzados de OAuth**.
+3. Ingresá el ID y el secreto generados en Plank. Si ChatGPT solicita un ámbito, usá `mcp`. Iniciá sesión en tu admin si hace falta y aprobá la conexión.
 
-## Conectar Claude con OAuth
+Si ChatGPT muestra una URL de retorno específica para tu conexión, podés editarla en el cliente existente desde Plank.
 
-1. Agregá un cliente para Claude en el entorno de Plank. Usá el mismo `PLANK_MCP_OAUTH_ORIGIN` y generá un secreto propio para Claude con `openssl rand -hex 32`.
+### Conectar Claude
 
-   ```dotenv
-   PLANK_MCP_OAUTH_CLIENTS='[{"clientId":"plank-claude","clientSecret":"<secreto-de-claude>","redirectUri":"https://claude.ai/api/mcp/auth_callback"}]'
-   ```
+Creá un cliente con el perfil **Claude**. El panel completa `https://claude.ai/api/mcp/auth_callback`. En Claude, agregá un conector personalizado con la URL pública de Plank en el puerto HTTPS estándar (443). Elegí **Use your own OAuth client**, ingresá el ID y secreto generados en Plank y autorizá la conexión. El mismo conector remoto está disponible en Claude web, Claude Desktop y Cowork. [Guía de conectores personalizados de Claude](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
 
-2. Reiniciá Plank. Podés conservar las variables de ChatGPT y sumar las de Claude. Si registrás más clientes en `PLANK_MCP_OAUTH_CLIENTS`, usá un ID único y la URL de retorno HTTPS exacta de cada uno.
-3. En Claude, agregá un conector personalizado con la URL pública de Plank en el puerto HTTPS estándar (443), por ejemplo `https://plank.example.com/mcp`. Elegí **Use your own OAuth client**, ingresá el ID y secreto de Claude y autorizá la conexión con tu cuenta de Plank. [Guía de conectores personalizados de Claude](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+Claude Code y VS Code también pueden usar un token **MCP Server** en el encabezado `Authorization: Bearer <token>`. [Claude Code](https://code.claude.com/docs/en/mcp) · [VS Code](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
 
-El mismo conector remoto funciona en Claude web, Claude Desktop y Cowork. Cada cliente OAuth tiene sus propios códigos y tokens. Claude Code y VS Code también pueden usar un token **MCP Server** en el encabezado `Authorization: Bearer <token>`. [Claude Code](https://code.claude.com/docs/en/mcp) · [VS Code](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
+### Verificar el descubrimiento OAuth
+
+Si un cliente indica que no pudo detectar OAuth, verificá las respuestas públicas de Plank.
+
+```bash
+curl -i https://plank.example.com/.well-known/oauth-protected-resource/mcp
+curl -i https://plank.example.com/.well-known/oauth-authorization-server
+curl -i https://plank.example.com/mcp
+```
+
+Con el origen configurado, las rutas de descubrimiento devuelven `200` con JSON y `/mcp` devuelve `401` con un encabezado `WWW-Authenticate` que incluye `resource_metadata`.
+
+Los clientes OAuth reciben acceso según el rol actual de la cuenta que autorizó la conexión. Los tokens de acceso duran hasta una hora y la conexión se puede renovar durante 30 días. Cerrar sesión en Plank, recuperar la contraseña o deshabilitar la cuenta invalida sus tokens.
 
 ## Herramientas
 

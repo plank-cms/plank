@@ -10,7 +10,6 @@ import publicRouter from './routes/public.js'
 import mcpRouter from './routes/mcp.js'
 import mcpOAuthRouter from './routes/mcpOAuth.js'
 import { errorHandler } from './middlewares/errorHandler.js'
-import { getMcpOAuthConfig } from './lib/mcpOAuth.js'
 
 function assertSecurityEnv(): void {
   const isBundledRuntime = Boolean(process.env.PLANK_ADMIN_DIST)
@@ -25,7 +24,6 @@ function assertSecurityEnv(): void {
 }
 
 assertSecurityEnv()
-getMcpOAuthConfig()
 
 const app: Express = express()
 

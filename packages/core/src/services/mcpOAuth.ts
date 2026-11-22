@@ -7,15 +7,12 @@ import {
   type McpOAuthClient,
 } from '../lib/mcpOAuth.js'
 import type { McpIdentity } from './mcpAuth.js'
+import { hashMcpCredential } from './mcpOAuthClients.js'
 
 const accessLifetime = 3600
 
 function randomToken() {
   return randomBytes(32).toString('base64url')
-}
-
-function hashToken(value: string) {
-  return createHash('sha256').update(value).digest('hex')
 }
 
 export async function createMcpOAuthCode(
@@ -25,15 +22,17 @@ export async function createMcpOAuthCode(
   challenge: string,
 ) {
   const code = randomToken()
-  await pool.query(
+  const { rowCount } = await pool.query(
     `WITH expired AS (
        DELETE FROM plank_mcp_oauth_grants WHERE expires_at <= NOW()
      )
      INSERT INTO plank_mcp_oauth_grants
        (code_hash, code_challenge, client_id, redirect_uri, resource, user_id, session_version, expires_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() + INTERVAL '5 minutes')`,
+     SELECT $1, $2, c.client_id, c.redirect_uri, $5, $6, $7, NOW() + INTERVAL '5 minutes'
+     FROM plank_mcp_oauth_clients c
+     WHERE c.client_id = $3 AND c.redirect_uri = $4`,
     [
-      hashToken(code),
+      hashMcpCredential(code),
       challenge,
       client.clientId,
       client.redirectUri,
@@ -42,7 +41,7 @@ export async function createMcpOAuthCode(
       user.sessionVersion,
     ],
   )
-  return code
+  return rowCount ? code : null
 }
 
 export async function issueMcpOAuthTokens(
@@ -67,15 +66,18 @@ export async function issueMcpOAuthTokens(
        }
      RETURNING FLOOR(EXTRACT(EPOCH FROM (g.access_expires - NOW())))::INTEGER AS expires_in`,
     [
-      hashToken(accessToken),
-      hashToken(refreshToken),
+      hashMcpCredential(accessToken),
+      hashMcpCredential(refreshToken),
       accessLifetime,
       client.clientId,
       resource,
       client.redirectUri,
       ...(isCode
-        ? [hashToken(grant.code), createHash('sha256').update(grant.verifier).digest('base64url')]
-        : [hashToken(grant.refreshToken)]),
+        ? [
+            hashMcpCredential(grant.code),
+            createHash('sha256').update(grant.verifier).digest('base64url'),
+          ]
+        : [hashMcpCredential(grant.refreshToken)]),
     ],
   )
   if (!rows[0]) return null
@@ -89,22 +91,20 @@ export async function issueMcpOAuthTokens(
 }
 
 export async function resolveMcpOAuthIdentity(token: string): Promise<McpIdentity | null> {
-  const config = getMcpOAuthConfig()
+  const config = await getMcpOAuthConfig()
   if (!config) return null
-  const { rows } = await pool.query<McpIdentity & { clientId: string; redirectUri: string }>(
-    `SELECT u.id, u.role_id AS "roleId", r.permissions,
-            g.client_id AS "clientId", g.redirect_uri AS "redirectUri"
+  const { rows } = await pool.query<McpIdentity>(
+    `SELECT u.id, u.role_id AS "roleId", r.permissions
      FROM plank_mcp_oauth_grants g
      JOIN plank_users u ON u.id = g.user_id
      JOIN plank_roles r ON r.id = u.role_id
+     JOIN plank_mcp_oauth_clients c ON c.client_id = g.client_id AND c.redirect_uri = g.redirect_uri
      WHERE g.access_hash = $1 AND g.resource = $2
        AND g.access_expires > NOW() AND g.expires_at > NOW()
        AND u.enabled = TRUE AND u.session_version = g.session_version`,
-    [hashToken(token), config.resource],
+    [hashMcpCredential(token), config.resource],
   )
-  const grant = rows[0]
-  if (!grant || config.clients.get(grant.clientId)?.redirectUri !== grant.redirectUri) return null
-  return { id: grant.id, roleId: grant.roleId, permissions: grant.permissions }
+  return rows[0] ?? null
 }
 
 export async function revokeMcpOAuthGrant(resource: string, client: McpOAuthClient, token: string) {
@@ -112,6 +112,6 @@ export async function revokeMcpOAuthGrant(resource: string, client: McpOAuthClie
     `DELETE FROM plank_mcp_oauth_grants
      WHERE client_id = $1 AND resource = $2 AND redirect_uri = $3
        AND (access_hash = $4 OR refresh_hash = $4)`,
-    [client.clientId, resource, client.redirectUri, hashToken(token)],
+    [client.clientId, resource, client.redirectUri, hashMcpCredential(token)],
   )
 }

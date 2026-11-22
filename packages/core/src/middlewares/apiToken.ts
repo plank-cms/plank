@@ -14,15 +14,16 @@ async function enforceApiToken(
   res: Response,
   next: NextFunction,
   allowedAccessTypes: Set<Express.ApiTokenAccessType>,
-  challenge?: string | null,
+  challenge?: () => Promise<string | null>,
 ): Promise<void> {
-  function unauthorized(error: string) {
-    if (challenge) res.set('WWW-Authenticate', challenge)
+  async function unauthorized(error: string) {
+    const header = await challenge?.()
+    if (header) res.set('WWW-Authenticate', header)
     res.status(401).json({ error })
   }
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) {
-    unauthorized('API token required')
+    await unauthorized('API token required')
     return
   }
 
@@ -35,7 +36,7 @@ async function enforceApiToken(
   )
 
   if (!rows[0]) {
-    unauthorized('Invalid API token')
+    await unauthorized('Invalid API token')
     return
   }
 
@@ -59,7 +60,7 @@ async function enforceApiToken(
     const resolveIdentity = () => resolveMcpIdentity(id)
     const identity = await resolveIdentity()
     if (!identity) {
-      unauthorized('MCP token owner is unavailable or disabled')
+      await unauthorized('MCP token owner is unavailable or disabled')
       return
     }
     req.resolveMcpIdentity = resolveIdentity
@@ -75,13 +76,15 @@ export async function apiToken(req: Request, res: Response, next: NextFunction):
 
 export async function mcpToken(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.get('authorization')
-  const challenge = mcpOAuthChallenge(Boolean(header))
-  if (challenge && header?.slice(0, 7).toLowerCase() === 'bearer ') {
+  const challenge = () => mcpOAuthChallenge(Boolean(header))
+  if (header?.slice(0, 7).toLowerCase() === 'bearer ') {
     const token = header.slice(7)
     if (token.startsWith(mcpOAuthAccessPrefix)) {
       const resolveIdentity = () => resolveMcpOAuthIdentity(token)
       if (!(await resolveIdentity())) {
-        res.set('WWW-Authenticate', challenge).status(401).json({ error: 'Invalid MCP access token' })
+        const authHeader = await challenge()
+        if (authHeader) res.set('WWW-Authenticate', authHeader)
+        res.status(401).json({ error: 'Invalid MCP access token' })
         return
       }
       req.resolveMcpIdentity = resolveIdentity

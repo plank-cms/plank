@@ -6,19 +6,17 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { pool } from '@plank-cms/db'
 import express from 'express'
 import jwt from 'jsonwebtoken'
+import { errorHandler } from '../middlewares/errorHandler.js'
+import adminRouter from './admin.js'
 import mcpRouter from './mcp.js'
 import oauthRouter from './mcpOAuth.js'
 
 const issuer = 'https://plank.example.com'
 const resource = `${issuer}/mcp`
 const redirect = 'https://chatgpt.com/connector_platform_oauth_redirect'
-const clientId = 'plank-chatgpt'
-const clientSecret = 'test-client-secret-with-at-least-32-characters'
-const claude = {
-  clientId: 'plank-claude',
-  clientSecret: 'test-claude-secret-with-at-least-32-characters',
-  redirectUri: 'https://claude.ai/api/mcp/auth_callback',
-}
+const claudeRedirect = 'https://claude.ai/api/mcp/auth_callback'
+type ClientRow = { clientId: string; name: string; redirectUri: string }
+type CreatedClient = ClientRow & { clientSecret: string }
 const jwtSecret = 'test-session-secret-with-at-least-32-characters'
 const user = { sub: 'user', sv: 1, roleId: 'role' }
 
@@ -27,22 +25,12 @@ function hash(value: string) {
 }
 
 test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchanges and revokes tokens', async (t) => {
-  const env = {
-    PLANK_MCP_OAUTH_ORIGIN: issuer,
-    PLANK_MCP_OAUTH_CLIENT_ID: clientId,
-    PLANK_MCP_OAUTH_CLIENT_SECRET: clientSecret,
-    PLANK_MCP_OAUTH_REDIRECT_URI: redirect,
-    PLANK_MCP_OAUTH_CLIENTS: JSON.stringify([claude]),
-    PLANK_JWT_SECRET: jwtSecret,
-  }
-  for (const [key, value] of Object.entries(env)) {
-    const previous = process.env[key]
-    process.env[key] = value
-    t.after(() => {
-      if (previous === undefined) delete process.env[key]
-      else process.env[key] = previous
-    })
-  }
+  const previousSecret = process.env.PLANK_JWT_SECRET
+  process.env.PLANK_JWT_SECRET = jwtSecret
+  t.after(() => {
+    if (previousSecret === undefined) delete process.env.PLANK_JWT_SECRET
+    else process.env.PLANK_JWT_SECRET = previousSecret
+  })
 
   const grants = new Map<
     string,
@@ -54,22 +42,58 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
       refreshHash?: unknown
     }
   >()
-  const callbacks = new Map([
-    [clientId, redirect],
-    [claude.clientId, claude.redirectUri],
-  ])
+  const clients = new Map<string, { client: ClientRow; secretHash: unknown }>()
+  let publicOrigin: unknown
   let permissions: string[] = []
-  const query = async (sql: string, values: unknown[]) => {
+  const adminPermissions = ['settings:api-tokens:read']
+  const query = async (sql: string, values: unknown[] = []) => {
+    if (sql.includes('FROM plank_settings')) {
+      return { rows: values[0] === 'mcp-oauth' && publicOrigin ? [{ value: publicOrigin }] : [] }
+    }
+    if (sql.includes('INSERT INTO plank_settings')) {
+      assert.deepEqual(values.slice(0, 2), ['mcp-oauth', 'origin'])
+      publicOrigin = values[2]
+      return { rows: [] }
+    }
+    if (sql.includes('SELECT permissions FROM plank_roles')) {
+      return { rows: [{ permissions: adminPermissions }] }
+    }
+    if (sql.includes('INSERT INTO plank_mcp_oauth_clients')) {
+      const [id, name, secretHash, redirectUri] = values.map(String)
+      clients.set(id, { client: { clientId: id, name, redirectUri }, secretHash })
+      return { rows: [], rowCount: 1 }
+    }
+    if (sql.startsWith('DELETE FROM plank_mcp_oauth_clients')) {
+      const id = String(values[0])
+      grants.delete(id)
+      return { rows: [], rowCount: clients.delete(id) ? 1 : 0 }
+    }
+    if (sql.includes('UPDATE plank_mcp_oauth_clients')) {
+      const [id, name, redirectUri] = values.map(String)
+      const result = clients.get(id)
+      if (!result) return { rows: [], rowCount: 0 }
+      if (result.client.redirectUri !== redirectUri) grants.delete(id)
+      Object.assign(result.client, { name, redirectUri })
+      return { rows: [{ client_id: id }], rowCount: 1 }
+    }
+    if (sql.startsWith('SELECT') && sql.includes('FROM plank_mcp_oauth_clients')) {
+      if (!sql.includes('WHERE')) return { rows: [...clients.values()].map(({ client }) => client) }
+      const result = clients.get(String(values[0]))
+      return {
+        rows:
+          result && (values.length === 1 || values[1] === result.secretHash) ? [result.client] : [],
+      }
+    }
     if (sql.includes('SELECT session_version, enabled')) {
       assert.deepEqual(values, ['user'])
       return { rows: [{ enabled: true, session_version: 1 }] }
     }
     if (sql.includes('INSERT INTO plank_mcp_oauth_grants')) {
       const [codeHash, challenge, id, redirectUri] = values
-      assert.equal(callbacks.get(String(id)), redirectUri)
+      assert.equal(clients.get(String(id))?.client.redirectUri, redirectUri)
       assert.deepEqual(values.slice(4), [resource, 'user', 1])
       grants.set(String(id), { redirectUri, codeHash, challenge })
-      return { rows: [] }
+      return { rows: [], rowCount: 1 }
     }
     if (sql.includes('UPDATE plank_mcp_oauth_grants')) {
       const [accessHash, refreshHash, , id, audience, redirectUri, proof, verifier] = values
@@ -86,7 +110,11 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
     if (sql.includes('WHERE g.access_hash =')) {
       assert.deepEqual(values.slice(1), [resource])
       const rows = [...grants]
-        .filter(([, grant]) => values[0] === grant.accessHash)
+        .filter(
+          ([id, grant]) =>
+            values[0] === grant.accessHash &&
+            clients.get(id)?.client.redirectUri === grant.redirectUri,
+        )
         .map(([clientId, grant]) => ({
           id: 'user',
           roleId: 'role',
@@ -117,6 +145,8 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
   app.use(express.json())
   app.use(oauthRouter)
   app.use('/mcp', mcpRouter)
+  app.use('/cms/admin', adminRouter)
+  app.use(errorHandler)
   const server = app.listen(0, '127.0.0.1')
   t.after(() => {
     server.closeAllConnections()
@@ -127,9 +157,40 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
   assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
 
+  const metadata = '/.well-known/oauth-protected-resource/mcp'
+  assert.equal((await fetch(base + metadata)).status, 404)
+
+  const admin = (path: string, method = 'GET', body?: object) =>
+    fetch(base + '/cms/admin/mcp-oauth' + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `plank_session=${jwt.sign(user, jwtSecret)}`,
+      },
+      body: body && JSON.stringify(body),
+    })
+  assert.equal((await admin('/origin', 'PUT', { origin: issuer })).status, 403)
+  adminPermissions.push('settings:api-tokens:write', 'settings:api-tokens:delete')
+  assert.equal((await admin('/origin', 'PUT', { origin: issuer + '/mcp' })).status, 400)
+  assert.equal((await admin('/origin', 'PUT', { origin: issuer + '/' })).status, 200)
+  const create = (name: string, redirectUri: string) =>
+    admin('/clients', 'POST', { name, redirectUri })
+  assert.equal((await create('Invalid', 'http://example.com/callback')).status, 400)
+  const primary = await create('ChatGPT', redirect)
+  assert.equal(primary.status, 201)
+  assert.equal(primary.headers.get('cache-control'), 'no-store')
+  const { clientId, clientSecret } = (await primary.json()) as CreatedClient
+  assert.match(clientSecret, /^[a-f0-9]{64}$/)
+  assert.equal(clients.get(clientId)?.secretHash, hash(clientSecret))
+  const claude = (await (await create('Claude', claudeRedirect)).json()) as CreatedClient
+  assert.notEqual(clientId, claude.clientId)
+  const settings = await (await admin('')).json()
+  assert.equal(settings.origin, issuer)
+  assert.equal(settings.clients.length, 2)
+  assert.ok(settings.clients.every((entry: ClientRow) => !('clientSecret' in entry)))
+
   const anonymous = await fetch(base + '/mcp', { method: 'POST' })
   assert.equal(anonymous.status, 401)
-  const metadata = '/.well-known/oauth-protected-resource/mcp'
   assert.equal(
     anonymous.headers.get('www-authenticate'),
     `Bearer resource_metadata="${issuer}${metadata}", scope="mcp"`,
@@ -285,6 +346,16 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
     /invalid_token/,
   )
   assert.equal((await mcp(claudeTokens.access_token)).status, 405)
-  delete process.env.PLANK_MCP_OAUTH_CLIENTS
+  assert.equal(
+    (
+      await admin('/clients/' + claude.clientId, 'PUT', {
+        name: 'Claude',
+        redirectUri: 'https://claude.ai/new-callback',
+      })
+    ).status,
+    204,
+  )
   assert.equal((await mcp(claudeTokens.access_token)).status, 401)
+  assert.equal((await admin('/clients/' + claude.clientId, 'DELETE')).status, 204)
+  assert.equal((await (await admin('')).json()).clients.length, 1)
 })

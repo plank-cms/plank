@@ -337,7 +337,7 @@ export async function handleMcpRequest(req: Request, res: Response): Promise<voi
   const resolveIdentity = req.resolveMcpIdentity!
   const identity = await resolveIdentity()
   if (!identity) {
-    const challenge = mcpOAuthChallenge(true)
+    const challenge = await mcpOAuthChallenge(true)
     if (challenge) res.set('WWW-Authenticate', challenge)
     res.status(401).json({ error: 'MCP token owner is unavailable or disabled' })
     return

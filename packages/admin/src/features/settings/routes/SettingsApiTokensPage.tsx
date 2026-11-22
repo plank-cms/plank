@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/shared/ui/select.tsx'
 import HeaderFixed from '@/shared/components/Header'
+import { McpOAuthSettings } from '../components/McpOAuthSettings.tsx'
 
 type ApiToken = {
   id: string
@@ -226,6 +227,8 @@ export function SettingsApiTokens() {
             </TableBody>
           </Table>
         </div>
+
+        <McpOAuthSettings canWrite={canWrite} canDelete={canDelete} />
 
         {/* Create dialog — two states: form / token revealed */}
         <Dialog

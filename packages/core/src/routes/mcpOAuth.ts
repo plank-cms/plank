@@ -1,13 +1,9 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import Handlebars from 'handlebars'
 import express, { type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
-import {
-  getMcpOAuthConfig,
-  mcpOAuthScope,
-  type McpOAuthClient,
-  type McpOAuthConfig,
-} from '../lib/mcpOAuth.js'
+import { getMcpOAuthConfig, mcpOAuthScope, type McpOAuthConfig } from '../lib/mcpOAuth.js'
 import { authenticate } from '../middlewares/authenticate.js'
+import { findMcpOAuthClient } from '../services/mcpOAuthClients.js'
 import {
   createMcpOAuthCode,
   issueMcpOAuthTokens,
@@ -67,9 +63,9 @@ function redirectToClient(
   res.redirect(303, callback.href)
 }
 
-function readAuthorization(req: Request, res: Response, config: McpOAuthConfig) {
+async function readAuthorization(req: Request, res: Response, config: McpOAuthConfig) {
   const redirect = redirectParams.safeParse(req.query)
-  const client = redirect.success ? config.clients.get(redirect.data.client_id) : undefined
+  const client = redirect.success ? await findMcpOAuthClient(redirect.data.client_id) : undefined
   if (!redirect.success || !client || redirect.data.redirect_uri !== client.redirectUri) {
     oauthError(res, 'invalid_request')
     return null
@@ -88,10 +84,10 @@ function readAuthorization(req: Request, res: Response, config: McpOAuthConfig) 
             : 'invalid_request'
   if (error)
     redirectToClient(res, config.issuer, client.redirectUri, redirect.data.state, { error })
-  return !error && result.success ? result.data : null
+  return !error && result.success ? { params: result.data, client } : null
 }
 
-function verifyClient(req: Request, clients: Map<string, McpOAuthClient>) {
+async function verifyClient(req: Request) {
   const { client_id: bodyId, client_secret: bodySecret } = req.body ?? {}
   const header = req.get('authorization')
   let id = bodyId
@@ -113,18 +109,15 @@ function verifyClient(req: Request, clients: Map<string, McpOAuthClient>) {
 
   if (typeof id !== 'string' || typeof secret !== 'string') return null
   if (bodyId !== undefined && bodyId !== id) return null
-  const client = clients.get(id)
-  if (!client) return null
-  const digest = (value: string) => createHash('sha256').update(value).digest()
-  return timingSafeEqual(digest(secret), digest(client.clientSecret)) ? client : null
+  return findMcpOAuthClient(id, secret)
 }
 
-function clientRequest(req: Request, res: Response, config: McpOAuthConfig) {
+async function clientRequest(req: Request, res: Response) {
   if (!req.is('application/x-www-form-urlencoded')) {
     oauthError(res, 'invalid_request')
     return null
   }
-  const client = verifyClient(req, config.clients)
+  const client = await verifyClient(req)
   if (client) return client
   if (req.get('authorization')) res.set('WWW-Authenticate', 'Basic realm="Plank MCP"')
   oauthError(res, 'invalid_client', req.get('authorization') ? 401 : 400)
@@ -137,11 +130,13 @@ router.use(
     '/.well-known/oauth-authorization-server',
     '/oauth/mcp',
   ],
-  (_req, res, next) => {
-    if (!getMcpOAuthConfig()) {
+  async (_req, res, next) => {
+    const config = await getMcpOAuthConfig()
+    if (!config) {
       res.sendStatus(404)
       return
     }
+    res.locals.mcpOAuthConfig = config
     res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
     next()
   },
@@ -150,7 +145,7 @@ router.use(
 router.get(
   ['/.well-known/oauth-protected-resource/mcp', '/.well-known/oauth-protected-resource'],
   (_req, res) => {
-    const config = getMcpOAuthConfig()!
+    const config = res.locals.mcpOAuthConfig as McpOAuthConfig
     res.json({
       resource: config.resource,
       authorization_servers: [config.issuer],
@@ -161,7 +156,7 @@ router.get(
 )
 
 router.get('/.well-known/oauth-authorization-server', (_req, res) => {
-  const { issuer } = getMcpOAuthConfig()!
+  const { issuer } = res.locals.mcpOAuthConfig as McpOAuthConfig
   const clientAuthMethods = ['client_secret_basic', 'client_secret_post']
   res.json({
     issuer,
@@ -179,10 +174,11 @@ router.get('/.well-known/oauth-authorization-server', (_req, res) => {
   })
 })
 
-router.get(authorizePath, (req, res) => {
-  const config = getMcpOAuthConfig()!
-  const params = readAuthorization(req, res, config)
-  if (!params) return
+router.get(authorizePath, async (req, res) => {
+  const config = res.locals.mcpOAuthConfig as McpOAuthConfig
+  const authorization = await readAuthorization(req, res, config)
+  if (!authorization) return
+  const { params, client } = authorization
   const query = new URLSearchParams(
     Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
   )
@@ -200,6 +196,7 @@ router.get(authorizePath, (req, res) => {
 <title>Authorize Plank MCP</title>
 <main>
   <h1>Authorize access to Plank</h1>
+  <p><strong>${Handlebars.escapeExpression(client.name)}</strong> is requesting access.</p>
   <p>This connection can read content and work on drafts according to your Plank role.</p>
   <p>If you need to sign in or switch accounts, <a href="/admin" target="_blank" rel="noopener noreferrer">open the Plank admin</a>, then return here.</p>
   <form method="post" action="${action}">
@@ -216,13 +213,14 @@ router.post(
   authorizePath,
   form,
   async (req, res, next) => {
-    const config = getMcpOAuthConfig()!
+    const config = res.locals.mcpOAuthConfig as McpOAuthConfig
     if (req.get('origin') !== config.issuer || req.get('authorization')) {
       oauthError(res, 'invalid_request', 403)
       return
     }
-    const params = readAuthorization(req, res, config)
-    if (!params) return
+    const authorization = await readAuthorization(req, res, config)
+    if (!authorization) return
+    const { params } = authorization
     if (req.body?.decision === 'deny') {
       redirectToClient(res, config.issuer, params.redirect_uri, params.state, {
         error: 'access_denied',
@@ -236,27 +234,29 @@ router.post(
     await authenticate(req, res, next)
   },
   async (req, res) => {
-    const config = getMcpOAuthConfig()!
-    const params = authorizeParams.parse(req.query)
+    const config = res.locals.mcpOAuthConfig as McpOAuthConfig
+    const authorization = await readAuthorization(req, res, config)
+    if (!authorization) return
+    const { params, client } = authorization
     const { id, sessionVersion } = req.user!
     if (sessionVersion === undefined) {
       oauthError(res, 'access_denied', 403)
       return
     }
-    const client = config.clients.get(params.client_id)!
     const code = await createMcpOAuthCode(
       config.resource,
       client,
       { id, sessionVersion },
       params.code_challenge,
     )
+    if (!code) return oauthError(res, 'invalid_request')
     redirectToClient(res, config.issuer, client.redirectUri, params.state, { code })
   },
 )
 
 router.post(tokenPath, form, async (req, res) => {
-  const config = getMcpOAuthConfig()!
-  const client = clientRequest(req, res, config)
+  const config = res.locals.mcpOAuthConfig as McpOAuthConfig
+  const client = await clientRequest(req, res)
   if (!client) return
   if (!req.body?.grant_type) return oauthError(res, 'invalid_request')
   if (!['authorization_code', 'refresh_token'].includes(req.body.grant_type)) {
@@ -286,8 +286,8 @@ router.post(tokenPath, form, async (req, res) => {
 })
 
 router.post(revokePath, form, async (req, res) => {
-  const config = getMcpOAuthConfig()!
-  const client = clientRequest(req, res, config)
+  const config = res.locals.mcpOAuthConfig as McpOAuthConfig
+  const client = await clientRequest(req, res)
   if (!client) return
   const token = req.body?.token
   if (typeof token !== 'string' || !token) return oauthError(res, 'invalid_request')
