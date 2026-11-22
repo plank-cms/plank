@@ -114,6 +114,7 @@ export async function createTable(contentType: ContentType): Promise<void> {
     `  scheduled_for  TIMESTAMP,`,
     `  created_by     TEXT REFERENCES plank_users(id) ON DELETE SET NULL,`,
     `  editor_id      TEXT REFERENCES plank_users(id) ON DELETE SET NULL,`,
+    `  _scheduled_reviewer_id TEXT REFERENCES plank_users(id) ON DELETE SET NULL,`,
     `  review_locked_by_editor BOOLEAN NOT NULL DEFAULT FALSE,`,
     `  review_rejected BOOLEAN NOT NULL DEFAULT FALSE,`,
     `  created_at     TIMESTAMP NOT NULL DEFAULT NOW(),`,

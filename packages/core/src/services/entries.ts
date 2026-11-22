@@ -116,6 +116,7 @@ function normalizeNavigationFields(
   fields: import('@plank-cms/schema').FieldDefinition[],
 ): Record<string, unknown> {
   const out = { ...row }
+  delete out._scheduled_reviewer_id
   for (const field of fields) {
     if (field.type !== 'navigation') continue
     out[field.name] = normalizeNavigationItems(out[field.name])
@@ -195,7 +196,7 @@ export async function roleName(
   return rows[0]?.name?.toLowerCase() ?? ''
 }
 
-export async function listEntryData(context: EntryContext) {
+export async function listEntryData(context: EntryContext, dashboardStatus?: 'draft' | 'scheduled') {
   const db = context.db ?? pool
   const ct = await findContentTypeBySlug(context.slug, context.db ?? pool)
   if (!ct) {
@@ -214,10 +215,11 @@ export async function listEntryData(context: EntryContext) {
     'published_at',
     ...ct.fields.filter((field) => field.type !== 'separator').map((field) => field.name),
   ]
-  const sortField = allowedSort.includes(String(context.query.sort ?? ''))
-    ? String(context.query.sort)
-    : 'created_at'
-  const sortDir = context.query.order === 'asc' ? 'ASC' : 'DESC'
+  const requestedSort = String(context.query.sort ?? '')
+  const sortField = dashboardStatus
+    ? dashboardStatus === 'scheduled' ? 'scheduled_for' : 'updated_at'
+    : allowedSort.includes(requestedSort) ? requestedSort : 'created_at'
+  const sortDir = dashboardStatus === 'scheduled' || context.query.order === 'asc' ? 'ASC' : 'DESC'
   assertSafeIdentifier(sortField)
   const quotedSortField = quoteIdentifier(sortField)
 
@@ -242,12 +244,35 @@ export async function listEntryData(context: EntryContext) {
   const statusClauses: string[] = []
 
   const allowedStatuses = ['draft', 'published', 'scheduled', 'pending', 'in_review']
-  const statusFilter = context.query.status ? String(context.query.status) : ''
+  const statusFilter = dashboardStatus ?? String(context.query.status ?? '')
   if (statusFilter && allowedStatuses.includes(statusFilter)) {
     mainParams.push(statusFilter)
     countParams.push(statusFilter)
     mainClauses.push(`e.status = $${mainParams.length}`)
     countClauses.push(`e.status = $${countParams.length}`)
+  }
+
+  if (dashboardStatus) {
+    if (!context.user) throw new EntryError(401, 'Unauthorized')
+    const { id } = context.user
+    const { rows: roles } = dashboardStatus === 'scheduled'
+      ? await db.query<{ name: string }>(
+          'SELECT LOWER(r.name) AS name FROM plank_users u JOIN plank_roles r ON r.id = u.role_id WHERE u.id = $1',
+          [id],
+        )
+      : { rows: [] }
+    const role = roles[0]?.name
+    if (role !== 'super admin') {
+      const includeReviewed = context.editorial && role === 'editor'
+      function scope(params: unknown[]) {
+        const actor = `$${params.push(id)}`
+        const own = `e.created_by = ${actor}`
+        return includeReviewed ? `(${own} OR e._scheduled_reviewer_id = ${actor})` : own
+      }
+      mainClauses.push(scope(mainParams))
+      countClauses.push(scope(countParams))
+      statusClauses.push(scope(statusParams))
+    }
   }
 
   if (search && searchFields.length > 0) {
@@ -285,7 +310,7 @@ export async function listEntryData(context: EntryContext) {
        LEFT JOIN plank_users u ON u.id = e.created_by
        LEFT JOIN plank_users ed ON ed.id = e.editor_id
        ${mainWhereClause}
-       ORDER BY e.${quotedSortField} ${sortDir}
+       ORDER BY e.${quotedSortField} ${sortDir}${dashboardStatus ? ', e.id ASC' : ''}
        LIMIT $1 OFFSET $2`,
       mainParams,
     ),

@@ -2,7 +2,7 @@ import { config } from 'dotenv'
 import { resolve } from 'node:path'
 import pg from 'pg'
 
-const SNAPSHOT_EXCLUDED = ["'id'", "'status'", "'published_data'", "'published_at'", "'scheduled_for'", "'created_at'", "'updated_at'"]
+const SNAPSHOT_EXCLUDED = ["'id'", "'status'", "'published_data'", "'published_at'", "'scheduled_for'", "'_scheduled_reviewer_id'", "'created_at'", "'updated_at'"]
 const snapshotExpr = (table: string) =>
   `(SELECT ${SNAPSHOT_EXCLUDED.reduce((expr, col) => `${expr} - ${col}`, `to_jsonb(t.*)`)} FROM ${table} t WHERE t.id = $1)`
 

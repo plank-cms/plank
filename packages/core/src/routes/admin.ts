@@ -12,6 +12,7 @@ import {
 } from '../controllers/contentTypes.js'
 import {
   listEntries,
+  listDashboardEntries,
   getEntry,
   getSingleEntry,
   createEntry,
@@ -101,6 +102,7 @@ router.delete('/content-types/:slug', authorize('content-types:delete'), deleteC
 
 // Entries
 router.get('/content-types/:slug/entries', authorize('entries:read'), listEntries)
+router.get('/content-types/:slug/dashboard-entries', authorize('entries:read'), listDashboardEntries)
 router.get('/content-types/:slug/single', authorize('entries:read'), getSingleEntry)
 router.post('/content-types/:slug/entries', authorize('entries:write'), createEntry)
 router.get('/entries/:slug/:id', authorize('entries:read'), getEntry)

@@ -16,6 +16,8 @@ import type { ContentType, EntryFieldMap, RecentEntry } from '../types.ts'
 type EntriesTableProps = {
   title: string
   dateLabel: string
+  typeLabel?: string
+  formatEntryDate?: (value: string, timezone: string) => string
   emptyMessage: string
   entries: RecentEntry[]
   loading: boolean
@@ -32,6 +34,8 @@ type EntriesTableProps = {
 export function EntriesTable({
   title,
   dateLabel,
+  typeLabel = 'Collection Type',
+  formatEntryDate = formatDate,
   emptyMessage,
   entries,
   loading,
@@ -67,7 +71,7 @@ export function EntriesTable({
               Entry
             </TableHead>
             <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-              Collection Type
+              {typeLabel}
             </TableHead>
             <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
               Author
@@ -129,7 +133,7 @@ export function EntriesTable({
                 <TableCell className="px-4 py-3 align-middle">
                   {(() => {
                     const dateValue = getDateValue(entry)
-                    return dateValue ? formatDate(dateValue, timezone) : '—'
+                    return dateValue ? formatEntryDate(dateValue, timezone) : '—'
                   })()}
                 </TableCell>
               </TableRow>

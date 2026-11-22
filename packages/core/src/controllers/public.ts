@@ -402,6 +402,7 @@ const SYSTEM_FIELDS = new Set([
   'published_data',
   'published_at',
   'scheduled_for',
+  '_scheduled_reviewer_id',
   'created_by',
   'created_at',
   'updated_at',

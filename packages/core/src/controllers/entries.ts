@@ -4,6 +4,7 @@ import { findContentTypeBySlug, assertSafeIdentifier, quoteIdentifier } from '@p
 import { triggerWebhooks } from './webhooks.js'
 import {
   listEntryData,
+  EntryError,
   getEntryData,
   createEntryData,
   getSingleEntryData,
@@ -31,6 +32,23 @@ export const listEntries: SlugParam = async (req, res) => {
   res.json(await listEntryData(entryContext(req)))
 }
 
+export const listDashboardEntries: SlugParam = async (req, res) => {
+  const { status } = req.query
+  if (status !== 'draft' && status !== 'scheduled') {
+    throw new EntryError(400, 'Dashboard status must be draft or scheduled')
+  }
+  const context = entryContext(req)
+  const requestedPage = Number(req.query.page)
+  context.query = {
+    page: status === 'scheduled' && Number.isSafeInteger(requestedPage) && requestedPage > 0
+      ? requestedPage
+      : 1,
+    limit: status === 'scheduled' ? 100 : 7,
+    displayLocale: req.query.displayLocale,
+  }
+  res.json(await listEntryData(context, status))
+}
+
 export const getEntry: SlugIdParam = async (req, res) => {
   res.json(await getEntryData(entryContext(req)))
 }
@@ -55,6 +73,7 @@ const SNAPSHOT_EXCLUDED = [
   "'published_data'",
   "'published_at'",
   "'scheduled_for'",
+  "'_scheduled_reviewer_id'",
   "'created_at'",
   "'updated_at'",
 ]
@@ -167,12 +186,17 @@ export const patchEntryStatus: SlugIdParam = async (req, res) => {
       UPDATE ${quotedTableName} SET
         status = 'scheduled',
         scheduled_for = $2,
+        _scheduled_reviewer_id = CASE
+          WHEN status = 'scheduled' THEN _scheduled_reviewer_id
+          WHEN status IN ('pending', 'in_review') AND NOT review_rejected AND editor_id = $3 THEN $3
+          ELSE NULL
+        END,
         review_rejected = FALSE,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `
-    values = [req.params.id, scheduled_for]
+    values = [req.params.id, scheduled_for, editorialMode && isEditorRole ? req.user!.id : null]
   } else if (status === 'pending') {
     sql = `
       UPDATE ${quotedTableName} SET

@@ -12,6 +12,7 @@ export type Entry = Record<string, unknown> & {
   id: string
   status: 'draft' | 'scheduled' | 'published' | 'pending' | 'in_review'
   published_at: string | null
+  scheduled_for: string | null
   updated_at: string
   created_by: string | null
   _author_first_name: string | null
