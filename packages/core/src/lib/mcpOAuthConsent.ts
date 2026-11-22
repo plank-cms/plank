@@ -78,14 +78,15 @@ button {
   cursor: pointer;
   transition: background-color 150ms ease, transform 150ms ease;
 }
-button:hover { background: var(--inset); }
+button:not(:disabled):hover { background: var(--inset); }
+button:disabled { cursor: not-allowed; opacity: .5; }
 button:active { transform: scale(.97); }
 button[value="authorize"] {
   border-color: transparent;
   background: var(--primary);
   color: var(--on-primary);
 }
-button[value="authorize"]:hover { background: var(--primary-hover); }
+button[value="authorize"]:not(:disabled):hover { background: var(--primary-hover); }
 a {
   color: var(--text);
   text-underline-offset: .2em;
@@ -107,7 +108,18 @@ button:focus-visible, a:focus-visible {
 
 export const mcpOAuthConsentStyleHash = createHash('sha256').update(styles).digest('base64')
 
-export function renderMcpOAuthConsent(clientName: string, action: string) {
+export function renderMcpOAuthConsent(
+  clientName: string,
+  action: string,
+  account?: { id: string; email: string },
+  canAuthorize = true,
+) {
+  const session = account
+    ? `Signed in as <strong>${Handlebars.escapeExpression(account.email)}</strong>.`
+    : 'Sign in to Plank before authorizing this connection.'
+  const accountField = account
+    ? `<input type="hidden" name="account_id" value="${Handlebars.escapeExpression(account.id)}">`
+    : ''
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -122,11 +134,14 @@ export function renderMcpOAuthConsent(clientName: string, action: string) {
     <h1 id="consent-title">Authorize access to Plank</h1>
     <p><strong>${Handlebars.escapeExpression(clientName)}</strong> is requesting access.</p>
     <p class="access">This connection can read content and work on drafts according to your Plank role.</p>
+    <p>${session}</p>
+    ${account && !canAuthorize ? '<p>This OAuth client is registered to a different Plank account.</p>' : ''}
     <form method="post" action="${Handlebars.escapeExpression(action)}">
+      ${accountField}
       <button type="submit" name="decision" value="deny">Deny</button>
-      <button type="submit" name="decision" value="authorize">Authorize</button>
+      <button type="submit" name="decision" value="authorize"${account && canAuthorize ? '' : ' disabled'}>Authorize</button>
     </form>
-    <p class="sign-in">Need to sign in or switch accounts? <a href="/admin" target="_blank" rel="noopener noreferrer">Open the Plank admin</a>, then return here.</p>
+    <p class="sign-in">Need to sign in or switch accounts? <a href="/admin" target="_blank" rel="noopener noreferrer">Open the Plank admin</a>, then reload this page.</p>
   </main>
 </body>
 </html>`

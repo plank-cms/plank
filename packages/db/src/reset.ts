@@ -9,6 +9,8 @@ async function reset(): Promise<void> {
       plank_settings,
       plank_media,
       plank_api_tokens,
+      plank_mcp_oauth_grants,
+      plank_mcp_oauth_clients,
       plank_content_types,
       plank_users,
       plank_roles

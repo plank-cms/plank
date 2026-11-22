@@ -42,7 +42,12 @@ function cookieValue(raw: string | undefined, key: string): string | null {
   return null
 }
 
-export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  unauthorized: (error: string) => void = (error) => { res.status(401).json({ error }) },
+): Promise<void> {
   const header = req.headers.authorization
   const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null
   const cookieToken = cookieValue(req.headers.cookie, ACCESS_TOKEN_COOKIE)
@@ -50,7 +55,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   const token = bearer ?? cookieToken
 
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized' })
+    unauthorized('Unauthorized')
     return
   }
 
@@ -73,25 +78,25 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (payload.twoFactor || payload.type) throw new Error('Invalid access token')
     const session = await validateSession(payload)
     if (!session.ok) {
-      res.status(401).json({ error: 'Session has been revoked' })
+      unauthorized('Session has been revoked')
       return
     }
     req.user = { id: payload.sub, roleId: payload.roleId, sessionVersion: session.sessionVersion }
     next()
   } catch {
     if (bearer || !refreshToken) {
-      res.status(401).json({ error: 'Invalid or expired token' })
+      unauthorized('Invalid or expired token')
       return
     }
     try {
       const refreshPayload = jwt.verify(refreshToken, process.env.PLANK_JWT_SECRET!) as JwtPayload
       if (refreshPayload.type !== 'refresh') {
-        res.status(401).json({ error: 'Invalid or expired token' })
+        unauthorized('Invalid or expired token')
         return
       }
       const session = await validateSession(refreshPayload)
       if (!session.ok || typeof session.sessionVersion !== 'number') {
-        res.status(401).json({ error: 'Session has been revoked' })
+        unauthorized('Session has been revoked')
         return
       }
 
@@ -109,7 +114,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       next()
       return
     } catch {
-      res.status(401).json({ error: 'Invalid or expired token' })
+      unauthorized('Invalid or expired token')
       return
     }
   }

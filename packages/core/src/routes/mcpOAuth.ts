@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type IRouter } from 'express'
+import { pool } from '@plank-cms/db'
 import { z } from 'zod'
 import { getMcpOAuthConfig, mcpOAuthScope, type McpOAuthConfig } from '../lib/mcpOAuth.js'
 import { mcpOAuthConsentStyleHash, renderMcpOAuthConsent } from '../lib/mcpOAuthConsent.js'
@@ -174,23 +175,40 @@ router.get('/.well-known/oauth-authorization-server', (_req, res) => {
   })
 })
 
-router.get(authorizePath, async (req, res) => {
-  const config = res.locals.mcpOAuthConfig as McpOAuthConfig
-  const authorization = await readAuthorization(req, res, config)
-  if (!authorization) return
-  const { params, client } = authorization
-  const query = new URLSearchParams(
-    Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
-  )
-  const action = `${authorizePath}?${query}`
-  res.set('Referrer-Policy', 'same-origin')
-  res.set('Cross-Origin-Opener-Policy', 'unsafe-none')
-  res.set(
-    'Content-Security-Policy',
-    `default-src 'none'; style-src 'sha256-${mcpOAuthConsentStyleHash}'; form-action 'self' ${new URL(params.redirect_uri).origin}; frame-ancestors 'none'`,
-  )
-  res.type('html').send(renderMcpOAuthConsent(client.name, action))
-})
+router.get(
+  authorizePath,
+  (req, res, next) => {
+    return authenticate(req, res, next, () => next())
+  },
+  async (req, res) => {
+    const config = res.locals.mcpOAuthConfig as McpOAuthConfig
+    const authorization = await readAuthorization(req, res, config)
+    if (!authorization) return
+    const { params, client } = authorization
+    const query = new URLSearchParams(
+      Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    )
+    const action = `${authorizePath}?${query}`
+    res.set('Referrer-Policy', 'same-origin')
+    res.set('Cross-Origin-Opener-Policy', 'unsafe-none')
+    res.set(
+      'Content-Security-Policy',
+      `default-src 'none'; style-src 'sha256-${mcpOAuthConsentStyleHash}'; form-action 'self' ${new URL(params.redirect_uri).origin}; frame-ancestors 'none'`,
+    )
+    const id = req.user?.id
+    const account = id
+      ? (
+          await pool.query<{ id: string; email: string }>(
+            'SELECT id, email FROM plank_users WHERE id = $1 AND enabled = TRUE',
+            [id],
+          )
+        ).rows[0]
+      : undefined
+    res
+      .type('html')
+      .send(renderMcpOAuthConsent(client.name, action, account, client.ownerId === id))
+  },
+)
 
 const form = express.urlencoded({ extended: false, limit: '8kb' })
 
@@ -224,8 +242,21 @@ router.post(
     if (!authorization) return
     const { params, client } = authorization
     const { id, sessionVersion } = req.user!
+    if (req.body?.account_id !== id) {
+      res
+        .status(403)
+        .type('text')
+        .send('The Plank account changed. Reload the authorization page and try again.')
+      return
+    }
     if (sessionVersion === undefined) {
       oauthError(res, 'access_denied', 403)
+      return
+    }
+    if (client.ownerId !== id) {
+      redirectToClient(res, config.issuer, client.redirectUri, params.state, {
+        error: 'access_denied',
+      })
       return
     }
     const code = await createMcpOAuthCode(

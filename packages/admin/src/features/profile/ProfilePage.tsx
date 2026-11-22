@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { Button } from '@/shared/ui/button.tsx'
 import HeaderFixed from '@/shared/components/Header'
 import { AccountCard } from '@/shared/components/profile/AccountCard.tsx'
 import { SecurityCard } from '@/shared/components/profile/SecurityCard.tsx'
@@ -14,6 +16,9 @@ export function Profile() {
           <div className="space-y-4">
             <AccountCard />
             <SecurityCard />
+            <Button variant="outline" asChild>
+              <Link to="/profile/credentials">Personal credentials</Link>
+            </Button>
           </div>
         </div>
       </section>

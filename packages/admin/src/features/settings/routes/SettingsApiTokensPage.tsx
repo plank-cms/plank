@@ -33,7 +33,9 @@ import {
   SelectValue,
 } from '@/shared/ui/select.tsx'
 import HeaderFixed from '@/shared/components/Header'
+import { McpOAuthOriginSettings } from '../components/McpOAuthOriginSettings.tsx'
 import { McpOAuthSettings } from '../components/McpOAuthSettings.tsx'
+import { PersonalMcpConnections } from '../components/PersonalMcpConnections.tsx'
 
 type ApiToken = {
   id: string
@@ -75,13 +77,17 @@ function CopyButton({ value }: { value: string }) {
 
 const EMPTY_FORM: CreateForm = { name: '', accessType: '' }
 
-export function SettingsApiTokens() {
+export function SettingsApiTokens({ personal = false }: { personal?: boolean }) {
   const { user } = useAuth()
-  const { data: tokens, loading, refetch } = useFetch<ApiToken[]>('/cms/admin/api-tokens')
+  const endpoint = personal ? '/cms/admin/users/me/api-tokens' : '/cms/admin/api-tokens'
+  const { data: tokens, loading, refetch } = useFetch<ApiToken[]>(endpoint)
   const { request, loading: submitting, error: apiError } = useApi<CreatedToken>()
   const permissions = user?.permissions ?? []
-  const canWrite = permissions.includes('*') || permissions.includes('settings:api-tokens:write')
-  const canDelete = permissions.includes('*') || permissions.includes('settings:api-tokens:delete')
+  const hasPermission = (permission: string) =>
+    permissions.includes('*') || permissions.includes(permission)
+  const canReadEntries = hasPermission('entries:read')
+  const canWrite = personal || hasPermission('settings:api-tokens:write')
+  const canDelete = personal || hasPermission('settings:api-tokens:delete')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)
@@ -134,7 +140,7 @@ export function SettingsApiTokens() {
   async function handleCreate(e: React.SyntheticEvent) {
     e.preventDefault()
     try {
-      const result = await request('/cms/admin/api-tokens', 'POST', {
+      const result = await request(endpoint, 'POST', {
         name: form.name,
         accessType: form.accessType,
       })
@@ -154,7 +160,7 @@ export function SettingsApiTokens() {
 
   async function handleDelete() {
     try {
-      await request(`/cms/admin/api-tokens/${deleteToken!.id}`, 'DELETE')
+      await request(`${endpoint}/${deleteToken!.id}`, 'DELETE')
       setDeleteToken(null)
       refetch()
       toast.success('Token revoked')
@@ -168,9 +174,13 @@ export function SettingsApiTokens() {
       <HeaderFixed>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold -mt-2">API Tokens</h1>
+            <h1 className="text-2xl font-bold -mt-2">
+              {personal ? 'Personal Credentials' : 'API Tokens'}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage tokens for consuming the public API and the instance MCP endpoint.
+              {personal
+                ? 'Manage your own API tokens and MCP OAuth connections.'
+                : 'Manage tokens for consuming the public API and the instance MCP endpoint.'}
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} disabled={!canWrite}>
@@ -228,7 +238,14 @@ export function SettingsApiTokens() {
           </Table>
         </div>
 
-        <McpOAuthSettings canWrite={canWrite} canDelete={canDelete} />
+        {personal ? (
+          <>
+            <McpOAuthSettings />
+            <PersonalMcpConnections />
+          </>
+        ) : (
+          <McpOAuthOriginSettings canWrite={canWrite} />
+        )}
 
         {/* Create dialog — two states: form / token revealed */}
         <Dialog
@@ -270,8 +287,10 @@ export function SettingsApiTokens() {
                         <SelectValue placeholder="Select access type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="read-only">Read only</SelectItem>
-                        <SelectItem value="full-access">Full access</SelectItem>
+                        {canReadEntries && <SelectItem value="read-only">Read only</SelectItem>}
+                        {canReadEntries && hasPermission('entries:write') && (
+                          <SelectItem value="full-access">Full access</SelectItem>
+                        )}
                         <SelectItem value="mcp-server">MCP Server</SelectItem>
                       </SelectContent>
                     </Select>

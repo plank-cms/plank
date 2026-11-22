@@ -30,7 +30,7 @@ export async function createMcpOAuthCode(
        (code_hash, code_challenge, client_id, redirect_uri, resource, user_id, session_version, expires_at)
      SELECT $1, $2, c.client_id, c.redirect_uri, $5, $6, $7, NOW() + INTERVAL '5 minutes'
      FROM plank_mcp_oauth_clients c
-     WHERE c.client_id = $3 AND c.redirect_uri = $4`,
+     WHERE c.client_id = $3 AND c.redirect_uri = $4 AND c.owner_id = $6`,
     [
       hashMcpCredential(code),
       challenge,
@@ -58,8 +58,9 @@ export async function issueMcpOAuthTokens(
          access_expires = ${isCode ? "NOW() + $3 * INTERVAL '1 second'" : "LEAST(NOW() + $3 * INTERVAL '1 second', g.expires_at)"},
          code_challenge = NULL,
          expires_at = ${isCode ? "NOW() + INTERVAL '30 days'" : 'g.expires_at'}
-     FROM plank_users u
-     WHERE u.id = g.user_id AND u.enabled = TRUE AND u.session_version = g.session_version
+     FROM plank_users u, plank_mcp_oauth_clients c
+     WHERE c.client_id = g.client_id AND c.owner_id = g.user_id
+       AND c.redirect_uri = g.redirect_uri AND u.id = g.user_id AND u.enabled = TRUE AND u.session_version = g.session_version
        AND g.client_id = $4 AND g.resource = $5 AND g.redirect_uri = $6
        AND g.expires_at > NOW() AND ${
          isCode ? 'g.code_hash = $7 AND g.code_challenge = $8' : 'g.refresh_hash = $7'
@@ -99,6 +100,7 @@ export async function resolveMcpOAuthIdentity(token: string): Promise<McpIdentit
      JOIN plank_users u ON u.id = g.user_id
      JOIN plank_roles r ON r.id = u.role_id
      JOIN plank_mcp_oauth_clients c ON c.client_id = g.client_id AND c.redirect_uri = g.redirect_uri
+       AND c.owner_id = g.user_id
      WHERE g.access_hash = $1 AND g.resource = $2
        AND g.access_expires > NOW() AND g.expires_at > NOW()
        AND u.enabled = TRUE AND u.session_version = g.session_version`,

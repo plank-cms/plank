@@ -17,10 +17,15 @@ const clientSchema = z.object({
   redirectUri: mcpOAuthRedirectUri,
 })
 
-export async function getMcpOAuthSettings(_req: Request, res: Response) {
+export async function getMcpOAuthOrigin(_req: Request, res: Response) {
+  const origin = await getSetting(mcpOAuthNamespace, 'origin')
+  res.set('Cache-Control', 'no-store').json({ origin })
+}
+
+export async function getOwnMcpOAuthSettings(req: Request, res: Response) {
   const [origin, clients] = await Promise.all([
     getSetting(mcpOAuthNamespace, 'origin'),
-    listMcpOAuthClients(),
+    listMcpOAuthClients(req.user!.id),
   ])
   res.set('Cache-Control', 'no-store').json({ origin, clients })
 }
@@ -42,9 +47,9 @@ export async function createMcpOAuthClient(req: Request, res: Response) {
   const clientId = `plank_${randomBytes(16).toString('hex')}`
   const clientSecret = randomBytes(32).toString('hex')
   await pool.query(
-    `INSERT INTO plank_mcp_oauth_clients (client_id, name, client_secret_hash, redirect_uri)
-     VALUES ($1, $2, $3, $4)`,
-    [clientId, name, hashMcpCredential(clientSecret), redirectUri],
+    `INSERT INTO plank_mcp_oauth_clients (client_id, name, client_secret_hash, redirect_uri, owner_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [clientId, name, hashMcpCredential(clientSecret), redirectUri, req.user!.id],
   )
   res
     .set('Cache-Control', 'no-store')
@@ -59,13 +64,13 @@ export async function updateMcpOAuthClient(req: Request, res: Response) {
     `WITH updated AS (
        UPDATE plank_mcp_oauth_clients
        SET name = $2, redirect_uri = $3
-       WHERE client_id = $1 RETURNING client_id
+       WHERE client_id = $1 AND owner_id = $4 RETURNING client_id
      ), revoked AS (
        DELETE FROM plank_mcp_oauth_grants g USING updated
        WHERE g.client_id = updated.client_id AND g.redirect_uri <> $3
      )
      SELECT client_id FROM updated`,
-    [id, name, redirectUri],
+    [id, name, redirectUri, req.user!.id],
   )
   if (!rowCount) {
     res.status(404).json({ error: 'OAuth client not found' })
@@ -76,8 +81,8 @@ export async function updateMcpOAuthClient(req: Request, res: Response) {
 
 export async function deleteMcpOAuthClient(req: Request, res: Response) {
   const { rowCount } = await pool.query(
-    'DELETE FROM plank_mcp_oauth_clients WHERE client_id = $1',
-    [req.params.id],
+    'DELETE FROM plank_mcp_oauth_clients WHERE client_id = $1 AND owner_id = $2',
+    [req.params.id, req.user!.id],
   )
   if (!rowCount) {
     res.status(404).json({ error: 'OAuth client not found' })

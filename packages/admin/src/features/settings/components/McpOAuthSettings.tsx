@@ -34,7 +34,7 @@ import {
   TableRow,
 } from '@/shared/ui/table.tsx'
 
-const endpoint = '/cms/admin/mcp-oauth'
+const endpoint = '/cms/admin/users/me/mcp-oauth'
 const buttonFeedback =
   'enabled:cursor-pointer motion-safe:transition-[background-color,color,scale] motion-safe:enabled:active:scale-95'
 const presets = {
@@ -232,30 +232,11 @@ function ClientDialog({
   )
 }
 
-export function McpOAuthSettings({
-  canWrite,
-  canDelete,
-}: {
-  canWrite: boolean
-  canDelete: boolean
-}) {
+export function McpOAuthSettings() {
   const { data, loading, error, refetch } = useFetch<Settings>(endpoint)
-  const { request: saveOriginRequest, loading: saving } = useApi()
   const { request: revokeRequest, loading: deleting } = useApi()
   const [editor, setEditor] = useState<{ client: Client | null } | null>(null)
   const [revoking, setRevoking] = useState<Client | null>(null)
-
-  async function saveOrigin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const origin = new FormData(event.currentTarget).get('origin')
-    try {
-      await saveOriginRequest(`${endpoint}/origin`, 'PUT', { origin })
-      refetch()
-      toast.success('MCP origin saved')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save MCP origin')
-    }
-  }
 
   async function revoke() {
     if (!revoking) return
@@ -272,9 +253,9 @@ export function McpOAuthSettings({
   return (
     <Card className="mt-6 bg-transparent shadow-none">
       <CardHeader>
-        <CardTitle>MCP OAuth</CardTitle>
+        <CardTitle>My OAuth clients</CardTitle>
         <CardDescription>
-          Manage OAuth connections for ChatGPT, Claude, and other MCP clients.
+          Register OAuth clients that can connect to your Plank account.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -290,75 +271,29 @@ export function McpOAuthSettings({
         )}
         {data && (
           <>
-            <form onSubmit={saveOrigin}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="mcp-oauth-origin">Public HTTPS origin</FieldLabel>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      key={data.origin}
-                      id="mcp-oauth-origin"
-                      name="origin"
-                      type="url"
-                      className="w-full sm:max-w-sm"
-                      defaultValue={
-                        data.origin ??
-                        (window.location.protocol === 'https:' ? window.location.origin : '')
-                      }
-                      disabled={!canWrite || saving}
-                      placeholder="https://plank.example.com"
-                      required
-                    />
-                    {canWrite && (
-                      <Button
-                        type="submit"
-                        variant="outline"
-                        className={buttonFeedback}
-                        disabled={saving}
-                        aria-busy={saving}
-                      >
-                        {saving && <Spinner aria-hidden="true" />}
-                        {saving ? 'Saving…' : 'Save origin'}
-                      </Button>
-                    )}
-                  </div>
-                  <FieldDescription>
-                    {data.origin
-                      ? `MCP server URL: ${data.origin}/mcp`
-                      : 'Save the public origin to enable OAuth discovery.'}
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-            </form>
-            {canWrite && (
-              <Button
-                className={cn(buttonFeedback, 'self-start')}
-                onClick={() => setEditor({ client: null })}
-                disabled={!data.origin}
-              >
-                <PlusIcon aria-hidden="true" />
-                New OAuth client
-              </Button>
-            )}
+            <Button
+              className={cn(buttonFeedback, 'self-start')}
+              onClick={() => setEditor({ client: null })}
+              disabled={!data.origin}
+            >
+              <PlusIcon aria-hidden="true" />
+              New OAuth client
+            </Button>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Client ID</TableHead>
                   <TableHead>Redirect URL</TableHead>
-                  {(canWrite || canDelete) && (
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  )}
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.clients.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={canWrite || canDelete ? 4 : 3}>
-                      No OAuth clients yet.
-                    </TableCell>
+                    <TableCell colSpan={4}>No OAuth clients yet.</TableCell>
                   </TableRow>
                 )}
                 {data.clients.map((client) => (
@@ -366,39 +301,33 @@ export function McpOAuthSettings({
                     <TableCell>{client.name}</TableCell>
                     <TableCell>{client.clientId}</TableCell>
                     <TableCell>{client.redirectUri}</TableCell>
-                    {(canWrite || canDelete) && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {canWrite && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(buttonFeedback, 'size-8 rounded text-muted-foreground')}
-                              onClick={() => setEditor({ client })}
-                              aria-label={`Edit ${client.name}`}
-                              title={`Edit ${client.name}`}
-                            >
-                              <PencilIcon aria-hidden="true" className="size-3.5" />
-                            </Button>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(buttonFeedback, 'size-8 rounded text-muted-foreground')}
+                          onClick={() => setEditor({ client })}
+                          aria-label={`Edit ${client.name}`}
+                          title={`Edit ${client.name}`}
+                        >
+                          <PencilIcon aria-hidden="true" className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            buttonFeedback,
+                            'size-8 rounded text-destructive hover:bg-destructive/10 hover:text-destructive',
                           )}
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                buttonFeedback,
-                                'size-8 rounded text-destructive hover:bg-destructive/10 hover:text-destructive',
-                              )}
-                              onClick={() => setRevoking(client)}
-                              aria-label={`Revoke ${client.name}`}
-                              title={`Revoke ${client.name}`}
-                            >
-                              <Trash2Icon aria-hidden="true" className="size-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
+                          onClick={() => setRevoking(client)}
+                          aria-label={`Revoke ${client.name}`}
+                          title={`Revoke ${client.name}`}
+                        >
+                          <Trash2Icon aria-hidden="true" className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -169,6 +169,7 @@ export const router = createBrowserRouter(
           ],
         },
         { path: 'profile', element: <Profile /> },
+        { path: 'profile/credentials', element: <SettingsApiTokens personal /> },
       ],
     },
     { path: '*', element: <Navigate to="/" replace /> },

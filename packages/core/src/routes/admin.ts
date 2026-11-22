@@ -40,9 +40,13 @@ import {
 } from '../controllers/users.js'
 import { getUserPref, setUserPref } from '../controllers/userPrefs.js'
 import { listRoles, updateRole, resetRoles } from '../controllers/roles.js'
-import { listApiTokens, createApiToken, deleteApiToken } from '../controllers/apiTokens.js'
 import {
-  getMcpOAuthSettings,
+  listApiTokens, listOwnApiTokens, createApiToken, deleteApiToken, deleteOwnApiToken,
+} from '../controllers/apiTokens.js'
+import { listOwnMcpOAuthConnections, revokeOwnMcpOAuthConnection } from '../controllers/mcpOAuthConnections.js'
+import {
+  getMcpOAuthOrigin,
+  getOwnMcpOAuthSettings,
   updateMcpOAuthOrigin,
   createMcpOAuthClient,
   updateMcpOAuthClient,
@@ -106,6 +110,15 @@ router.delete('/entries/:slug/:id', authorize('entries:delete'), deleteEntry)
 
 // Current user profile
 router.get('/users/me', getMe)
+router.get('/users/me/api-tokens', listOwnApiTokens)
+router.post('/users/me/api-tokens', createApiToken)
+router.delete('/users/me/api-tokens/:id', deleteOwnApiToken)
+router.get('/users/me/mcp-oauth', getOwnMcpOAuthSettings)
+router.post('/users/me/mcp-oauth/clients', createMcpOAuthClient)
+router.put('/users/me/mcp-oauth/clients/:id', updateMcpOAuthClient)
+router.delete('/users/me/mcp-oauth/clients/:id', deleteMcpOAuthClient)
+router.get('/users/me/mcp-connections', listOwnMcpOAuthConnections)
+router.delete('/users/me/mcp-connections/:id', revokeOwnMcpOAuthConnection)
 router.patch('/users/me', updateMe)
 router.patch('/users/me/password', changePassword)
 router.post('/users/me/avatar', upload.single('file'), uploadAvatar)
@@ -136,11 +149,8 @@ router.delete('/users/:id', authorize('settings:users:delete'), deleteUser)
 router.get('/api-tokens', authorize('settings:api-tokens:read'), listApiTokens)
 router.post('/api-tokens', authorize('settings:api-tokens:write'), createApiToken)
 router.delete('/api-tokens/:id', authorize('settings:api-tokens:delete'), deleteApiToken)
-router.get('/mcp-oauth', authorize('settings:api-tokens:read'), getMcpOAuthSettings)
+router.get('/mcp-oauth', authorize('settings:api-tokens:read'), getMcpOAuthOrigin)
 router.put('/mcp-oauth/origin', authorize('settings:api-tokens:write'), updateMcpOAuthOrigin)
-router.post('/mcp-oauth/clients', authorize('settings:api-tokens:write'), createMcpOAuthClient)
-router.put('/mcp-oauth/clients/:id', authorize('settings:api-tokens:write'), updateMcpOAuthClient)
-router.delete('/mcp-oauth/clients/:id', authorize('settings:api-tokens:delete'), deleteMcpOAuthClient)
 
 // Folders
 router.get('/folders', authorize('media:read'), listFolders)

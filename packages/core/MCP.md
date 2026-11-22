@@ -2,9 +2,17 @@
 
 Plank expone un servidor MCP remoto en `/mcp` para descubrir esquemas, consultar entradas y preparar borradores. Usa Streamable HTTP sin sesiones, con respuestas JSON y el SDK oficial MCP v2.
 
+## Conectar tu cuenta de Plank
+
+En **Profile → Personal credentials** podés crear y revocar tus tokens, registrar tus propios clientes OAuth y revocar las conexiones que autorizaste. La instancia debe tener un origen HTTPS configurado para OAuth en **Settings → API Tokens**.
+
+Para conectar un agente por OAuth, registrá un cliente personal desde esa misma pantalla. Iniciá el flujo en el agente y verificá la cuenta que aparece antes de autorizar. Los borradores se atribuyen a la cuenta de Plank que aprobó la conexión. Si el agente ya está conectado con otro usuario, desconectalo y volvé a autorizarlo con tu cuenta.
+
+Los permisos se comprueban con el rol actual de la cuenta. Esto también aplica a las credenciales que ya existían. Las operaciones MCP mantienen las reglas de autoría y del flujo editorial.
+
 ## Conectar KIZUNA Assistant
 
-1. En el admin, abrí **Settings → API Tokens** y creá un token de tipo **MCP Server**.
+1. En el admin, abrí **Profile → Personal credentials** y creá un token de tipo **MCP Server**.
 2. Copiá el token cuando se muestre: Plank almacena su hash y no permite recuperarlo después.
 3. En KIZUNA Assistant, agregá un servidor MCP remoto con URL `https://your-instance.com/mcp` y autenticación Bearer.
 4. Configurá el token como secreto del cliente. Plank espera `Authorization: Bearer <token>`.
@@ -14,13 +22,15 @@ El servidor actúa como el usuario que creó el token. Revisa en cada solicitud 
 
 Los tokens `read-only` y `full-access` no sirven para `/mcp`; los tokens `mcp-server` no sirven para `/api`.
 
+En la API pública, **Read only** permite lectura y **Full access** permite las operaciones que la API exponga y que el rol autorice. Ambos requieren `entries:read` para consultar contenido publicado. Para crear un token **Full access**, se requiere además `entries:write`. La API pública actualmente solo expone operaciones de lectura.
+
 ## Administrar MCP OAuth
 
 En el admin, abrí **Settings → API Tokens → MCP OAuth**. Guardá el origen público HTTPS de Plank, por ejemplo `https://plank.example.com`. El panel muestra la URL del servidor MCP con el sufijo `/mcp`.
 
-Elegí **New OAuth client** y seleccioná **ChatGPT**, **Claude** o **Custom**. Plank genera un ID y un secreto para cada registro. Copiá el secreto cuando se muestre, porque Plank guarda su hash. Podés editar la URL de retorno o revocar el cliente desde el mismo panel. Ambas acciones revocan las autorizaciones afectadas. Los cambios se aplican al guardarlos.
+En **Profile → Personal credentials**, elegí **New OAuth client** y seleccioná **ChatGPT**, **Claude** o **Custom**. Cada cliente solo puede autorizarse con la cuenta que lo registró. Plank genera un ID y un secreto para cada registro. Copiá el secreto cuando se muestre, porque Plank guarda su hash. Podés editar la URL de retorno o revocar el cliente desde el mismo panel. Ambas acciones revocan las autorizaciones afectadas. Los cambios se aplican al guardarlos.
 
-Si la instancia ya usaba las variables `PLANK_MCP_OAUTH_*`, Plank importa el origen y los clientes al iniciar por primera vez con esta versión. Los clientes importados se administran desde el panel.
+Al actualizar, el origen HTTPS se conserva. Si solo estaba en `PLANK_MCP_OAUTH_ORIGIN`, Plank lo importa al arrancar. Los clientes OAuth compartidos de versiones anteriores dejan de autorizar conexiones y sus tokens pierden acceso. Para reconectar, creá un cliente personal y actualizá las credenciales de tu agente.
 
 ### Conectar ChatGPT
 

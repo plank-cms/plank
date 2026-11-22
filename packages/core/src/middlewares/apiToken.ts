@@ -50,6 +50,29 @@ async function enforceApiToken(
     return
   }
 
+  if (rows[0].access_type !== 'mcp-server') {
+    const { rows: owners } = await pool.query<{ id: string; roleId: string; permissions: string[] }>(
+      `SELECT u.id, u.role_id AS "roleId", r.permissions
+       FROM plank_api_tokens t
+       JOIN plank_users u ON u.id = t.created_by
+       JOIN plank_roles r ON r.id = u.role_id
+       WHERE t.id = $1 AND u.enabled = TRUE`,
+      [rows[0].id],
+    )
+    const owner = owners[0]
+    if (!owner) {
+      await unauthorized('API token owner is unavailable or disabled')
+      return
+    }
+    const permissions = owner.permissions
+    const required = READ_ONLY_METHODS.has(req.method) ? 'entries:read' : 'entries:write'
+    if (!permissions.includes('*') && !permissions.includes(required)) {
+      res.status(403).json({ error: 'The token owner does not have permission for this operation' })
+      return
+    }
+    req.user = { id: owner.id, roleId: owner.roleId }
+  }
+
   req.apiToken = {
     id: rows[0].id,
     accessType: rows[0].access_type,

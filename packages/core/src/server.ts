@@ -2,14 +2,14 @@ import { migrate } from '@plank-cms/db'
 import { syncAllTables } from '@plank-cms/schema'
 import app from './app.js'
 import { syncInstalledAddons } from './lib/addons.js'
-import { importLegacyMcpOAuthConfig } from './services/mcpOAuthClients.js'
+import { importLegacyMcpOAuthOrigin } from './services/mcpOAuthClients.js'
 
 export async function start(): Promise<void> {
   const PORT = process.env.PLANK_PORT ?? 5500
   const isDev = !process.env.PLANK_ADMIN_DIST
 
   await migrate()
-  await importLegacyMcpOAuthConfig()
+  await importLegacyMcpOAuthOrigin()
   await syncAllTables()
   await syncInstalledAddons()
 
