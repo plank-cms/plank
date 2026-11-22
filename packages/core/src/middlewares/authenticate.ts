@@ -7,6 +7,7 @@ interface JwtPayload {
   roleId: string
   sv?: number
   type?: string
+  twoFactor?: boolean
 }
 
 const ACCESS_TOKEN_COOKIE = 'plank_session'
@@ -69,12 +70,13 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   try {
     const payload = jwt.verify(token, process.env.PLANK_JWT_SECRET!) as unknown as JwtPayload
+    if (payload.twoFactor || payload.type) throw new Error('Invalid access token')
     const session = await validateSession(payload)
     if (!session.ok) {
       res.status(401).json({ error: 'Session has been revoked' })
       return
     }
-    req.user = { id: payload.sub, roleId: payload.roleId }
+    req.user = { id: payload.sub, roleId: payload.roleId, sessionVersion: session.sessionVersion }
     next()
   } catch {
     if (bearer || !refreshToken) {
@@ -99,7 +101,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
         sv: session.sessionVersion,
       })
       setSessionCookie(res, renewed)
-      req.user = { id: refreshPayload.sub, roleId: refreshPayload.roleId }
+      req.user = {
+        id: refreshPayload.sub,
+        roleId: refreshPayload.roleId,
+        sessionVersion: session.sessionVersion,
+      }
       next()
       return
     } catch {

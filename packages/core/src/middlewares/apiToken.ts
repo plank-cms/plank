@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from 'express'
 import { createHash } from 'node:crypto'
 import { pool } from '@plank-cms/db'
 import { resolveMcpIdentity } from '../services/mcpAuth.js'
+import { resolveMcpOAuthIdentity } from '../services/mcpOAuth.js'
+import { mcpOAuthAccessPrefix, mcpOAuthChallenge } from '../lib/mcpOAuth.js'
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const PUBLIC_API_ACCESS_TYPES = new Set<Express.ApiTokenAccessType>(['read-only', 'full-access'])
@@ -12,10 +14,15 @@ async function enforceApiToken(
   res: Response,
   next: NextFunction,
   allowedAccessTypes: Set<Express.ApiTokenAccessType>,
+  challenge?: string | null,
 ): Promise<void> {
+  function unauthorized(error: string) {
+    if (challenge) res.set('WWW-Authenticate', challenge)
+    res.status(401).json({ error })
+  }
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'API token required' })
+    unauthorized('API token required')
     return
   }
 
@@ -28,7 +35,7 @@ async function enforceApiToken(
   )
 
   if (!rows[0]) {
-    res.status(401).json({ error: 'Invalid API token' })
+    unauthorized('Invalid API token')
     return
   }
 
@@ -48,11 +55,14 @@ async function enforceApiToken(
   }
 
   if (rows[0].access_type === 'mcp-server') {
-    const identity = await resolveMcpIdentity(rows[0].id)
+    const { id } = rows[0]
+    const resolveIdentity = () => resolveMcpIdentity(id)
+    const identity = await resolveIdentity()
     if (!identity) {
-      res.status(401).json({ error: 'MCP token owner is unavailable or disabled' })
+      unauthorized('MCP token owner is unavailable or disabled')
       return
     }
+    req.resolveMcpIdentity = resolveIdentity
     req.user = { id: identity.id, roleId: identity.roleId }
   }
 
@@ -64,5 +74,20 @@ export async function apiToken(req: Request, res: Response, next: NextFunction):
 }
 
 export async function mcpToken(req: Request, res: Response, next: NextFunction): Promise<void> {
-  await enforceApiToken(req, res, next, MCP_ACCESS_TYPES)
+  const header = req.get('authorization')
+  const challenge = mcpOAuthChallenge(Boolean(header))
+  if (challenge && header?.slice(0, 7).toLowerCase() === 'bearer ') {
+    const token = header.slice(7)
+    if (token.startsWith(mcpOAuthAccessPrefix)) {
+      const resolveIdentity = () => resolveMcpOAuthIdentity(token)
+      if (!(await resolveIdentity())) {
+        res.set('WWW-Authenticate', challenge).status(401).json({ error: 'Invalid MCP access token' })
+        return
+      }
+      req.resolveMcpIdentity = resolveIdentity
+      next()
+      return
+    }
+  }
+  await enforceApiToken(req, res, next, MCP_ACCESS_TYPES, challenge)
 }

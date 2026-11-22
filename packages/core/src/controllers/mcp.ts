@@ -6,8 +6,9 @@ import { findAllContentTypes, findContentTypeBySlug, ValidationError } from '@pl
 import { getSettings } from '../lib/settings.js'
 import { getCurrentVersion } from '../lib/version.js'
 import { resolveAppModes } from '../lib/appModes.js'
-import { resolveMcpIdentity, hasMcpPermission } from '../services/mcpAuth.js'
+import { hasMcpPermission } from '../services/mcpAuth.js'
 import type { McpIdentity } from '../services/mcpAuth.js'
+import { mcpOAuthChallenge } from '../lib/mcpOAuth.js'
 import { EntryError, listEntryData, getEntryData } from '../services/entries.js'
 import type { EntryContext } from '../services/entries.js'
 import { writeMcpEntry, McpEntryError } from '../services/mcpEntries.js'
@@ -124,7 +125,10 @@ async function resourceOperation<T>(operation: () => Promise<T>): Promise<T> {
 const slugSchema = z.string().min(1)
 const dataSchema = z.record(z.string(), z.unknown())
 
-export async function createMcpServer(tokenId: string, identity: McpIdentity) {
+async function createMcpServer(
+  resolveIdentity: () => Promise<McpIdentity | null>,
+  identity: McpIdentity,
+) {
   const server = new McpServer(
     { name: 'plank-cms', title: 'Plank CMS', version: await getCurrentVersion() },
     {
@@ -133,7 +137,7 @@ export async function createMcpServer(tokenId: string, identity: McpIdentity) {
     },
   )
   async function authorize(permission?: string) {
-    const current = await resolveMcpIdentity(tokenId)
+    const current = await resolveIdentity()
     if (!current) throw new EntryError(403, 'The MCP token or its owner is no longer available')
     if (permission && !hasMcpPermission(current, permission)) throw new EntryError(403, 'Forbidden')
     return current
@@ -330,13 +334,15 @@ export async function handleMcpRequest(req: Request, res: Response): Promise<voi
     res.set('Allow', 'POST').status(405).end()
     return
   }
-  const tokenId = req.apiToken!.id
-  const identity = await resolveMcpIdentity(tokenId)
+  const resolveIdentity = req.resolveMcpIdentity!
+  const identity = await resolveIdentity()
   if (!identity) {
+    const challenge = mcpOAuthChallenge(true)
+    if (challenge) res.set('WWW-Authenticate', challenge)
     res.status(401).json({ error: 'MCP token owner is unavailable or disabled' })
     return
   }
-  const server = await createMcpServer(tokenId, identity)
+  const server = await createMcpServer(resolveIdentity, identity)
   const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

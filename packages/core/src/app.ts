@@ -8,7 +8,9 @@ import authRouter from './routes/auth.js'
 import adminRouter from './routes/admin.js'
 import publicRouter from './routes/public.js'
 import mcpRouter from './routes/mcp.js'
+import mcpOAuthRouter from './routes/mcpOAuth.js'
 import { errorHandler } from './middlewares/errorHandler.js'
+import { getMcpOAuthConfig } from './lib/mcpOAuth.js'
 
 function assertSecurityEnv(): void {
   const isBundledRuntime = Boolean(process.env.PLANK_ADMIN_DIST)
@@ -23,6 +25,7 @@ function assertSecurityEnv(): void {
 }
 
 assertSecurityEnv()
+getMcpOAuthConfig()
 
 const app: Express = express()
 
@@ -52,6 +55,7 @@ app.use('/cms/admin', cmsCorOptions, adminRouter)
 // /api/* is public — any origin can consume it (headless CMS)
 app.use('/api', cors(), publicRouter)
 app.use('/mcp', mcpRouter)
+app.use(mcpOAuthRouter)
 
 app.get('/', (_req, res) => {
   if (isDev) {

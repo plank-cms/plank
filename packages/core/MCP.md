@@ -12,7 +12,39 @@ Plank expone un servidor MCP remoto en `/mcp` para descubrir esquemas, consultar
 
 El servidor actúa como el usuario que creó el token. Revisa en cada solicitud si el token existe, si el usuario está habilitado y cuál es su rol actual. Los permisos también se comprueban al ejecutar cada herramienta. Los tokens MCP existentes adquieren estas capacidades según los permisos de sus creadores.
 
-No se requiere OAuth. Los tokens `read-only` y `full-access` no sirven para `/mcp`; los tokens `mcp-server` no sirven para `/api`.
+Los tokens `read-only` y `full-access` no sirven para `/mcp`; los tokens `mcp-server` no sirven para `/api`.
+
+## Conectar ChatGPT con OAuth
+
+1. En [Plugins de ChatGPT](https://chatgpt.com/plugins), elegí **Add custom MCP server**, ingresá la URL pública `https://plank.example.com/mcp` y seleccioná **OAuth**.
+2. Usá un cliente OAuth preconfigurado. Elegí un ID para la conexión, generá un secreto con `openssl rand -hex 32` y copiá la URL de retorno exacta que muestra ChatGPT.
+3. Agregá estos valores al entorno de Plank y reiniciá la instancia. Plank aplica la migración al arrancar.
+
+   ```dotenv
+   PLANK_MCP_OAUTH_ORIGIN=https://plank.example.com
+   PLANK_MCP_OAUTH_CLIENT_ID=plank-chatgpt
+   PLANK_MCP_OAUTH_CLIENT_SECRET=<secreto-generado>
+   PLANK_MCP_OAUTH_REDIRECT_URI=<url-de-retorno-de-chatgpt>
+   ```
+
+4. Ingresá el mismo ID y secreto en ChatGPT. Si solicita un scope, usá `mcp`. Cuando ChatGPT abra la pantalla de autorización, iniciá sesión en el admin de esa instancia si hace falta, volvé a la pantalla de autorización y elegí **Authorize**.
+
+Plank publica los metadatos en `/.well-known/oauth-protected-resource/mcp` y `/.well-known/oauth-authorization-server`. El endpoint MCP y el admin tienen que estar disponibles en el mismo origen HTTPS.
+
+ChatGPT solo recibe acceso a las herramientas que permite el rol actual de la cuenta que autorizó la conexión. Los tokens de acceso duran hasta una hora y la conexión se puede renovar durante 30 días. Cerrar sesión en Plank, cambiar la contraseña mediante la recuperación o deshabilitar la cuenta invalida sus tokens OAuth. Los clientes que usan un token de tipo **MCP Server** pueden seguir conectándose por Bearer.
+
+## Conectar Claude con OAuth
+
+1. Agregá un cliente para Claude en el entorno de Plank. Usá el mismo `PLANK_MCP_OAUTH_ORIGIN` y generá un secreto propio para Claude con `openssl rand -hex 32`.
+
+   ```dotenv
+   PLANK_MCP_OAUTH_CLIENTS='[{"clientId":"plank-claude","clientSecret":"<secreto-de-claude>","redirectUri":"https://claude.ai/api/mcp/auth_callback"}]'
+   ```
+
+2. Reiniciá Plank. Podés conservar las variables de ChatGPT y sumar las de Claude. Si registrás más clientes en `PLANK_MCP_OAUTH_CLIENTS`, usá un ID único y la URL de retorno HTTPS exacta de cada uno.
+3. En Claude, agregá un conector personalizado con la URL pública de Plank en el puerto HTTPS estándar (443), por ejemplo `https://plank.example.com/mcp`. Elegí **Use your own OAuth client**, ingresá el ID y secreto de Claude y autorizá la conexión con tu cuenta de Plank. [Guía de conectores personalizados de Claude](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+
+El mismo conector remoto funciona en Claude web, Claude Desktop y Cowork. Cada cliente OAuth tiene sus propios códigos y tokens. Claude Code y VS Code también pueden usar un token **MCP Server** en el encabezado `Authorization: Bearer <token>`. [Claude Code](https://code.claude.com/docs/en/mcp) · [VS Code](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
 
 ## Herramientas
 
