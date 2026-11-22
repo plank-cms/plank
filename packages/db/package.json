@@ -1,6 +1,6 @@
 {
   "name": "@plank-cms/db",
-  "version": "0.38.1",
+  "version": "0.39.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
