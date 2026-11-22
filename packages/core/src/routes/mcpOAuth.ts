@@ -1,7 +1,7 @@
-import Handlebars from 'handlebars'
 import express, { type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
 import { getMcpOAuthConfig, mcpOAuthScope, type McpOAuthConfig } from '../lib/mcpOAuth.js'
+import { mcpOAuthConsentStyleHash, renderMcpOAuthConsent } from '../lib/mcpOAuthConsent.js'
 import { authenticate } from '../middlewares/authenticate.js'
 import { findMcpOAuthClient } from '../services/mcpOAuthClients.js'
 import {
@@ -182,29 +182,14 @@ router.get(authorizePath, async (req, res) => {
   const query = new URLSearchParams(
     Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
   )
-  const action = `${authorizePath}?${query.toString().replaceAll('&', '&amp;')}`
+  const action = `${authorizePath}?${query}`
   res.set('Referrer-Policy', 'same-origin')
   res.set('Cross-Origin-Opener-Policy', 'unsafe-none')
   res.set(
     'Content-Security-Policy',
-    `default-src 'none'; form-action 'self' ${new URL(params.redirect_uri).origin}; frame-ancestors 'none'`,
+    `default-src 'none'; style-src 'sha256-${mcpOAuthConsentStyleHash}'; form-action 'self' ${new URL(params.redirect_uri).origin}; frame-ancestors 'none'`,
   )
-  res.type('html').send(`<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Authorize Plank MCP</title>
-<main>
-  <h1>Authorize access to Plank</h1>
-  <p><strong>${Handlebars.escapeExpression(client.name)}</strong> is requesting access.</p>
-  <p>This connection can read content and work on drafts according to your Plank role.</p>
-  <p>If you need to sign in or switch accounts, <a href="/admin" target="_blank" rel="noopener noreferrer">open the Plank admin</a>, then return here.</p>
-  <form method="post" action="${action}">
-    <button name="decision" value="authorize">Authorize</button>
-    <button name="decision" value="deny">Deny</button>
-  </form>
-</main>
-</html>`)
+  res.type('html').send(renderMcpOAuthConsent(client.name, action))
 })
 
 const form = express.urlencoded({ extended: false, limit: '8kb' })

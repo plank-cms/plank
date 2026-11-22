@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { CopyIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useApi } from '@/shared/hooks/useApi.ts'
 import { useFetch } from '@/shared/hooks/useFetch.ts'
@@ -14,6 +15,7 @@ import {
 } from '@/shared/ui/dialog.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field.tsx'
 import { Input } from '@/shared/ui/input.tsx'
+import { cn } from '@/shared/lib/utils'
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/ui/select.tsx'
+import { Spinner } from '@/shared/ui/spinner.tsx'
 import {
   Table,
   TableBody,
@@ -32,6 +35,8 @@ import {
 } from '@/shared/ui/table.tsx'
 
 const endpoint = '/cms/admin/mcp-oauth'
+const buttonFeedback =
+  'enabled:cursor-pointer motion-safe:transition-[background-color,color,scale] motion-safe:enabled:active:scale-95'
 const presets = {
   ChatGPT: 'https://chatgpt.com/connector_platform_oauth_redirect',
   Claude: 'https://claude.ai/api/mcp/auth_callback',
@@ -60,10 +65,13 @@ function Credential({ id, label, value }: { id: string; label: string; value: st
         <Button
           type="button"
           variant="outline"
+          size="icon"
+          className={cn(buttonFeedback, 'shrink-0')}
           onClick={copy}
           aria-label={`Copy ${label.toLowerCase()}`}
+          title={`Copy ${label.toLowerCase()}`}
         >
-          Copy
+          <CopyIcon aria-hidden="true" />
         </Button>
       </div>
     </Field>
@@ -139,7 +147,9 @@ function ClientDialog({
               />
             </FieldGroup>
             <DialogFooter>
-              <Button onClick={close}>Done</Button>
+              <Button className={buttonFeedback} onClick={close}>
+                Done
+              </Button>
             </DialogFooter>
           </>
         ) : (
@@ -190,8 +200,29 @@ function ClientDialog({
               </Field>
             </FieldGroup>
             <DialogFooter>
-              <Button type="submit" disabled={loading}>
-                {client ? 'Save client' : 'Create client'}
+              <Button
+                type="button"
+                variant="outline"
+                className={buttonFeedback}
+                disabled={loading}
+                onClick={close}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className={buttonFeedback}
+                disabled={loading}
+                aria-busy={loading}
+              >
+                {loading && <Spinner aria-hidden="true" />}
+                {loading
+                  ? client
+                    ? 'Saving…'
+                    : 'Creating…'
+                  : client
+                    ? 'Save client'
+                    : 'Create client'}
               </Button>
             </DialogFooter>
           </form>
@@ -209,7 +240,8 @@ export function McpOAuthSettings({
   canDelete: boolean
 }) {
   const { data, loading, error, refetch } = useFetch<Settings>(endpoint)
-  const { request, loading: saving } = useApi()
+  const { request: saveOriginRequest, loading: saving } = useApi()
+  const { request: revokeRequest, loading: deleting } = useApi()
   const [editor, setEditor] = useState<{ client: Client | null } | null>(null)
   const [revoking, setRevoking] = useState<Client | null>(null)
 
@@ -217,7 +249,7 @@ export function McpOAuthSettings({
     event.preventDefault()
     const origin = new FormData(event.currentTarget).get('origin')
     try {
-      await request(`${endpoint}/origin`, 'PUT', { origin })
+      await saveOriginRequest(`${endpoint}/origin`, 'PUT', { origin })
       refetch()
       toast.success('MCP origin saved')
     } catch (error) {
@@ -228,7 +260,7 @@ export function McpOAuthSettings({
   async function revoke() {
     if (!revoking) return
     try {
-      await request(`${endpoint}/clients/${encodeURIComponent(revoking.clientId)}`, 'DELETE')
+      await revokeRequest(`${endpoint}/clients/${encodeURIComponent(revoking.clientId)}`, 'DELETE')
       setRevoking(null)
       refetch()
       toast.success('OAuth client revoked')
@@ -238,7 +270,7 @@ export function McpOAuthSettings({
   }
 
   return (
-    <Card className="mt-6">
+    <Card className="mt-6 bg-transparent shadow-none">
       <CardHeader>
         <CardTitle>MCP OAuth</CardTitle>
         <CardDescription>
@@ -278,8 +310,15 @@ export function McpOAuthSettings({
                       required
                     />
                     {canWrite && (
-                      <Button type="submit" variant="outline" disabled={saving}>
-                        Save origin
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        className={buttonFeedback}
+                        disabled={saving}
+                        aria-busy={saving}
+                      >
+                        {saving && <Spinner aria-hidden="true" />}
+                        {saving ? 'Saving…' : 'Save origin'}
                       </Button>
                     )}
                   </div>
@@ -293,10 +332,11 @@ export function McpOAuthSettings({
             </form>
             {canWrite && (
               <Button
-                className="self-start"
+                className={cn(buttonFeedback, 'self-start')}
                 onClick={() => setEditor({ client: null })}
                 disabled={!data.origin}
               >
+                <PlusIcon aria-hidden="true" />
                 New OAuth client
               </Button>
             )}
@@ -306,7 +346,11 @@ export function McpOAuthSettings({
                   <TableHead>Name</TableHead>
                   <TableHead>Client ID</TableHead>
                   <TableHead>Redirect URL</TableHead>
-                  {(canWrite || canDelete) && <TableHead>Actions</TableHead>}
+                  {(canWrite || canDelete) && (
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -324,23 +368,32 @@ export function McpOAuthSettings({
                     <TableCell>{client.redirectUri}</TableCell>
                     {(canWrite || canDelete) && (
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
                           {canWrite && (
                             <Button
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(buttonFeedback, 'size-8 rounded text-muted-foreground')}
                               onClick={() => setEditor({ client })}
+                              aria-label={`Edit ${client.name}`}
+                              title={`Edit ${client.name}`}
                             >
-                              Edit
+                              <PencilIcon aria-hidden="true" className="size-3.5" />
                             </Button>
                           )}
                           {canDelete && (
                             <Button
-                              variant="destructive"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                buttonFeedback,
+                                'size-8 rounded text-destructive hover:bg-destructive/10 hover:text-destructive',
+                              )}
                               onClick={() => setRevoking(client)}
+                              aria-label={`Revoke ${client.name}`}
+                              title={`Revoke ${client.name}`}
                             >
-                              Revoke
+                              <Trash2Icon aria-hidden="true" className="size-3.5" />
                             </Button>
                           )}
                         </div>
@@ -358,10 +411,10 @@ export function McpOAuthSettings({
         <Dialog
           open={Boolean(revoking)}
           onOpenChange={(open) => {
-            if (!open && !saving) setRevoking(null)
+            if (!open && !deleting) setRevoking(null)
           }}
         >
-          <DialogContent>
+          <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Revoke OAuth client</DialogTitle>
               <DialogDescription>
@@ -369,11 +422,23 @@ export function McpOAuthSettings({
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setRevoking(null)} disabled={saving}>
+              <Button
+                variant="outline"
+                className={buttonFeedback}
+                onClick={() => setRevoking(null)}
+                disabled={deleting}
+              >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={revoke} disabled={saving}>
-                Revoke client
+              <Button
+                variant="destructive"
+                className={buttonFeedback}
+                onClick={revoke}
+                disabled={deleting}
+                aria-busy={deleting}
+              >
+                {deleting && <Spinner aria-hidden="true" />}
+                {deleting ? 'Revoking…' : 'Revoke client'}
               </Button>
             </DialogFooter>
           </DialogContent>

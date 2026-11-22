@@ -226,12 +226,20 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
     })
 
   const page = await fetch(authorize)
-  assert.match(await page.text(), /Authorize access to Plank/)
-  assert.equal(page.headers.get('referrer-policy'), 'same-origin')
-  assert.match(
-    page.headers.get('content-security-policy') ?? '',
-    /form-action 'self' https:\/\/chatgpt\.com/,
+  const html = await page.text()
+  assert.match(html, /Authorize access to Plank/)
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1]
+  const action = /<form method="post" action="([^"]+)">/.exec(html)?.[1]
+  assert.ok(style)
+  assert.ok(action)
+  const policy = page.headers.get('content-security-policy') ?? ''
+  assert.ok(
+    policy.includes(`style-src 'sha256-${createHash('sha256').update(style).digest('base64')}'`),
   )
+  const consentUrl = new URL(action.replaceAll('&amp;', '&').replaceAll('&#x3D;', '='), base)
+  assert.equal(consentUrl.searchParams.get('state'), 'client-state')
+  assert.equal(page.headers.get('referrer-policy'), 'same-origin')
+  assert.match(policy, /form-action 'self' https:\/\/chatgpt\.com/)
   const wrongRedirect = new URL(authorize)
   wrongRedirect.searchParams.set('redirect_uri', claude.redirectUri)
   assert.equal((await fetch(wrongRedirect, { redirect: 'manual' })).status, 400)
@@ -239,7 +247,7 @@ test('OAuth discovers Plank MCP, requires a completed login and PKCE, and exchan
   assert.equal((await consent({ ...user, twoFactor: true, jti: 'challenge' })).status, 401)
   assert.equal(grants.size, 0)
 
-  const approval = await consent(user)
+  const approval = await consent(user, issuer, consentUrl.href)
   assert.equal(approval.status, 303)
   const callback = new URL(approval.headers.get('location')!)
   const code = callback.searchParams.get('code')
